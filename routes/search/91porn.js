@@ -17,7 +17,7 @@ const cacheKey = "gdianData";
 let updateTime = new Date().toISOString();
 
 // 永久导航页（需翻墙）
-const Host = "https://8fu9a82.91pn136.cc/";
+const Host = "https://91porny.com";
 
 // 数据处理
 const getData = (data) => {
