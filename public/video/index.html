@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频搜索</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- DPlayer -->
+    <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
+    <!-- hls.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#6366f1',
+                        accent: '#f59e0b'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+
+            .glass-effect {
+                @apply backdrop-blur-md bg-white/80 border border-white/20;
+            }
+            
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
+            }
+            
+            .btn-primary {
+                @apply bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+            }
+            
+            .btn-secondary {
+                @apply bg-secondary hover:bg-secondary/90 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+            }
+            
+            .btn-accent {
+                @apply bg-accent hover:bg-accent/90 text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+            }
+            
+            .input-primary {
+                @apply bg-white/80 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary;
+            }
+            
+            .blurred-bg {
+                @apply filter blur-md pointer-events-none;
+            }
+            
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 transition-colors duration-300">
+    <!-- 导航头 -->
+    <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-effect shadow-lg">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center justify-between">
+                <!-- 左侧：应用标题 -->
+                <div class="flex items-center space-x-2">
+                    <i class="fa fa-play-circle text-primary text-2xl"></i>
+                    <h1 class="text-xl font-bold text-primary">视频搜索</h1>
+                </div>
+                
+                <!-- 中间：搜索框 -->
+                <div class="hidden md:flex items-center bg-white rounded-lg shadow-md max-w-xl w-full mx-4">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        placeholder="搜索视频..." 
+                        class="flex-1 border-none outline-none bg-transparent px-4 py-2"
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button 
+                        id="searchButton" 
+                        onclick="searchData()"
+                        class="btn-primary rounded-l-none"
+                    >
+                        <i class="fa fa-search mr-1"></i> 搜索
+                    </button>
+                </div>
+                
+                <!-- 右侧：功能按钮 -->
+                <div class="flex items-center space-x-3">
+                    <button 
+                        id="hostButton" 
+                        onclick="toggleHostModal()"
+                        class="btn-secondary text-sm"
+                        title="设置Host"
+                    >
+                        <i class="fa fa-cog mr-1"></i> 设置
+                    </button>
+                    
+                    <button 
+                        id="historyButton" 
+                        onclick="toggleHistory()"
+                        class="btn-accent text-sm"
+                        title="播放历史"
+                    >
+                        <i class="fa fa-history mr-1"></i> 历史
+                    </button>
+                    
+
+                </div>
+            </div>
+            
+            <!-- 移动端搜索框 -->
+            <div class="md:hidden mt-3 flex items-center bg-white rounded-lg shadow-md">
+                <input 
+                    type="text" 
+                    id="searchInputMobile" 
+                    placeholder="搜索视频..." 
+                    class="flex-1 border-none outline-none bg-transparent px-4 py-2"
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button 
+                    id="searchButtonMobile" 
+                    onclick="searchData()"
+                    class="btn-primary rounded-l-none"
+                >
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 pt-28 pb-20">
+        <!-- 视频列表 -->
+        <div id="videoList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <!-- 视频卡片将在这里动态生成 -->
+        </div>
+        
+        <!-- 加载更多按钮 -->
+        <div class="flex justify-center mt-8">
+            <button 
+                id="loadMoreButton" 
+                onclick="loadMoreData()"
+                class="btn-primary flex items-center space-x-2 hidden"
+            >
+                <span>加载更多</span>
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+        
+        <!-- 空状态 -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-16 text-center">
+            <i class="fa fa-search text-6xl text-gray-400 mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-700 mb-2">暂无搜索结果</h3>
+            <p class="text-gray-600">请尝试其他搜索关键词</p>
+        </div>
+    </main>
+
+    <!-- 播放历史面板 -->
+    <div 
+        id="historyPanel" 
+        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+    >
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">播放历史</h3>
+            <button onclick="toggleHistory()" class="p-2 hover:bg-gray-200 rounded-full">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        
+        <div id="historyContent" class="flex-1 overflow-y-auto scrollbar-hide p-4">
+            <!-- 历史记录将在这里动态生成 -->
+        </div>
+        
+        <div class="p-4 border-t border-gray-200">
+            <button onclick="clearHistory()" class="w-full btn-secondary">
+                <i class="fa fa-trash mr-1"></i> 清空历史
+            </button>
+        </div>
+    </div>
+
+    <!-- 背景遮罩 -->
+    <div 
+        id="overlay" 
+        class="fixed inset-0 bg-black/50 z-30 hidden"
+        onclick="closeAllPanels()"
+    ></div>
+
+    <!-- 悬浮控制按钮 -->
+    <div 
+        id="floatingButtons" 
+        class="fixed bottom-6 right-6 glass-effect rounded-lg shadow-lg p-2 hidden"
+    >
+        <button 
+            onclick="scrollToTop()" 
+            class="p-3 rounded-full hover:bg-gray-200 transition-colors"
+            title="回到顶部"
+        >
+            <i class="fa fa-arrow-up"></i>
+        </button>
+    </div>
+
+    <!-- 视频播放器模态框 -->
+    <div 
+        id="videoPlayerModal" 
+        class="fixed inset-0 z-50 hidden flex items-center justify-center p-4"
+    >
+        <div class="relative w-full max-w-4xl h-[70vh] bg-black rounded-lg overflow-hidden">
+            <!-- 移动设备专用关闭按钮 -->
+            <button 
+                id="closeVideoButtonMobile" 
+                onclick="closeVideoPlayer()"
+                class="md:hidden fixed top-4 right-4 bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center z-50 shadow-lg"
+            >
+                <i class="fa fa-times text-xl"></i>
+            </button>
+            
+            <!-- 桌面端关闭按钮 -->
+            <button 
+                id="closeVideoButton" 
+                onclick="closeVideoPlayer()"
+                class="hidden md:flex absolute top-4 right-4 bg-red-600 hover:bg-red-700 text-white rounded-full w-10 h-10 items-center justify-center z-10"
+            >
+                <i class="fa fa-times"></i>
+            </button>
+            
+            <div id="dplayer" class="w-full h-full"></div>
+        </div>
+    </div>
+
+    <!-- Host设置模态框 -->
+    <div 
+        id="hostModal" 
+        class="fixed inset-0 z-50 hidden items-center justify-center p-4"
+    >
+        <div class="relative w-full max-w-md glass-effect rounded-lg shadow-2xl p-6">
+            <button 
+                onclick="toggleHostModal()"
+                class="absolute top-4 right-4 hover:bg-gray-200 rounded-full p-1"
+            >
+                <i class="fa fa-times"></i>
+            </button>
+            
+            <h3 class="text-xl font-semibold mb-4 text-center">设置API Host</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-1">当前Host</label>
+                    <input 
+                        type="text" 
+                        id="hostInput" 
+                        class="input-primary w-full"
+                        placeholder="请输入API Host地址"
+                    >
+                </div>
+                
+                <div class="flex space-x-3 pt-4">
+                    <button onclick="saveHost()" class="btn-primary flex-1">
+                        <i class="fa fa-save mr-1"></i> 保存
+                    </button>
+                    <button onclick="resetHost()" class="btn-secondary flex-1">
+                        <i class="fa fa-refresh mr-1"></i> 重置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div 
+        id="loadingIndicator" 
+        class="fixed inset-0 z-50 hidden items-center justify-center bg-black/30"
+    >
+        <div class="glass-effect rounded-lg p-6 flex flex-col items-center space-y-3">
+            <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p id="loadingText" class="text-gray-700">加载中...</p>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentPage = 1;
+        let searchTerm = '';
+        let host = '';
+        let dplayer = null;
+        let isLoading = false;
+        
+        // DOM元素
+        const videoList = document.getElementById('videoList');
+        const loadMoreButton = document.getElementById('loadMoreButton');
+        const emptyState = document.getElementById('emptyState');
+        const historyPanel = document.getElementById('historyPanel');
+        const historyContent = document.getElementById('historyContent');
+        const overlay = document.getElementById('overlay');
+        const floatingButtons = document.getElementById('floatingButtons');
+        const videoPlayerModal = document.getElementById('videoPlayerModal');
+        const hostModal = document.getElementById('hostModal');
+        const hostInput = document.getElementById('hostInput');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingText = document.getElementById('loadingText');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 加载保存的Host
+            host = localStorage.getItem('apiHost') || '';
+            
+
+            
+            // 加载初始数据
+            loadInitialData();
+            
+            // 监听滚动事件
+            window.addEventListener('scroll', handleScroll);
+        });
+        
+        // 加载初始数据
+        function loadInitialData() {
+            if (!host) {
+                // 如果没有设置Host，显示设置提示
+                showHostModal();
+                return;
+            }
+            
+            showLoading('正在加载推荐视频...');
+            fetchData('', 1).finally(() => {
+                hideLoading();
+            });
+        }
+        
+        // 获取代理URL
+        function getProxyUrl(endpoint, params = {}) {
+            const baseUrl = window.location.origin + '/proxy';
+            const url = new URL(endpoint, baseUrl);
+            
+            // 添加查询参数
+            Object.keys(params).forEach(key => {
+                if (params[key] !== undefined && params[key] !== null) {
+                    url.searchParams.append(key, params[key]);
+                }
+            });
+            
+            return url.toString();
+        }
+        
+        // 获取数据
+        async function fetchData(keyword, page) {
+            try {
+                const params = {
+                    wd: keyword,
+                    pg: page,
+                    url: host
+                };
+                
+                const response = await fetch(getProxyUrl('', params));
+                const data = await response.json();
+                
+                if (!data.list || data.list.length === 0) {
+                    if (page === 1) {
+                        showEmptyState();
+                    }
+                    hideLoadMoreButton();
+                    return [];
+                }
+                
+                // 渲染数据
+                if (page === 1) {
+                    videoList.innerHTML = '';
+                }
+                
+                renderVideos(data.list);
+                
+                // 更新分页状态
+                currentPage = page;
+                searchTerm = keyword;
+                
+                // 显示/隐藏加载更多按钮
+                if (data.list.length < 20) {
+                    hideLoadMoreButton();
+                } else {
+                    showLoadMoreButton();
+                }
+                
+                return data.list;
+            } catch (error) {
+                console.error('获取数据失败:', error);
+                if (page === 1) {
+                    showErrorState('获取数据失败，请检查网络连接或Host设置');
+                }
+                return [];
+            }
+        }
+        
+        // 渲染视频卡片
+        function renderVideos(videos) {
+            videos.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover';
+                card.innerHTML = `
+                    <div class="relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
+                        <img 
+                            src="/spankbang/loading.gif" 
+                            data-src="${video.vod_pic}" 
+                            alt="${video.vod_name}" 
+                            class="w-full h-full object-cover lazy-image"
+                        >
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end">
+                            <div class="p-3 w-full">
+                                <h3 class="text-white font-medium line-clamp-2">${video.vod_name}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-semibold mb-2 line-clamp-1">${video.vod_name}</h3>
+                        <div class="flex justify-between items-center">
+                            <button 
+                                onclick="openVideoPlayer('${video.vod_play_url}', '${video.vod_name}')"
+                                class="btn-primary text-sm"
+                            >
+                                <i class="fa fa-play mr-1"></i> 播放
+                            </button>
+                            <button 
+                                onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}')"
+                                class="btn-secondary text-sm"
+                                title="分享视频"
+                            >
+                                <i class="fa fa-share-alt mr-1"></i> 分享
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                videoList.appendChild(card);
+            });
+            
+            // 初始化懒加载
+            initLazyLoading();
+        }
+        
+        // 初始化图片懒加载
+        function initLazyLoading() {
+            const lazyImages = document.querySelectorAll('.lazy-image');
+            
+            if ('IntersectionObserver' in window) {
+                const imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            img.src = img.dataset.src;
+                            img.classList.remove('lazy-image');
+                            imageObserver.unobserve(img);
+                        }
+                    });
+                });
+                
+                lazyImages.forEach(img => {
+                    imageObserver.observe(img);
+                });
+            } else {
+                // 回退方案
+                lazyImages.forEach(img => {
+                    img.src = img.dataset.src;
+                    img.classList.remove('lazy-image');
+                });
+            }
+        }
+        
+        // 搜索功能
+        function searchData() {
+            const input = document.getElementById('searchInput').value.trim() || 
+                         document.getElementById('searchInputMobile').value.trim();
+            
+            if (!input) {
+                showToast('请输入搜索关键词');
+                return;
+            }
+            
+            if (!host) {
+                showToast('请先设置API Host');
+                showHostModal();
+                return;
+            }
+            
+            searchTerm = input;
+            currentPage = 1;
+            
+            // 更新两个搜索框的值
+            document.getElementById('searchInput').value = input;
+            document.getElementById('searchInputMobile').value = input;
+            
+            showLoading('正在搜索...');
+            fetchData(input, 1).finally(() => {
+                hideLoading();
+            });
+        }
+        
+        // 加载更多
+        function loadMoreData() {
+            if (isLoading || !host) return;
+            
+            isLoading = true;
+            showLoading('加载更多内容...');
+            
+            fetchData(searchTerm, currentPage + 1).finally(() => {
+                hideLoading();
+                isLoading = false;
+            });
+        }
+        
+        // 处理回车键搜索
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                searchData();
+            }
+        }
+        
+        // 显示全屏预览
+        function openFullScreenPreview(imageUrl, title) {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4';
+            overlay.innerHTML = `
+                <div class="relative max-w-4xl max-h-[90vh]">
+                    <button 
+                        onclick="this.closest('.fixed').remove()"
+                        class="absolute -top-12 right-0 text-white hover:text-gray-300"
+                    >
+                        <i class="fa fa-times text-xl"></i>
+                    </button>
+                    <img 
+                        src="${imageUrl}" 
+                        alt="${title}" 
+                        class="max-w-full max-h-[90vh] object-contain rounded-lg"
+                    >
+                    <p class="text-white text-center mt-4">${title}</p>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+            
+            // 点击空白区域关闭
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                    document.body.style.overflow = '';
+                }
+            });
+        }
+        
+        // 打开视频播放器
+        function openVideoPlayer(videoUrl, videoTitle) {
+            if (!host) {
+                showToast('请先设置API Host');
+                showHostModal();
+                return;
+            }
+            
+            showLoading('正在加载视频...');
+            
+            try {
+                // 解析真实视频URL
+                const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
+                
+                // 保存播放历史
+                saveToHistory(videoTitle, realVideoUrl);
+                
+                // 显示播放器
+                videoPlayerModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+                // 初始化DPlayer
+                if (dplayer) {
+                    dplayer.destroy();
+                }
+                
+                dplayer = new DPlayer({
+                    container: document.getElementById('dplayer'),
+                    video: {
+                        url: realVideoUrl,
+                        type: 'hls',
+                        pic: '',
+                        thumbnails: '',
+                        title: videoTitle || '视频播放'
+                    },
+                    autoplay: true,
+                    theme: '#3b82f6',
+                    loop: false,
+                    screenshot: true,
+                    hotkey: true,
+                    preload: 'auto',
+                    contextmenu: [
+                        {
+                            text: '在新窗口打开',
+                            link: realVideoUrl,
+                        }
+                    ]
+                });
+                
+                // 添加窗口播放按钮到控制栏
+                setTimeout(() => {
+                    const controller = document.querySelector('.dplayer-controller');
+                    if (controller) {
+                        const windowButton = document.createElement('button');
+                        windowButton.className = 'dplayer-button dplayer-window-button';
+                        windowButton.innerHTML = '<i class="fa fa-window-restore"></i>';
+                        windowButton.title = '窗口播放';
+                        windowButton.onclick = () => window.open(realVideoUrl, '_blank');
+                        
+                        // 插入到全屏按钮之前
+                        const fullscreenButton = controller.querySelector('.dplayer-fullscreen-toggle');
+                        if (fullscreenButton) {
+                            controller.insertBefore(windowButton, fullscreenButton);
+                        } else {
+                            controller.appendChild(windowButton);
+                        }
+                    }
+                }, 100);
+                
+                dplayer.on('play', () => {
+                    hideLoading();
+                    isLoading = false;
+                });
+                
+                dplayer.on('error', (e) => {
+                    // 只有在加载过程中发生错误才显示提示
+                    if (isLoading) {
+                        hideLoading();
+                        showToast('视频加载失败，请尝试其他视频');
+                    }
+                    console.error('视频播放错误:', e);
+                });
+            } catch (error) {
+                hideLoading();
+                showToast('视频加载失败');
+                console.error('视频播放器初始化失败:', error);
+            }
+        }
+        
+        // 关闭视频播放器
+        function closeVideoPlayer() {
+            if (dplayer) {
+                dplayer.destroy();
+                dplayer = null;
+            }
+            
+            videoPlayerModal.classList.add('hidden');
+            document.body.style.overflow = '';
+            
+            // 隐藏移动设备关闭按钮
+            const mobileCloseButton = document.getElementById('closeVideoButtonMobile');
+            if (mobileCloseButton) {
+                // 使用className重置所有样式，确保下次能正确显示
+                mobileCloseButton.className = 'md:hidden fixed top-4 right-4 bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center z-50 shadow-lg';
+                mobileCloseButton.style.cssText = '';
+            }
+        }
+        
+        // 保存到播放历史
+        function saveToHistory(title, url) {
+            try {
+                const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+                
+                // 检查是否已存在
+                const existingIndex = history.findIndex(item => item.url === url);
+                
+                const historyItem = {
+                    title,
+                    url,
+                    timestamp: Date.now(),
+                    playCount: existingIndex >= 0 ? (history[existingIndex].playCount || 0) + 1 : 1
+                };
+                
+                // 如果已存在，先移除
+                if (existingIndex >= 0) {
+                    history.splice(existingIndex, 1);
+                }
+                
+                // 添加到开头
+                history.unshift(historyItem);
+                
+                // 限制历史记录数量
+                if (history.length > 50) {
+                    history.splice(50);
+                }
+                
+                localStorage.setItem('playHistory', JSON.stringify(history));
+            } catch (error) {
+                console.error('保存播放历史失败:', error);
+            }
+        }
+        
+        // 显示历史记录
+        function toggleHistory() {
+            const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+            
+            if (history.length === 0) {
+                historyContent.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa fa-history text-4xl mb-3"></i>
+                        <p>暂无播放历史</p>
+                    </div>
+                `;
+            } else {
+                historyContent.innerHTML = history.map(item => `
+                    <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
+                        <h4 class="font-medium text-sm mb-2 line-clamp-1">${item.title}</h4>
+                        <div class="flex justify-between items-center text-xs text-gray-500">
+                            <span>播放次数: ${item.playCount}</span>
+                            <span>${formatDate(item.timestamp)}</span>
+                        </div>
+                        <div class="mt-3 flex space-x-2">
+                            <button 
+                                onclick="openVideoPlayer('${item.url}', '${item.title}')"
+                                class="btn-primary text-xs py-1 px-2 flex-1"
+                            >
+                                <i class="fa fa-play mr-1"></i> 播放
+                            </button>
+                            <button 
+                                onclick="removeFromHistory('${item.url}')"
+                                class="text-gray-500 hover:text-red-500 p-1"
+                            >
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            historyPanel.classList.toggle('translate-x-full');
+            overlay.classList.toggle('hidden');
+        }
+        
+        // 从历史记录中移除
+        function removeFromHistory(url) {
+            try {
+                const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+                const filteredHistory = history.filter(item => item.url !== url);
+                localStorage.setItem('playHistory', JSON.stringify(filteredHistory));
+                
+                // 重新渲染历史记录
+                toggleHistory();
+                toggleHistory();
+            } catch (error) {
+                console.error('移除历史记录失败:', error);
+            }
+        }
+        
+        // 清空历史记录
+        function clearHistory() {
+            if (confirm('确定要清空所有播放历史吗？')) {
+                localStorage.removeItem('playHistory');
+                toggleHistory();
+                toggleHistory();
+                showToast('历史记录已清空');
+            }
+        }
+        
+        // 切换Host设置模态框
+        function toggleHostModal() {
+            hostModal.classList.toggle('hidden');
+            hostModal.classList.toggle('flex');
+            
+            if (!hostModal.classList.contains('hidden')) {
+                hostInput.value = host;
+                hostInput.focus();
+            }
+        }
+        
+        // 保存Host设置
+        function saveHost() {
+            const input = hostInput.value.trim();
+            
+            if (!input) {
+                showToast('请输入有效的Host地址');
+                return;
+            }
+            
+            // 验证URL格式
+            try {
+                new URL(input);
+            } catch (e) {
+                showToast('请输入有效的URL格式');
+                return;
+            }
+            
+            host = input;
+            localStorage.setItem('apiHost', host);
+            
+            toggleHostModal();
+            showToast('Host设置已保存');
+            
+            // 如果之前因为没有Host而无法加载数据，现在重新加载
+            if (videoList.children.length === 0) {
+                loadInitialData();
+            }
+        }
+        
+        // 重置Host设置
+        function resetHost() {
+            host = '';
+            hostInput.value = '';
+            localStorage.removeItem('apiHost');
+            showToast('Host已重置');
+        }
+        
+
+        
+        // 分享视频
+        function shareVideo(videoUrl, videoTitle) {
+            const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
+            
+            if (navigator.share) {
+                // 使用Web Share API
+                navigator.share({
+                    title: videoTitle,
+                    text: '分享一个精彩视频',
+                    url: realVideoUrl
+                }).catch(err => {
+                    console.log('分享失败:', err);
+                    fallbackShare(realVideoUrl);
+                });
+            } else {
+                // 回退方案
+                fallbackShare(realVideoUrl);
+            }
+        }
+        
+        // 分享回退方案
+        function fallbackShare(url) {
+            try {
+                // 尝试复制到剪贴板
+                navigator.clipboard.writeText(url).then(() => {
+                    showToast('视频链接已复制到剪贴板');
+                }).catch(() => {
+                    // 如果复制失败，显示提示
+                    prompt('请复制视频链接:', url);
+                });
+            } catch (err) {
+                prompt('请复制视频链接:', url);
+            }
+        }
+        
+        // 切换画中画模式
+        function togglePictureInPicture() {
+            if (!dplayer || !dplayer.video) return;
+            
+            if (document.pictureInPictureElement) {
+                // 退出画中画模式
+                document.exitPictureInPicture().then(() => {
+                    showToast('已退出画中画模式');
+                }).catch(err => {
+                    console.error('退出画中画失败:', err);
+                    showToast('退出画中画失败');
+                });
+            } else {
+                // 进入画中画模式
+                if (document.pictureInPictureEnabled) {
+                    dplayer.video.requestPictureInPicture().then(() => {
+                        showToast('已进入画中画模式');
+                    }).catch(err => {
+                        console.error('进入画中画失败:', err);
+                        showToast('进入画中画失败');
+                    });
+                } else {
+                    showToast('您的浏览器不支持画中画功能');
+                }
+            }
+        }
+        
+        // 滚动处理
+        function handleScroll() {
+            // 显示/隐藏回到顶部按钮
+            if (window.scrollY > 300) {
+                floatingButtons.classList.remove('hidden');
+            } else {
+                floatingButtons.classList.add('hidden');
+            }
+            
+            // 无限滚动加载更多
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
+                if (loadMoreButton.style.display !== 'none' && !isLoading) {
+                    loadMoreData();
+                }
+            }
+        }
+        
+        // 回到顶部
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+        
+        // 显示加载指示器
+        function showLoading(text = '加载中...') {
+            loadingText.textContent = text;
+            loadingIndicator.classList.remove('hidden');
+            loadingIndicator.classList.add('flex');
+        }
+        
+        // 隐藏加载指示器
+        function hideLoading() {
+            loadingIndicator.classList.add('hidden');
+            loadingIndicator.classList.remove('flex');
+        }
+        
+        // 显示空状态
+        function showEmptyState() {
+            videoList.innerHTML = '';
+            emptyState.classList.remove('hidden');
+            hideLoadMoreButton();
+        }
+        
+        // 显示错误状态
+        function showErrorState(message) {
+            videoList.innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <i class="fa fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
+                    <h3 class="text-xl font-semibold text-gray-700 mb-2">加载失败</h3>
+                    <p class="text-gray-600 mb-4">${message}</p>
+                    <button onclick="loadInitialData()" class="btn-primary">
+                        <i class="fa fa-refresh mr-1"></i> 重试
+                    </button>
+                </div>
+            `;
+            hideLoadMoreButton();
+        }
+        
+        // 显示加载更多按钮
+        function showLoadMoreButton() {
+            loadMoreButton.classList.remove('hidden');
+        }
+        
+        // 隐藏加载更多按钮
+        function hideLoadMoreButton() {
+            loadMoreButton.classList.add('hidden');
+        }
+        
+        // 关闭所有面板
+        function closeAllPanels() {
+            historyPanel.classList.add('translate-x-full');
+            overlay.classList.add('hidden');
+        }
+        
+        // 显示Toast提示
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg z-50';
+            toast.textContent = message;
+            
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 2000);
+        }
+        
+        // 格式化日期
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            
+            // 小于1小时
+            if (diff < 3600000) {
+                const minutes = Math.floor(diff / 60000);
+                return minutes <= 1 ? '刚刚' : `${minutes}分钟前`;
+            }
+            
+            // 小于24小时
+            if (diff < 86400000) {
+                const hours = Math.floor(diff / 3600000);
+                return `${hours}小时前`;
+            }
+            
+            // 小于7天
+            if (diff < 604800000) {
+                const days = Math.floor(diff / 86400000);
+                return `${days}天前`;
+            }
+            
+            // 其他情况显示具体日期
+            return date.toLocaleDateString('zh-CN');
+        }
+        
+
+    </script>
+</body>
+</html>

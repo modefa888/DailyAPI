@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📰</text></svg>" type="image/x-icon"/>
+    <title>每日吃瓜 - 热点资讯</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- AOS - Animate On Scroll -->
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e40af',
+                        secondary: '#3b82f6',
+                        accent: '#60a5fa',
+                        light: '#f3f4f6',
+                        dark: '#1f2937'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'card': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                        'card-hover': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .card-transition {
+                transition: all 0.3s ease;
+            }
+            .glass-effect {
+                background: rgba(255, 255, 255, 0.8);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+            }
+            .gradient-bg {
+                background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            }
+            .gradient-text {
+                background-clip: text;
+                -webkit-background-clip: text;
+                color: transparent;
+                background-image: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            }
+        }
+        
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #1e40af;
+        }
+        
+        /* 骨架屏动画 */
+        @keyframes pulse {
+            0% {
+                background-color: rgba(229, 231, 235, 0.4);
+            }
+            50% {
+                background-color: rgba(229, 231, 235, 0.7);
+            }
+            100% {
+                background-color: rgba(229, 231, 235, 0.4);
+            }
+        }
+        
+        .skeleton {
+            animation: pulse 1.5s infinite;
+            border-radius: 0.375rem;
+        }
+        
+        /* 加载动画 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- 导航栏 -->
+    <header class="sticky top-0 z-50 bg-white shadow-md">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">📰</span>
+                <h1 class="text-2xl font-bold gradient-text">每日吃瓜</h1>
+            </div>
+            
+            <!-- 搜索框 -->
+            <div class="hidden md:flex items-center bg-gray-100 rounded-full px-3 py-2 w-1/3">
+                <input type="text" id="searchInput" placeholder="搜索热点资讯..." 
+                       class="bg-transparent border-none outline-none flex-grow text-sm">
+                <button id="searchButton" class="ml-2 text-gray-500 hover:text-primary transition-colors">
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+            
+            <!-- 移动端搜索按钮 -->
+            <button id="mobileSearchButton" class="md:hidden text-gray-500 hover:text-primary transition-colors">
+                <i class="fa fa-search text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- 移动端搜索框 -->
+        <div id="mobileSearchBox" class="md:hidden hidden px-4 pb-3">
+            <div class="flex items-center bg-gray-100 rounded-full px-3 py-2">
+                <input type="text" id="mobileSearchInput" placeholder="搜索热点资讯..." 
+                       class="bg-transparent border-none outline-none flex-grow text-sm">
+                <button id="mobileSearchBtn" class="ml-2 text-gray-500 hover:text-primary transition-colors">
+                    <i class="fa fa-search"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- 分类标签 -->
+        <div class="flex overflow-x-auto pb-4 mb-6 scrollbar-hide space-x-2">
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="mrdg">
+                <i class="fa fa-fire"></i>
+                <span>每日大瓜</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="wpcz">
+                <i class="fa fa-clock-o"></i>
+                <span>今日吃瓜</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="rdsj">
+                <i class="fa fa-star"></i>
+                <span>热门吃瓜</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="bkdg">
+                <i class="fa fa-thumbs-up"></i>
+                <span>必看大瓜</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="whhl">
+                <i class="fa fa-users"></i>
+                <span>网红黑料</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="xsxy">
+                <i class="fa fa-graduation-cap"></i>
+                <span>学生学校</span>
+            </button>
+            <button class="category-btn whitespace-nowrap px-4 py-2 rounded-full bg-gray-200 text-gray-700 font-medium hover:bg-gray-300 transition-colors flex items-center space-x-1" data-category="whmx">
+                <i class="fa fa-film"></i>
+                <span>明星黑料</span>
+            </button>
+        </div>
+
+        <!-- 数据容器 -->
+        <div id="dataContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- 卡片将通过JavaScript动态生成 -->
+        </div>
+
+        <!-- 加载中状态 -->
+        <div id="loadingMessage" class="hidden fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+            <div class="bg-white p-5 rounded-lg shadow-lg flex items-center space-x-3">
+                <div class="loading-spinner w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
+                <span class="text-gray-700 font-medium">正在搜索中...</span>
+            </div>
+        </div>
+
+        <!-- 无结果提示 -->
+        <div id="noResultCard" class="hidden bg-white rounded-xl shadow-card p-8 text-center my-8" data-aos="fade-up">
+            <div class="text-6xl mb-4">😔</div>
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">不好意思，没找到相关内容</h3>
+            <p class="text-gray-600">换个关键词试试，或者等待我们更新更多内容</p>
+            <button id="resetSearch" class="mt-6 px-6 py-2 bg-primary text-white rounded-full font-medium hover:bg-primary/90 transition-colors">
+                返回首页
+            </button>
+        </div>
+
+        <!-- 加载更多按钮 -->
+        <div class="flex justify-center mt-8 mb-12">
+            <button id="loadMoreButton" class="hidden px-6 py-3 bg-white border border-primary text-primary rounded-full font-medium hover:bg-primary hover:text-white transition-colors flex items-center space-x-2">
+                <span>加载更多</span>
+                <i class="fa fa-refresh"></i>
+            </button>
+        </div>
+        
+        <!-- 底部加载指示器 -->
+        <div id="bottomLoader" class="hidden fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-4 py-3 rounded-full shadow-lg flex items-center space-x-2 z-40">
+            <div class="loading-spinner w-5 h-5 border-3 border-primary border-t-transparent rounded-full"></div>
+            <span class="text-gray-700 font-medium">正在加载中...</span>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer id="pageFooter" class="hidden bg-gray-800 text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl">📰</span>
+                        <h2 class="text-xl font-bold">每日吃瓜</h2>
+                    </div>
+                    <p class="text-gray-400 mt-2">您的热点资讯聚合平台</p>
+                </div>
+                
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-weibo text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-wechat text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-twitter text-xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors">
+                        <i class="fa fa-facebook text-xl"></i>
+                    </a>
+                </div>
+            </div>
+            
+            <hr class="border-gray-700 my-6">
+            
+            <div class="text-center text-gray-400 text-sm">
+                <p>© 2025 每日吃瓜. 保留所有权利.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 初始化AOS动画库
+        document.addEventListener('DOMContentLoaded', function() {
+            AOS.init({
+                duration: 800,
+                easing: 'ease-in-out',
+                once: true
+            });
+        });
+
+        // API配置
+        const Host = window.location.origin + '/51cg';
+        // const Host = 'https://api.buxiangyao.link/weimiQ/';
+        
+        // 获取URL参数
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        // 全局变量
+        let currentPage = 1;
+        let currentCategory = getParameterByName('typ') || 'wpcz';
+        let currentSearchTerm = '';
+        const container = document.getElementById('dataContainer');
+        
+        // 移动端搜索框切换
+        document.getElementById('mobileSearchButton').addEventListener('click', function() {
+            const mobileSearchBox = document.getElementById('mobileSearchBox');
+            mobileSearchBox.classList.toggle('hidden');
+            if (!mobileSearchBox.classList.contains('hidden')) {
+                document.getElementById('mobileSearchInput').focus();
+            }
+        });
+        
+        // 搜索功能
+        document.getElementById('searchButton').addEventListener('click', function() {
+            performSearch(document.getElementById('searchInput').value.trim());
+        });
+        
+        document.getElementById('mobileSearchBtn').addEventListener('click', function() {
+            performSearch(document.getElementById('mobileSearchInput').value.trim());
+        });
+        
+        document.getElementById('searchInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                performSearch(this.value.trim());
+            }
+        });
+        
+        document.getElementById('mobileSearchInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                performSearch(this.value.trim());
+            }
+        });
+        
+        // 返回首页按钮
+        document.getElementById('resetSearch').addEventListener('click', function() {
+            currentSearchTerm = '';
+            document.getElementById('searchInput').value = '';
+            document.getElementById('mobileSearchInput').value = '';
+            document.getElementById('noResultCard').classList.add('hidden');
+            currentPage = 1;
+            fetchData(currentPage);
+        });
+        
+        // 分类按钮点击事件
+        document.querySelectorAll('.category-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                // 移除所有按钮的选中状态
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                
+                // 添加当前按钮的选中状态
+                this.classList.remove('bg-gray-200', 'text-gray-700');
+                this.classList.add('bg-primary', 'text-white');
+                
+                // 清空搜索框和搜索状态
+                currentSearchTerm = '';
+                document.getElementById('searchInput').value = '';
+                document.getElementById('mobileSearchInput').value = '';
+                document.getElementById('noResultCard').classList.add('hidden');
+                
+                // 更新当前分类并重新获取数据
+                currentCategory = this.getAttribute('data-category');
+                currentPage = 1;
+                fetchData(currentPage);
+            });
+        });
+        
+        // 执行搜索
+        function performSearch(searchTerm) {
+            currentSearchTerm = searchTerm;
+            currentPage = 1;
+            
+            if (searchTerm) {
+                showLoadingMessage();
+                // 调用搜索API
+                fetchData(currentPage);
+            } else {
+                // 如果搜索词为空，显示所有数据
+                fetchData(currentPage);
+            }
+        }
+        
+        // 获取数据
+        const fetchData = async (page) => {
+            try {
+                if (page === 1) {
+                    showLoadingMessage();
+                } else {
+                    showBottomLoader();
+                }
+                
+                // 模拟API请求延迟
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                let response;
+                let responseData;
+                let data;
+                
+                // 判断是搜索还是分类浏览
+                if (currentSearchTerm) {
+                    // 搜索请求
+                    response = await fetch(`${Host}/search/?wd=${encodeURIComponent(currentSearchTerm)}&pg=${page}`);
+                    responseData = await response.json();
+                    data = responseData.data || [];
+                } else {
+                    // 分类浏览请求
+                    response = await fetch(`${Host}/${currentCategory}/${page}`);
+                    responseData = await response.json();
+                    data = responseData.data || [];
+                }
+
+                if (data.length === 0) {
+                    document.getElementById('loadMoreButton').classList.add('hidden');
+                    document.getElementById('noResultCard').classList.remove('hidden');
+                    container.innerHTML = ''; // 清空容器
+                } else {
+                    document.getElementById('noResultCard').classList.add('hidden');
+                    
+                    if (page === 1) {
+                        // 第一页时清空容器
+                        container.innerHTML = '';
+                    }
+                    
+                    renderData(data);
+                    
+                    // 显示页脚
+                    showFooter();
+                    
+                    // 如果数据少于预期，隐藏加载更多按钮
+                    if (data.length < 8) {
+                        document.getElementById('loadMoreButton').classList.add('hidden');
+                    } else {
+                        document.getElementById('loadMoreButton').classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                // 显示错误消息
+                container.innerHTML = `
+                    <div class="col-span-full bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                        <i class="fa fa-exclamation-circle text-red-500 text-3xl mb-3"></i>
+                        <h3 class="text-lg font-semibold text-red-700 mb-2">加载失败</h3>
+                        <p class="text-red-600 mb-4">无法获取数据，请稍后再试</p>
+                        <button onclick="fetchData(currentPage)" class="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                            重试
+                        </button>
+                    </div>
+                `;
+                document.getElementById('loadMoreButton').classList.add('hidden');
+                // 即使出错也显示页脚
+                showFooter();
+            } finally {
+                hideLoadingMessage();
+                hideBottomLoader();
+            }
+        };
+        
+        // 渲染数据
+        const renderData = (data) => {
+            data.forEach((item, index) => {
+                // 创建卡片元素
+                const card = document.createElement('div');
+                card.classList.add('bg-white', 'rounded-xl', 'overflow-hidden', 'shadow-card', 'card-transition', 'hover:shadow-card-hover', 'hover:-translate-y-1');
+                card.setAttribute('data-aos', 'fade-up');
+                card.setAttribute('data-aos-delay', (index % 4) * 100); // 错开动画时间
+                
+                // 设置卡片内容
+                card.innerHTML = `
+                    <div class="relative aspect-video overflow-hidden bg-gray-100">
+                        <img src="/cg/loading.gif" data-src="${item.pic}" alt="${item.title}" 
+                             class="w-full h-full object-cover transition-transform duration-500 hover:scale-105 lazy-image">
+                        <div class="absolute top-3 right-3 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded-full">
+                            ${item.date}
+                        </div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2 line-clamp-2 h-14">${item.title}</h3>
+                        <div class="flex items-center justify-between mt-2">
+                            <a href="/cg/detail?id=${item.url.split('/')[2]}" target="_blank" 
+                               class="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium hover:bg-primary/90 transition-colors">
+                                阅读更多
+                            </a>
+                            <a href="${item.href || item.url}" target="_blank" class="text-xs text-gray-500 hover:text-primary">详情</a>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加到容器
+                container.appendChild(card);
+            });
+            
+            // 初始化懒加载
+            initLazyLoading();
+        };
+        
+        // 初始化图片懒加载
+        const initLazyLoading = () => {
+            const lazyImages = document.querySelectorAll('.lazy-image');
+            
+            if ('IntersectionObserver' in window) {
+                const imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            img.src = img.getAttribute('data-src');
+                            img.classList.remove('lazy-image');
+                            imageObserver.unobserve(img);
+                        }
+                    });
+                });
+                
+                lazyImages.forEach(img => {
+                    imageObserver.observe(img);
+                });
+            } else {
+                // 回退方案，适用于不支持IntersectionObserver的浏览器
+                lazyImages.forEach(img => {
+                    img.src = img.getAttribute('data-src');
+                    img.classList.remove('lazy-image');
+                });
+            }
+        };
+        
+        // 显示加载消息
+        const showLoadingMessage = () => {
+            document.getElementById('loadingMessage').classList.remove('hidden');
+        };
+        
+        // 隐藏加载消息
+        const hideLoadingMessage = () => {
+            document.getElementById('loadingMessage').classList.add('hidden');
+        };
+        
+        // 显示底部加载指示器
+        const showBottomLoader = () => {
+            document.getElementById('bottomLoader').classList.remove('hidden');
+        };
+        
+        // 隐藏底部加载指示器
+        const hideBottomLoader = () => {
+            document.getElementById('bottomLoader').classList.add('hidden');
+        };
+        
+        // 显示页脚
+        const showFooter = () => {
+            document.getElementById('pageFooter').classList.remove('hidden');
+        };
+        
+        // 加载更多数据
+        document.getElementById('loadMoreButton').addEventListener('click', function() {
+            currentPage++;
+            this.innerHTML = '<div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>';
+            fetchData(currentPage).then(() => {
+                this.innerHTML = '<span>加载更多</span><i class="fa fa-refresh"></i>';
+            });
+        });
+        
+        // 页面加载时获取数据并设置初始分类
+        window.addEventListener('load', () => {
+            // 获取URL参数中的分类
+            const urlCategory = getParameterByName('typ');
+            if (urlCategory) {
+                // 更新当前分类
+                currentCategory = urlCategory;
+                
+                // 更新分类按钮的选中状态
+                document.querySelectorAll('.category-btn').forEach(btn => {
+                    btn.classList.remove('bg-primary', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                    
+                    if (btn.getAttribute('data-category') === urlCategory) {
+                        btn.classList.remove('bg-gray-200', 'text-gray-700');
+                        btn.classList.add('bg-primary', 'text-white');
+                    }
+                });
+            }
+            
+            // 获取数据
+            fetchData(currentPage);
+        });
+    </script>
+</body>
+</html>

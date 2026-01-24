@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>瓜圈 - 内容详情</title>
+    <!-- Tailwind CSS v3 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Include fancyBox CSS and JS files -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css"/>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+    <!-- DPlayer -->
+    <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
+    <!-- hls.js -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
+    <!-- GSAP for animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <!-- AOS for scroll animations -->
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563eb',
+                        secondary: '#4f46e5',
+                        accent: '#f59e0b',
+                        dark: '#1e293b',
+                        light: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 20px rgba(0, 0, 0, 0.08)',
+                        'hover': '0 10px 25px rgba(0, 0, 0, 0.12)',
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-in-out',
+                        'slide-up': 'slideUp 0.5s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .glass-effect {
+                @apply bg-white bg-opacity-80 backdrop-blur-md;
+            }
+            .card-hover {
+                @apply transition-all duration-300 hover:shadow-hover hover:-translate-y-1;
+            }
+            .text-balance {
+                text-wrap: balance;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+        }
+        
+        /* Custom styles */
+        body {
+            @apply bg-gradient-to-br from-light to-blue-50 min-h-screen;
+        }
+        
+        .image-card {
+            @apply relative overflow-hidden rounded-xl shadow-soft card-hover;
+            aspect-ratio: 1/1;
+        }
+        
+        .image-card img {
+            @apply w-full h-full object-cover transition-transform duration-500 hover:scale-105;
+        }
+        
+        .placeholder {
+            @apply animate-pulse bg-gray-200;
+        }
+        
+        /* Loading animation */
+        .loading-spinner {
+            @apply w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin;
+        }
+        
+        /* Custom error notification */
+        .error-notification {
+            @apply fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-red-500 text-white p-6 rounded-xl shadow-lg z-50 max-w-md w-full mx-4;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                transform: translate(-50%, -60%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+            }
+        }
+        
+        /* Video player container */
+        .video-player-container {
+            @apply rounded-xl overflow-hidden shadow-soft bg-black;
+        }
+        
+        /* Header with glass effect */
+        .header-glass {
+            @apply sticky top-0 z-40 glass-effect border-b border-gray-200 border-opacity-20;
+        }
+        
+        /* Custom fancybox styles */
+        .fancybox-bg {
+            background: rgba(15, 23, 42, 0.9) !important;
+        }
+        
+        .fancybox-caption {
+            @apply bg-dark bg-opacity-80 backdrop-blur-sm text-white p-4 text-center text-balance;
+        }
+        
+        .fancybox-button {
+            @apply bg-dark bg-opacity-60 hover:bg-opacity-80 backdrop-blur-sm;
+        }
+    </style>
+</head>
+<body class="font-sans text-dark">
+    <!-- Header -->
+    <header class="header-glass py-4 px-6 mb-6">
+        <div class="container mx-auto flex justify-center items-center">
+            <h1 id="title" class="text-2xl md:text-3xl font-bold text-primary"></h1>
+        </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="container mx-auto px-4 pb-16">
+        <!-- Loading state -->
+        <div id="loading" class="flex flex-col items-center justify-center py-20">
+            <div class="loading-spinner"></div>
+            <p class="mt-4 text-lg text-gray-600">正在加载精彩内容...</p>
+        </div>
+
+        <!-- Content sections (hidden by default) -->
+        <div id="contentWrapper" class="hidden animate-fade-in">
+            <!-- Date display -->
+            <div class="mb-8 text-center" data-aos="fade-up">
+                <p id="date" class="text-lg text-gray-600"></p>
+            </div>
+
+            <!-- Video section -->
+            <section id="videoContainer" class="mb-12" data-aos="fade-up" data-aos-delay="100">
+                <h2 class="text-xl font-semibold mb-4 text-center">视频内容</h2>
+                <div class="video-player-container mx-auto max-w-4xl">
+                    <div id="dplayer"></div>
+                </div>
+            </section>
+
+            <!-- Images section -->
+            <section class="mb-12">
+                <h2 class="text-xl font-semibold mb-6 text-center">图片集</h2>
+                <div id="imageContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Error notification -->
+    <div id="idError" class="error-notification hidden">
+        <div class="flex flex-col items-center text-center">
+            <i class="fa fa-exclamation-circle text-4xl mb-4"></i>
+            <p class="text-lg font-medium mb-4"></p>
+            <button onclick="goToHome()" class="px-6 py-2 bg-white text-red-500 rounded-lg font-medium hover:bg-gray-100 transition-colors">
+                返回首页
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize AOS animations
+        document.addEventListener('DOMContentLoaded', function() {
+            AOS.init({
+                duration: 800,
+                once: true,
+                offset: 100
+            });
+        });
+
+        const host = window.location.origin;
+
+        // Get URL parameter
+        function getParameterByName(name, url) {
+            if (!url) url = window.location.href;
+            name = name.replace(/[\[\]]/g, "\\$&");
+            var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+                results = regex.exec(url);
+            if (!results) return null;
+            if (!results[2]) return '';
+            return decodeURIComponent(results[2].replace(/\+/g, " "));
+        }
+
+        // Navigation functions
+        function goToHome() {
+            window.location.href = '/cg';
+        }
+
+
+
+        // Show error notification
+        function showError(message) {
+            const errorElement = document.getElementById('idError');
+            errorElement.querySelector('p').textContent = message;
+            errorElement.classList.remove('hidden');
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                errorElement.classList.add('hidden');
+            }, 5000);
+        }
+
+        // Initialize page when DOM is loaded
+        document.addEventListener("DOMContentLoaded", function () {
+            var idParameter = getParameterByName('id');
+
+            if (idParameter) {
+                // Show loading state
+                document.getElementById('loading').classList.remove('hidden');
+                document.getElementById('contentWrapper').classList.add('hidden');
+
+                // Fetch data with error handling
+                fetch(`${host}/51cg/detail?uid=` + idParameter)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Hide loading, show content
+                        document.getElementById('loading').classList.add('hidden');
+                        document.getElementById('contentWrapper').classList.remove('hidden');
+
+                        // Update page title and date
+                        document.getElementById('title').textContent = data.data.title || '内容详情';
+                        document.getElementById('date').textContent = data.data.date ? `发布日期: ${data.data.date}` : '';
+                        
+                        // Update document title
+                        document.title = `${data.data.title || '内容详情'} - 瓜圈`;
+
+                        // Handle video content
+                        const videoContainer = document.getElementById('videoContainer');
+                        if (data.data.url && data.data.url.length > 0) {
+                            videoContainer.classList.remove('hidden');
+                            
+                            // Setup first video player
+                            setupDPlayer(data.data.url[0], 'dplayer');
+                            
+                            // Handle multiple videos
+                            if (data.data.url.length > 1) {
+                                data.data.url.forEach((videoUrl, index) => {
+                                    if (index > 0) { // Skip first video (already added)
+                                        const playerContainer = document.createElement('div');
+                                        playerContainer.className = 'mt-8 video-player-container mx-auto max-w-4xl';
+                                        playerContainer.setAttribute('data-aos', 'fade-up');
+                                        playerContainer.setAttribute('data-aos-delay', (index * 100).toString());
+                                        
+                                        const playerId = `dplayer-${index}`;
+                                        playerContainer.innerHTML = `
+                                            <h3 class="text-lg font-medium mb-3 text-center">视频 ${index + 1}</h3>
+                                            <div id="${playerId}"></div>
+                                        `;
+                                        
+                                        videoContainer.appendChild(playerContainer);
+                                        setupDPlayer(videoUrl, playerId);
+                                    }
+                                });
+                            }
+                        } else {
+                            videoContainer.classList.add('hidden');
+                        }
+
+                        // Handle image gallery
+                        const imageContainer = document.getElementById('imageContainer');
+                        if (data.data.ImageList && data.data.ImageList.length > 0) {
+                            data.data.ImageList.forEach((imageUrl, index) => {
+                                const imgWrapper = document.createElement('div');
+                                imgWrapper.className = 'image-card';
+                                imgWrapper.setAttribute('data-aos', 'fade-up');
+                                imgWrapper.setAttribute('data-aos-delay', (index * 50).toString());
+                                
+                                // Create image link for fancybox
+                                const imgLink = document.createElement('a');
+                                imgLink.href = imageUrl;
+                                imgLink.setAttribute('data-fancybox', 'gallery');
+                                imgLink.setAttribute('data-caption', `图片 ${index + 1}`);
+                                
+                                // Create placeholder
+                                const placeholderImg = document.createElement('div');
+                                placeholderImg.className = 'placeholder absolute inset-0';
+                                
+                                // Create actual image with lazy loading
+                                const img = document.createElement('img');
+                                img.src = imageUrl;
+                                img.alt = `图片 ${index + 1}`;
+                                img.className = 'opacity-0 transition-opacity duration-300';
+                                img.loading = 'lazy';
+                                
+                                // Show image when loaded, hide placeholder
+                                img.onload = function() {
+                                    placeholderImg.classList.add('hidden');
+                                    img.classList.remove('opacity-0');
+                                };
+                                
+                                // Handle image load error
+                                img.onerror = function() {
+                                    placeholderImg.classList.remove('hidden');
+                                    placeholderImg.innerHTML = '<div class="flex items-center justify-center h-full text-gray-400"><i class="fa fa-image text-3xl"></i></div>';
+                                    console.error(`Failed to load image: ${imageUrl}`);
+                                };
+                                
+                                // Assemble image card
+                                imgLink.appendChild(placeholderImg);
+                                imgLink.appendChild(img);
+                                imgWrapper.appendChild(imgLink);
+                                imageContainer.appendChild(imgWrapper);
+                            });
+                            
+                            // Initialize fancybox with custom options
+                            $('[data-fancybox="gallery"]').fancybox({
+                                loop: true,
+                                buttons: [
+                                    "slideShow",
+                                    "fullScreen",
+                                    "thumbs",
+                                    "download",
+                                    "close"
+                                ],
+                                backFocus: false,
+                                trapFocus: false,
+                                touch: {
+                                    vertical: false,
+                                },
+                                infobar: false,
+                                toolbar: true,
+                                clickContent: false,
+                                clickSlide: 'toggleControls',
+                                clickOutside: 'close',
+                                transitionEffect: "slide",
+                                animationDuration: 300,
+                                idleTime: 3,
+                                onInit: function(instance) {
+                                    // Add custom styling when fancybox opens
+                                    document.body.classList.add('fancybox-open');
+                                },
+                                onClosed: function(instance) {
+                                    // Remove custom styling when fancybox closes
+                                    document.body.classList.remove('fancybox-open');
+                                }
+                            });
+                        } else {
+                            // No images to show
+                            imageContainer.innerHTML = `
+                                <div class="col-span-full py-12 text-center">
+                                    <i class="fa fa-picture-o text-4xl text-gray-300 mb-4"></i>
+                                    <p class="text-gray-500">暂无图片内容</p>
+                                </div>
+                            `;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                        document.getElementById('loading').classList.add('hidden');
+                        showError('数据加载失败，请稍后重试。');
+                    });
+            } else {
+                // No ID parameter provided
+                document.getElementById('loading').classList.add('hidden');
+                showError('请提供有效的内容ID参数。');
+            }
+        });
+
+        // Setup DPlayer with error handling
+        function setupDPlayer(videoUrl, containerId) {
+            try {
+                const dp = new DPlayer({
+                    container: document.getElementById(containerId),
+                    screenshot: true,
+                    hotkey: true,
+                    preload: 'metadata',
+                    video: {
+                        url: videoUrl,
+                        type: 'hls',
+                        customType: {
+                            hls: function(video, player) {
+                                if (Hls.isSupported()) {
+                                    const hls = new Hls({
+                                        maxBufferLength: 60,
+                                        maxBufferSize: 60 * 1000 * 1000,
+                                        maxBufferHole: 0.5,
+                                        highBufferWatchdogPeriod: 2,
+                                        startLevel: -1,
+                                        capLevelToPlayerSize: true
+                                    });
+                                    
+                                    hls.loadSource(video.src);
+                                    hls.attachMedia(video);
+                                    
+                                    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                                        // Video is ready to play
+                                        player.notice('视频加载完成，点击播放');
+                                    });
+                                    
+                                    hls.on(Hls.Events.ERROR, function(event, data) {
+                                        if (data.fatal) {
+                                            switch (data.type) {
+                                                case Hls.ErrorTypes.NETWORK_ERROR:
+                                                    console.error('Network error, trying to recover...');
+                                                    hls.startLoad();
+                                                    player.notice('网络错误，正在尝试恢复...');
+                                                    break;
+                                                case Hls.ErrorTypes.MEDIA_ERROR:
+                                                    console.error('Media error, trying to recover...');
+                                                    player.notice('媒体错误，正在尝试恢复...');
+                                                    hls.recoverMediaError();
+                                                    break;
+                                                default:
+                                                    console.error('Fatal error, cannot recover:', data);
+                                                    player.notice('视频加载失败，请刷新页面重试');
+                                                    break;
+                                            }
+                                        }
+                                    });
+                                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                                    video.src = videoUrl;
+                                    video.addEventListener('loadedmetadata', function() {
+                                        player.notice('视频加载完成，点击播放');
+                                    });
+                                    video.addEventListener('error', function() {
+                                        console.error('Video playback error');
+                                        player.notice('视频播放出错，请刷新页面重试');
+                                    });
+                                } else {
+                                    console.error('HLS not supported');
+                                    player.notice('当前浏览器不支持视频播放格式');
+                                }
+                            }
+                        }
+                    },
+                    danmaku: {
+                        id: 'comment',
+                        api: 'https://api.prprpr.me/dplayer/',
+                        token: 'tokendemo',
+                        maximum: 1000,
+                        user: '瓜圈用户',
+                        bottom: '15%',
+                        unlimited: true
+                    },
+                    contextmenu: [
+                        {
+                            text: '返回首页',
+                            link: '/cg'
+                        }
+                    ]
+                });
+                
+                // Add error handling for player
+                dp.on('error', function() {
+                    console.error('DPlayer error occurred');
+                    dp.notice('播放器出错，请刷新页面重试');
+                });
+                
+                return dp;
+            } catch (error) {
+                console.error('Error initializing DPlayer:', error);
+                document.getElementById(containerId).innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-12 text-center">
+                        <i class="fa fa-film text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">视频播放器加载失败</p>
+                        <button onclick="location.reload()" class="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                            刷新页面重试
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

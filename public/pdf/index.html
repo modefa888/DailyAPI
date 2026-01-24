@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>显示PDF文件</title>
+  <meta charset="UTF-8">
+  <style>
+    #pdf-container {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="pdf-container"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js"></script>
+  <script>
+    var pdfContainer = document.getElementById('pdf-container');
+
+    var pdfUrl = '../pdf/15928.pdf'; // 替换为你的PDF文件的URL或相对路径
+
+    // 使用PDF.js加载和渲染PDF文件
+    pdfjsLib.getDocument(pdfUrl).promise.then(function(pdfDoc) {
+      var pageNum = 1; // 要显示的页码
+
+      pdfDoc.getPage(pageNum).then(function(page) {
+        var viewport = page.getViewport({ scale: 1.0 });
+        var canvas = document.createElement('canvas');
+        var context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        pdfContainer.appendChild(canvas);
+
+        page.render({
+          canvasContext: context,
+          viewport: viewport
+        });
+      });
+    });
+
+    // 使用window.open()方法打开PDF文件在外部浏览器中显示
+      window.open(pdfUrl);
+  </script>
+</body>
+</html>
