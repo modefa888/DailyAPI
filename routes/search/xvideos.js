@@ -1,13 +1,16 @@
 const Router = require("koa-router");
-const J1HostRouter = new Router();
-const axios = require("axios");
-const {get, set, del} = require("../../utils/cacheData");
-const response = require('../../utils/response')
+const XvideosHostRouter = new Router();
+const axiosClient = require("../../utils/axiosClient");
+const { get, set } = require("../../utils/cacheData");
+const response = require('../../utils/response');
 const cheerio = require('cheerio');
 
 // 接口信息
 const routerInfo = {
-    name: "xvideos", title: "xvideos影视", subtitle: "每日榜", category: ""
+    name: "xvideos",
+    title: "xvideos影视",
+    subtitle: "每日榜",
+    category: ""
 };
 
 // 缓存键名
@@ -16,121 +19,148 @@ const cacheKey = "gdianData";
 // 调用时间
 let updateTime = new Date().toISOString();
 
-// 永久导航页（需翻墙）
+// 目标站点（需代理）
 const Host = "https://www.xvideos.com";
 
-// 数据处理
-const getData = (data) => {
-    if (!data) return [];
+/**
+ * 列表数据解析
+ */
+const getData = (html) => {
+    if (!html) return null;
+
     try {
-        var listData = [];
-        const htmlString = data;
-        const $ = cheerio.load(htmlString);
-        $('.frame-block').each((index, element) => {
-            // 标题
-            const articleText = $(element).find('.title').text();
-            // 图片地址
-            const articleImg = $(element).find('.thumb').find('img').attr('data-src');
-            // 下载链接
-            const articleHref = Host + $(element).find('.thumb').find('a').attr('href');
-            // push日期 + 作者
-            // const date = $(element).find('.text-truncate').text().replace("\n",'').replace("\t",'');
-            const time = $(element).find('.duration').first().text();
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref}, Img:${articleImg}, time:${time}`);
+        const listData = [];
+        const $ = cheerio.load(html);
+
+        $('.frame-block').each((_, element) => {
+            const title = $(element).find('.title').text().trim();
+            const img = $(element).find('.thumb img').attr('data-src');
+            const hrefPath = $(element).find('.thumb a').attr('href');
+            const time = $(element).find('.duration').first().text().trim();
+
+            if (!hrefPath) return;
+
+            const href = Host + hrefPath;
+
             listData.push({
-                aid: articleHref.split('/')[3] + '@' + articleHref.split('/')[4],
-                title: articleText,
-                img: articleImg,
-                href: articleHref,
-                time: time
-            })
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref.split('/')[3]}, Img:${articleImg}, desc:${desc}`);
+                aid: hrefPath.split('/')[1] + '@' + hrefPath.split('/')[2],
+                title,
+                img,
+                href,
+                time,
+                video_url: null,
+            });
         });
+
         return {
-            count: $('.last-page').first().text(),
-            data: listData,
+            count: $('.last-page').first().text() || listData.length,
+            data: listData
         };
-    } catch (error) {
-        console.error("数据处理出错" + error);
-        return false;
+    } catch (err) {
+        console.error('[xvideos] HTML 解析失败:', err.message);
+        return null;
     }
 };
 
-// 播放地址
-J1HostRouter.get("/xvideos/:uid", async (ctx) => {
-    const {uid} = ctx.params;
-    console.log('uid => ' + uid)
-    const url = Host + `/${uid.replace('@','/')}`;
-    // console.log(`获取xvideos播放地址 => ${url}`);
+/**
+ * 播放地址
+ */
+XvideosHostRouter.get("/xvideos/:uid", async (ctx) => {
+    const { uid } = ctx.params;
+    const url = Host + `/${uid.replace('@', '/')}`;
     const key = `${cacheKey}_${uid}`;
+
     try {
-        // 从缓存中获取数据
         let data = await get(key);
-        const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取xvideos影视播放地址 => " + url);
-            // 从服务器拉取数据
-            const res = await axios.get(url);
-            // console.log(res.data)
-            ydata = res.data; // 修改此处，将结果赋值给已声明的data变量，而不是重新声明一个新的data变量
-            const data = ydata.match(/contentUrl": "(.+?)",/)[1];
-            // 将数据写入缓存
+            console.log('[xvideos] 播放页远程获取 =>', url);
+
+            const res = await axiosClient({
+                url,
+                useProxy: true
+            });
+
+            const match = res.data.match(/contentUrl":\s*"(.+?)"/);
+            if (!match) {
+                response(ctx, 500, "", "页面结构已变更，未解析到播放地址");
+                return;
+            }
+
+            data = match[1];
             await set(key, data);
+
             response(ctx, 200, data, "从远程获取成功");
         } else {
             response(ctx, 200, data, "从缓存获取成功");
         }
+
     } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+        console.error('[xvideos] 播放地址获取失败:', err.message);
+
+        response(
+            ctx,
+            606,
+            "",
+            "目标站点不可达或被拦截（代理 / 网络异常）"
+        );
     }
 });
 
-// xvideos影视搜索
-J1HostRouter.get("/xvideos/:wd/:page", async (ctx) => {
-    const {wd, page} = ctx.params;
-    const url = `${Host}/?k=${wd}&p=${page}`;
-    console.log(`获取xvideos影视 ${url}`);
+/**
+ * xvideos 搜索
+ */
+XvideosHostRouter.get("/xvideos/:wd/:page", async (ctx) => {
+    const { wd, page } = ctx.params;
+    const url = `${Host}/?k=${encodeURIComponent(wd)}&p=${page}`;
+    const cacheKeyUrl = `${cacheKey}_${url}`;
+
     try {
-        // 从缓存中获取数据
-        let data = await get(`${cacheKey}_${url}`);
+        let data = await get(cacheKeyUrl);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取xvideos影视");
-            // 从服务器拉取数据
-            const response = await axios.get(url);
-            data = getData(response.data);
+            console.log('[xvideos] 搜索远程获取 =>', url);
+
+            const res = await axiosClient({
+                url,
+                useProxy: true
+            });
+
+            data = getData(res.data);
             updateTime = new Date().toISOString();
+
             if (!data) {
                 ctx.body = {
                     code: 500,
                     ...routerInfo,
-                    message: "获取失败",
+                    message: "页面解析失败，可能站点结构已更新"
                 };
-                return false;
+                return;
             }
-            // 将数据写入缓存
-            await set(`${cacheKey}_${url}`, data);
+
+            await set(cacheKeyUrl, data);
         }
+
         ctx.body = {
             code: 200,
             message: "获取成功",
             ...routerInfo,
             from,
-            total: data.length,
+            total: data.data.length,
             updateTime,
-            data,
+            data
         };
-    } catch (error) {
-        console.error(error);
+
+    } catch (err) {
+        console.error('[xvideos] 搜索失败:', err.message);
+
         ctx.body = {
             code: 500,
-            message: "获取失败",
+            message: "目标站点访问失败（代理异常或网络不可用）"
         };
     }
 });
 
-
-J1HostRouter.info = routerInfo;
-module.exports = J1HostRouter;
+XvideosHostRouter.info = routerInfo;
+module.exports = XvideosHostRouter;

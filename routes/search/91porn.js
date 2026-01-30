@@ -1,137 +1,162 @@
 const Router = require("koa-router");
 const J1HostRouter = new Router();
-const axios = require("axios");
-const {get, set, del} = require("../../utils/cacheData");
-const response = require('../../utils/response')
-const cheerio = require('cheerio');
+const cheerio = require("cheerio");
 
-// 接口信息
+const axiosClient = require("../../utils/axiosClient");
+const { get, set } = require("../../utils/cacheData");
+const response = require("../../utils/response");
+
+/* ================== 接口信息 ================== */
+
 const routerInfo = {
-    name: "91", title: "91影视", subtitle: "每日榜", category: ""
+    name: "91",
+    title: "91影视",
+    subtitle: "每日榜",
+    category: ""
 };
 
-// 缓存键名
 const cacheKey = "gdianData";
-
-// 调用时间
+const Host = "https://91porny.com";
 let updateTime = new Date().toISOString();
 
-// 永久导航页（需翻墙）
-const Host = "https://91porny.com";
+/* ================== axios 请求（代理 → 直连 fallback） ================== */
 
-// 数据处理
-const getData = (data) => {
-    if (!data) return [];
+async function fetchHtml(url) {
     try {
-        var listData = [];
-        const htmlString = data;
-        const $ = cheerio.load(htmlString);
-        $('.colVideoList').each((index, element) => {
-            // 标题
-            const articleText = $(element).find('.title').text();
-            // 图片地址
-            const articleImg = $(element).find('.img').attr('style').replace('background-image: url(\'', '').replace("')", '');
-            // 下载链接
-            const articleHref = Host + $(element).find('.title').attr('href');
-            // push日期 + 作者
-            const desc = $(element).find('.text-truncate').text().replace("\\n", '').replace("\t", '');
-            // 时长
-            const time = $(element).find('.layer').text();
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref}, Img:${articleImg}, desc:${desc}`);
-            listData.push({
-                aid: articleHref.split('/')[5],
-                title: articleText,
-                img: articleImg,
-                href: articleHref,
-                desc: desc,
-                time: time
-            })
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref.split('/')[3]}, Img:${articleImg}, desc:${desc}`);
+        const res = await axiosClient({
+            url,
+            useProxy: true,
+            headers: {
+                Referer: Host
+            }
         });
-        return {
-            count: $('.container-title').text(),
-            data: listData,
-        };
-    } catch (error) {
-        console.error("数据处理出错" + error);
-        return false;
+        return res.data;
+    } catch (err) {
+        console.warn(`[91][FETCH_FAILED] ${url} ${err.message}`);
+        throw new Error("FETCH_BLOCKED");
     }
-};
+}
 
-// 播放地址
-J1HostRouter.get("/91/:uid", async (ctx) => {
-    const {uid} = ctx.params;
-    const url = Host + `/video/view/${uid}`;
-    // console.log(`获取91播放地址 => ${url}`);
-    const key = `${cacheKey}_${uid}`;
+/* ================== 数据解析 ================== */
+
+function getData(html) {
+    if (!html) return { count: 0, data: [] };
+
     try {
-        // 从缓存中获取数据
+        const $ = cheerio.load(html);
+        const list = [];
+
+        $(".colVideoList").each((_, el) => {
+            const title = $(el).find(".title").text().trim();
+            const hrefPath = $(el).find(".title").attr("href");
+            if (!title || !hrefPath) return;
+
+            const style = $(el).find(".img").attr("style") || "";
+            const img = style
+                .replace("background-image: url('", "")
+                .replace("')", "");
+
+            const href = Host + hrefPath;
+            const desc = $(el)
+                .find(".text-truncate")
+                .text()
+                .replace(/\s+/g, " ")
+                .trim();
+
+            const time = $(el).find(".layer").text().trim();
+
+            list.push({
+                aid: href.split("/")[5],
+                title,
+                img,
+                href,
+                desc,
+                time,
+                video_url:null
+            });
+        });
+
+        return {
+            count: $(".container-title").text().trim(),
+            data: list
+        };
+    } catch (err) {
+        console.warn("[91][PARSE_ERROR]", err.message);
+        return { count: 0, data: [] };
+    }
+}
+
+/* ================== 播放地址 ================== */
+
+J1HostRouter.get("/91/:uid", async (ctx) => {
+    const { uid } = ctx.params;
+    const url = `${Host}/video/view/${uid}`;
+    const key = `${cacheKey}_${uid}`;
+
+    try {
         let data = await get(key);
-        const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取91影视播放地址 => " + url);
-            // 从服务器拉取数据
-            const res = await axios.get(url);
-            // console.log(res.data)
-            ydata = res.data; // 修改此处，将结果赋值给已声明的data变量，而不是重新声明一个新的data变量
-            const data = ydata.match(/data-src="(.+?)">/)[1].replace('&amp;m=','&m=')
-            // 将数据写入缓存
+            const html = await fetchHtml(url);
+            const match = html.match(/data-src="(.+?)">/);
+            if (!match) {
+                response(ctx, 500, "", "播放地址解析失败（页面结构变更）");
+                return;
+            }
+
+            m3u8 = match[1].replace("&amp;m=", "&m=");
+            data = { m3u8 } 
             await set(key, data);
-            response(ctx, 200, data, "从远程获取成功");
+
+            response(ctx, 200, data, "从远程获取成功（代理自动兜底）");
         } else {
             response(ctx, 200, data, "从缓存获取成功");
         }
-    } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+    } catch {
+        response(
+            ctx,
+            606,
+            "",
+            "目标站点不可达（代理异常或网络受限）"
+        );
     }
 });
 
-// 91影视搜索
+/* ================== 搜索 ================== */
+
 J1HostRouter.get("/91/:wd/:page", async (ctx) => {
-    const {wd, page} = ctx.params;
+    const { wd, page } = ctx.params;
     const url = `${Host}/search?keywords=${wd}&page=${page}`;
-    console.log(`获取91影视 ${url}`);
+    const cacheKeyUrl = `${cacheKey}_${wd}_${page}`;
+
     try {
-        // 从缓存中获取数据
-        let data = await get(`${cacheKey}_${url}`);
+        let data = await get(cacheKeyUrl);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取91影视");
-            // 从服务器拉取数据
-            const response = await axios.get(url);
-            data = getData(response.data);
+            const html = await fetchHtml(url);
+            data = getData(html);
             updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
-            await set(`${cacheKey}_${url}`, data);
+            await set(cacheKeyUrl, data);
         }
+
         ctx.body = {
             code: 200,
             message: "获取成功",
             ...routerInfo,
             from,
-            total: data.length,
+            total: data.data.length,
             updateTime,
-            data,
+            data
         };
-    } catch (error) {
-        console.error(error);
+    } catch {
+        ctx.status = 403;
         ctx.body = {
-            code: 500,
-            message: "获取失败",
+            code: 403,
+            message: "目标站点访问失败（代理 / 网络异常）"
         };
     }
 });
-
 
 J1HostRouter.info = routerInfo;
 module.exports = J1HostRouter;

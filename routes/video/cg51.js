@@ -1,96 +1,105 @@
 const Router = require("koa-router");
 const cgRouter = new Router();
-const axios = require("axios");
-const {get, set, del} = require("../../utils/cacheData");
+const cheerio = require("cheerio");
 
-const cheerio = require('cheerio');
-
-const {loadBackgroundImage} = require("../../utils/51cgjm");
+const axiosClient = require("../../utils/axiosClient");
+const { get, set } = require("../../utils/cacheData");
+const { loadBackgroundImage } = require("../../utils/51cgjm");
 const response = require("../../utils/response");
 
-// 接口信息
+/* ================== 基础信息 ================== */
+
 const routerInfo = {
-    name: "51cg", title: "51吃瓜", subtitle: "每日榜", category: "wpac(今日吃瓜) mrdg(每日吃瓜) rdsj(热门吃瓜) bkdg(必看大瓜) whhl(网红黑料) \
-xsxy(学生学校) whmx(明星黑料)"
+    name: "51cg",
+    title: "51吃瓜",
+    subtitle: "每日榜",
+    category:
+        "wpac(今日吃瓜) mrdg(每日吃瓜) rdsj(热门吃瓜) bkdg(必看大瓜) whhl(网红黑料) xsxy(学生学校) whmx(明星黑料)"
 };
 
-// 缓存键名
+const cgHost = "https://51cg1.com";
 const cacheKey = "51cgData";
-
-// 调用时间
 let updateTime = new Date().toISOString();
 
-// 永久导航页（需翻墙）
-const cgHost = "https://51cg1.com";
+/* ================== axios 请求（走工具包） ================== */
 
-// 数据处理
-const getData = (data, host) => {
-    if (!data) return [];
-    const dataList = [];
+async function fetchHtml(url) {
     try {
-        const $ = cheerio.load(data);
-        $('article').each((index, element) => {
-            // 标题
-            const articleText = $(element).find('.post-card-title').text().trim();
-            // 链接
-            const articleHref = $(element).find('a').attr('href');
-            // push日期
-            const date = $(element).find('.post-card-info span').text();
-            // 背景图
-            const regex = /loadBannerDirect\('([^']+)'/;
-            const match = regex.exec($(element).text());
-            var Img = null;
-            if (match && match[1]) {
-                const imageUrl = match[1];
-                Img = host + imageUrl;
+        const res = await axiosClient({
+            url,
+            useProxy: true,
+            headers: {
+                Referer: cgHost
             }
-            if (articleText != '' && date != '') {
-                dataList.push({
-                    title: articleText,
-                    desc: articleText,
-                    date: date,
-                    pic: Img,
-                    hot: Number(0),
-                    url: articleHref.replace(cgHost,''),
-                    mobileUrl: Img,
-                    href: cgHost + articleHref.replace(cgHost,''),
-                });
+        });
+        return res.data;
+    } catch (err) {
+        console.warn(`[51cg][FETCH_BLOCKED] ${url}`);
+        throw new Error("FETCH_BLOCKED");
+    }
+}
+
+/* ================== 工具 ================== */
+
+function getImgProxyHost(ctx) {
+    return `http://${ctx.request.host}/51cg/img?url=`;
+}
+
+/* ================== 数据解析 ================== */
+
+function getData(html, imgHost) {
+    if (!html) return [];
+
+    try {
+        const $ = cheerio.load(html);
+        const list = [];
+
+        $("article").each((_, el) => {
+            const title = $(el).find(".post-card-title").text().trim();
+            const href = $(el).find("a").attr("href");
+            const date = $(el).find(".post-card-info span").text().trim();
+
+            let pic = null;
+            const match = /loadBannerDirect\('([^']+)'/.exec($(el).text());
+            if (match?.[1]) {
+                pic = imgHost + match[1];
             }
 
+            if (!title || !date || !href) return;
+
+            list.push({
+                title,
+                desc: title,
+                date,
+                pic,
+                hot: 0,
+                url: href.replace(cgHost, ""),
+                mobileUrl: pic,
+                href: cgHost + href.replace(cgHost, "")
+            });
         });
 
-        return dataList;
-    } catch (error) {
-        console.error("数据处理出错" + error);
-        return false;
+        return list;
+    } catch {
+        console.warn("[51cg][PARSE_ERROR]");
+        return [];
     }
-};
+}
 
-// 51吃瓜热搜
+/* ================== 首页 ================== */
+
 cgRouter.get("/51cg", async (ctx) => {
-    console.log("获取51吃瓜热搜");
     try {
-        // 从缓存中获取数据
         let data = await get(cacheKey);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取51吃瓜热搜");
-            // 从服务器拉取数据
-            const response = await axios.get(cgHost);
-            data = getData(response.data, getIpHost(ctx));
+            const html = await fetchHtml(cgHost);
+            data = getData(html, getImgProxyHost(ctx));
             updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
             await set(cacheKey, data);
         }
+
         ctx.body = {
             code: 200,
             message: "获取成功",
@@ -98,250 +107,137 @@ cgRouter.get("/51cg", async (ctx) => {
             from,
             total: data.length,
             updateTime,
-            data,
+            data
         };
-    } catch (error) {
-        console.error(error);
-        ctx.body = {
-            code: 500,
-            message: "获取失败",
-        };
+    } catch {
+        ctx.status = 403;
+        ctx.body = { code: 403, message: "目标站点访问受限（请检查代理）" };
     }
 });
 
-// 51吃瓜热搜 ==> 分类
+/* ================== 分类 ================== */
+
 cgRouter.get("/51cg/:param1/:param2", async (ctx) => {
-    const param1 = ctx.params.param1; // 获取param1的值
-    const param2 = ctx.params.param2; // 获取param2的值
-    console.log(`请求参数=> ${param1} ${param2}`)
-    var url = cgHost;
-    if (param1 != '') {
-        // eslint-disable-next-line no-const-assign
-        url = url + '/category/' + param1.toString();
-    }
-    if (param2 != '') {
-        // eslint-disable-next-line no-const-assign
-        url = url + '/' + param2.toString();
-    }
-    console.log("获取51吃瓜热搜");
-    try {
-        // 从缓存中获取数据
-        let data = await get(cacheKey + `_${param1}_${param2}`);
-        const from = data ? "cache" : "server";
-        if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取51吃瓜热搜");
-            // 从服务器拉取数据
-            const response = await axios.get(url);
-            data = getData(response.data, getIpHost(ctx));
-            updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
-            await set(cacheKey + `_${param1}_${param2}`, data);
-        }
-        ctx.body = {
-            code: 200,
-            message: "获取成功",
-            ...routerInfo,
-            from,
-            total: data.length,
-            updateTime,
-            data,
-        };
-    } catch (error) {
-        console.error(error);
-        ctx.body = {
-            code: 500,
-            message: "获取失败",
-        };
-    }
-});
+    const { param1, param2 } = ctx.params;
+    const url = `${cgHost}/category/${param1}/${param2}`;
+    const key = `${cacheKey}_${param1}_${param2}`;
 
-// 51吃瓜热搜
-cgRouter.get("/51cg/search", async (ctx) => {
-    const {wd, pg} = ctx.query;
-    console.log("获取51吃瓜热搜");
     try {
-        // 从缓存中获取数据
-        let data = await get(cacheKey + `_${wd}_${pg}`);
-        const from = data ? "cache" : "server";
-        if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取51吃瓜热搜");
-            // 从服务器拉取数据
-            const response = await axios.get(`${cgHost}/search/${wd}/${pg}/`);
-            data = getData(response.data, getIpHost(ctx));
-            updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
-            await set(cacheKey + `_${wd}_${pg}`, data);
-        }
-        ctx.body = {
-            code: 200,
-            message: "获取成功",
-            ...routerInfo,
-            from,
-            total: data.length,
-            updateTime,
-            data,
-        };
-    } catch (error) {
-        console.error(error);
-        ctx.body = {
-            code: 500,
-            message: "获取失败",
-        };
-    }
-});
-
-// 详细内容
-cgRouter.get("/51cg/detail", async (ctx) => {
-    const {uid} = ctx.query;
-    const url = cgHost + `/archives/${uid}`;
-    console.log(`获取cg播放地址 => ${url}`);
-    const key = `${cacheKey}_${uid}`;
-    try {
-        // 从缓存中获取数据
         let data = await get(key);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取播放地址 => " + url);
-            // 从服务器拉取数据
-            const res = await axios.get(url);
-            const htmlString = res.data;
-
-            const $ = cheerio.load(htmlString);
-
-            let ImageList = []
-            $('.post-content').find('img').each((index, element) => {
-                const img = $(element).attr('data-xkrkllgl');
-                if(img!=null){
-                    ImageList.push('http://' + ctx.request.host + '/51cg/img/?url=' + img);
-                }
-            });
-            let urlPlayArray = [];
-            const regex = /"url":"(.+?)"/g;
-
-            let match;
-            while ((match = regex.exec(htmlString)) !== null) {
-                urlPlayArray.push(match[1].replace(/\\/g, ''));
-            }
-            // 如果没有匹配到任何地址，可以设置默认值
-            if (urlPlayArray.length === 0) {
-                urlPlayArray.push('');
-            }
-
-            const data = {
-                title: $('.post-title ').text(),
-                ImageList: ImageList,
-                date: $('time').eq(0).text().replace(/\t/g, '').replace(/\n /g, ''),
-                url: urlPlayArray
-            }
-            // 将数据写入缓存
+            const html = await fetchHtml(url);
+            data = getData(html, getImgProxyHost(ctx));
+            updateTime = new Date().toISOString();
             await set(key, data);
-            response(ctx, 200, data, "从远程获取成功");
+        }
+
+        ctx.body = {
+            code: 200,
+            message: "获取成功",
+            ...routerInfo,
+            from,
+            total: data.length,
+            updateTime,
+            data
+        };
+    } catch {
+        ctx.status = 403;
+        ctx.body = { code: 403, message: "目标站点访问受限（请检查代理）" };
+    }
+});
+
+/* ================== 搜索 ================== */
+
+cgRouter.get("/51cg/search", async (ctx) => {
+    const { wd, pg } = ctx.query;
+    const url = `${cgHost}/search/${wd}/${pg}/`;
+    const key = `${cacheKey}_${wd}_${pg}`;
+
+    try {
+        let data = await get(key);
+        const from = data ? "cache" : "server";
+
+        if (!data) {
+            const html = await fetchHtml(url);
+            data = getData(html, getImgProxyHost(ctx));
+            updateTime = new Date().toISOString();
+            await set(key, data);
+        }
+
+        ctx.body = {
+            code: 200,
+            message: "获取成功",
+            ...routerInfo,
+            from,
+            total: data.length,
+            updateTime,
+            data
+        };
+    } catch {
+        ctx.status = 403;
+        ctx.body = { code: 403, message: "目标站点访问受限（请检查代理）" };
+    }
+});
+
+/* ================== 详情 ================== */
+
+cgRouter.get("/51cg/detail", async (ctx) => {
+    const { uid } = ctx.query;
+    const url = `${cgHost}/archives/${uid}`;
+    const key = `${cacheKey}_${uid}`;
+
+    try {
+        let data = await get(key);
+
+        if (!data) {
+            const html = await fetchHtml(url);
+            const $ = cheerio.load(html);
+
+            const ImageList = [];
+            $(".post-content img").each((_, el) => {
+                const img = $(el).attr("data-xkrkllgl");
+                if (img) ImageList.push(getImgProxyHost(ctx) + img);
+            });
+
+            const urls = [];
+            const reg = /"url":"(.+?)"/g;
+            let m;
+            while ((m = reg.exec(html))) {
+                urls.push(m[1].replace(/\\/g, ""));
+            }
+
+            data = {
+                title: $(".post-title").text().trim(),
+                ImageList,
+                date: $("time").eq(0).text().replace(/\s+/g, ""),
+                url: urls.length ? urls : [""]
+            };
+
+            await set(key, data);
+            response(ctx, 200, data, "从远程获取成功（代理）");
         } else {
             response(ctx, 200, data, "从缓存获取成功");
         }
-    } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+    } catch {
+        ctx.status = 403;
+        ctx.body = { code: 403, message: "目标站点访问受限（请检查代理）" };
     }
 });
 
+/* ================== 图片解密 ================== */
 
-// 51吃瓜热搜 - 获取最新数据
-cgRouter.get("/51cg/new", async (ctx) => {
-    console.log("获取51吃瓜热搜 - 最新数据");
-    try {
-        // 从服务器拉取最新数据
-        const response = await axios.get(cgHost);
-        const newData = getData(response.data, getIpHost(ctx));
-        updateTime = new Date().toISOString();
-        console.log("从服务端重新获取51吃瓜热搜");
-
-        // 返回最新数据
-        ctx.body = {
-            code: 200,
-            message: "获取成功",
-            ...routerInfo,
-            total: newData.length,
-            updateTime,
-            data: newData,
-        };
-
-        // 删除旧数据
-        await del(cacheKey);
-        // 将最新数据写入缓存
-        await set(cacheKey, newData);
-    } catch (error) {
-        // 如果拉取最新数据失败，尝试从缓存中获取数据
-        console.error(error);
-        const cachedData = await get(cacheKey);
-        if (cachedData) {
-            ctx.body = {
-                code: 200,
-                message: "获取成功",
-                ...routerInfo,
-                total: cachedData.length,
-                updateTime,
-                data: cachedData,
-            };
-        } else {
-            // 如果缓存中也没有数据，则返回错误信息
-            ctx.body = {
-                code: 500,
-                ...routerInfo,
-                message: "获取失败",
-            };
-        }
-    }
-});
-
-// 图片解密
 cgRouter.get("/51cg/img", async (ctx) => {
-    const paramUrl = ctx.query.url;
-    console.log(`请求参数=> ${paramUrl}`);
-    // return loadImg(paramUrl);
     try {
-        const result = await loadBackgroundImage(paramUrl);
-        // 处理返回值
-        // console.log(result);
-        // 在这里进行进一步操作，例如将返回的图像数据发送给客户端
-        // ctx.body = result;
-        // 将图像数据作为响应发送给浏览器
-        ctx.type = 'image/jpeg'; // 设置响应类型为图像/jpeg
-        ctx.body = Buffer.from(result.split(',')[1], 'base64'); // 将Base64字符串转换为Buffer并发送
-    } catch (error) {
-        // 处理错误
-        console.error(error);
-        // 在这里进行错误处理，例如发送错误响应给客户端
-        ctx.body = 'Error';
+        const base64 = await loadBackgroundImage(ctx.query.url);
+        ctx.type = "image/jpeg";
+        ctx.body = Buffer.from(base64.split(",")[1], "base64");
+    } catch {
+        ctx.status = 403;
+        ctx.body = "Error";
     }
 });
-
-
-function getIpHost(ctx) {
-    // 获取当前请求的host
-    const host = ctx.request.host;
-
-    const jimiImg = 'http://' + host + '/51cg/img?url=';
-    return jimiImg;
-}
 
 cgRouter.info = routerInfo;
 module.exports = cgRouter;

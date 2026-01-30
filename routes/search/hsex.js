@@ -1,129 +1,152 @@
 const Router = require("koa-router");
 const hsexRouter = new Router();
-const axios = require("axios");
-const {get, set, del} = require("../../utils/cacheData");
-const response = require('../../utils/response')
-const cheerio = require('cheerio');
+const cheerio = require("cheerio");
 
-// 接口信息
+const axiosClient = require("../../utils/axiosClient");
+const { get, set } = require("../../utils/cacheData");
+const response = require("../../utils/response");
+
+/* ================== 接口信息 ================== */
+
 const routerInfo = {
-    name: "hsex", title: "hsex影视", subtitle: "每日榜", category: ""
+    name: "hsex",
+    title: "hsex影视",
+    subtitle: "每日榜",
+    category: ""
 };
 
-// 缓存键名
 const cacheKey = "hsexData";
-
-// 调用时间
+const Host = "https://hsex.icu";
 let updateTime = new Date().toISOString();
 
-// 永久导航页（需翻墙）
-const Host = "https://hsex.icu";
+/* ================== 列表解析 ================== */
 
-// 数据处理
-const getData = (data) => {
-    if (!data) return [];
+function getData(html) {
+    if (!html) return [];
+
     try {
-        var listData = [];
-        const htmlString = data;
-        const $ = cheerio.load(htmlString);
-        $('.thumbnail').each((index, element) => {
-            // 标题
-            const articleText = $(element).find('.title').text();
-            // 图片地址
-            const articleImg = $(element).find('.image').attr('style').replace("background-image: url('", "").replace("')", "");
-            // 下载链接
-            const articleHref = $(element).find('.title').find('a').attr('href');
-            // push日期 + 作者
-            // const date = $(element).find('.text-truncate').text().replace("\n",'').replace("\t",'');
-            const time = $(element).find('.duration').text();
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref}, Img:${articleImg}, time:${time}`);
-            listData.push({
-                aid: articleHref,
-                title: articleText,
-                img: articleImg,
-                href: Host + '/' + articleHref,
-                time: time
-            })
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref.split('/')[3]}, Img:${articleImg}, desc:${desc}`);
+        const $ = cheerio.load(html);
+        const list = [];
+
+        $(".thumbnail").each((_, el) => {
+            const title = $(el).find(".title").text().trim();
+            const href = $(el).find(".title a").attr("href");
+            const duration = $(el).find(".duration").text().trim();
+
+            const style = $(el).find(".image").attr("style") || "";
+            const img = style
+                .replace("background-image: url('", "")
+                .replace("')", "");
+
+            if (!title || !href) return;
+
+            list.push({
+                aid: href,
+                title,
+                img,
+                href: Host + "/" + href.replace(/^\/+/, ""),
+                time: duration,
+                video_url:null
+            });
         });
-        return {
-            // count: $('.last-page').first().text(),
-            data: listData,
-        };
-    } catch (error) {
-        console.error("数据处理出错" + error);
-        return false;
-    }
-};
 
-// 播放地址
+        return { data:list };
+    } catch (err) {
+        console.warn("[hsex][PARSE_ERROR]", err.message);
+        return [];
+    }
+}
+
+/* ================== 播放详情 ================== */
+
 hsexRouter.get("/hsex/:uid", async (ctx) => {
-    const {uid} = ctx.params;
-    const url = Host + `/${uid}`;
-    console.log(`获取hsex播放地址 => ${url}`);
+    const { uid } = ctx.params;
+    const url = `${Host}/${uid}`;
     const key = `${cacheKey}_${uid}`;
+
     try {
-        // 从缓存中获取数据
         let data = await get(key);
-        const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取hsex影视播放地址 => " + url);
-            // 从服务器拉取数据
-            const res = await axios.get(url);
-            const ydata = res.data; // 修改此处，将结果赋值给已声明的data变量，而不是重新声明一个新的data变量
-            const title = ydata.match(/<h3 class="panel-title">(.+?)</)[1];
-            const m3u8 = ydata.match(/<source src="(.+?)"/)[1];
-            const img = ydata.match(/poster="(.+?)"/)[1];
-            data = {
-                title: title,
-                m3u8: m3u8,
-                img: img
+            console.log("[hsex] 播放页远程获取 =>", url);
+
+            const res = await axiosClient({
+                url,
+                useProxy: true
+            });
+
+            const html = res.data;
+
+            const title =
+                html.match(/<h3[^>]*class="panel-title"[^>]*>([^<]+)</)?.[1] ||
+                "";
+
+            const m3u8 =
+                html.match(/<source[^>]+src="([^"]+\.m3u8[^"]*)"/)?.[1] ||
+                "";
+
+            const img =
+                html.match(/poster="([^"]+)"/)?.[1] ||
+                "";
+
+            if (!m3u8) {
+                response(ctx, 500, null, "未解析到播放地址（页面结构可能变更）");
+                return;
             }
-            // 将数据写入缓存
+
+            data = { title, m3u8, img };
             await set(key, data);
-            response(ctx, 200, data, "从远程获取成功");
+
+            response(ctx, 200, data, "从远程获取成功（代理）");
         } else {
             response(ctx, 200, data, "从缓存获取成功");
         }
+
     } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+        console.error("[hsex] 播放地址获取失败:", err.message);
+        response(
+            ctx,
+            606,
+            "",
+            "目标站点不可达或被拦截（代理 / 网络异常）"
+        );
     }
 });
 
-// hsex影视搜索
+/* ================== 搜索 ================== */
+
 hsexRouter.get("/hsex/:wd/:page", async (ctx) => {
-    const {wd, page} = ctx.params;
-    const regex = /^[\u4e00-\u9fa5]{2,}$/; // 正则表达式匹配至少两个中文字符
+    const { wd, page } = ctx.params;
+    const regex = /^[\u4e00-\u9fa5]{2,}$/;
 
     if (!regex.test(wd)) {
-        ctx.body = "wd 参数必须包含至少两个以上的中文字符";
+        ctx.body = {
+            code: 400,
+            message: "wd 参数必须包含至少两个中文字符"
+        };
         return;
     }
+
     const url = `${Host}/search-${page}.htm?search=${wd}`;
-    console.log(`获取hsex影视 ${url}`);
+    const key = `${cacheKey}_${wd}_${page}`;
+
     try {
-        // 从缓存中获取数据
-        let data = await get(`${cacheKey}_${url}`);
+        let data = await get(key);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取hsex影视");
-            // 从服务器拉取数据
-            const response = await axios.get(url);
-            data = getData(response.data);
+            console.log("[hsex] 搜索页远程获取 =>", url);
+
+            const res = await axiosClient({
+                url,
+                useProxy: true
+            });
+
+            data = getData(res.data);
             updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
-            await set(`${cacheKey}_${url}`, data);
+            await set(key, data);
         }
+
         ctx.body = {
             code: 200,
             message: "获取成功",
@@ -131,17 +154,17 @@ hsexRouter.get("/hsex/:wd/:page", async (ctx) => {
             from,
             total: data.length,
             updateTime,
-            data,
+            data
         };
-    } catch (error) {
-        console.error(error);
+
+    } catch (err) {
+        console.error("[hsex] 搜索失败:", err.message);
         ctx.body = {
-            code: 500,
-            message: "获取失败",
+            code: 403,
+            message: "目标站点访问受限（请检查代理）"
         };
     }
 });
-
 
 hsexRouter.info = routerInfo;
 module.exports = hsexRouter;

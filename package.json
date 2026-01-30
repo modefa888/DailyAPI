@@ -26,6 +26,7 @@
     "eslint": "^8.56.0",
     "eslint-plugin-vue": "^9.19.2",
     "formdata-polyfill": "^4.0.10",
+    "https-proxy-agent": "^7.0.6",
     "jquery": "^3.7.1",
     "jsencrypt": "^3.3.2",
     "koa": "^2.15.0",
@@ -39,6 +40,7 @@
     "node-fetch": "^3.3.2",
     "nodemon": "^2.0.22",
     "prettier": "^3.1.1",
+    "socks-proxy-agent": "^8.0.5",
     "xmldom": "^0.6.0",
     "xpath": "^0.0.34"
   }

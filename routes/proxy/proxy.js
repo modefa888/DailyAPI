@@ -7,46 +7,68 @@ const response = require('../../utils/response');
 // 缓存键名
 const cacheKey = "proxyData";
 
-// 播放地址
+/* ================== proxy ================== */
+
 proxyRouter.get("/proxy", async (ctx) => {
-    const { url,wd,pg } = ctx.query;
-    let zURl = url;
-    if (wd != '' || pg != ''){
-        zURl = `${url}?ac=videolist&wd=${wd}&pg=${pg}`;
+    const { url, wd, pg } = ctx.query;
+
+    if (!url) {
+        ctx.status = 400;
+        ctx.body = {
+            code: 400,
+            message: "缺少 url 参数"
+        };
+        return;
     }
-    const key = `${cacheKey}_${zURl}`;
+
+    let zUrl = url;
+
+    if ((wd && wd !== '') || (pg && pg !== '')) {
+        zUrl = `${url}?ac=videolist&wd=${wd || ''}&pg=${pg || ''}`;
+    }
+
+    const key = `${cacheKey}_${zUrl}`;
+
     try {
-        // 从缓存中获取数据
         let data = await get(key);
+
         if (!data) {
-            // 从服务器拉取数据
-            console.log(zURl)
-            const res = await axios.get(zURl, { responseType: 'arraybuffer' });
-            // Check if the content type is an image
+            console.log(`[proxy] fetch => ${zUrl}`);
+
+            const res = await axios.get(zUrl, {
+                timeout: 15000,
+                responseType: 'arraybuffer',
+                headers: {
+                    "User-Agent": "Mozilla/5.0"
+                }
+            });
+
             const contentType = res.headers['content-type'];
+
+            // 图片：不缓存，直接透传
             if (contentType && contentType.startsWith('image/')) {
-                // Serve the image directly
                 ctx.status = res.status;
                 ctx.type = contentType;
                 ctx.body = res.data;
-            } else {
-                // For non-image content, cache and return the data
-                data = res.data;
-                // 将数据写入缓存
-                await set(key, data);
-                // 直接将原始数据返回
-                ctx.status = 200;
-                ctx.body = data;
+                return;
             }
+
+            // 非图片：缓存并返回
+            data = res.data;
+            await set(key, data);
+
+            ctx.status = 200;
+            ctx.body = data;
         } else {
-            // 直接将原始数据返回
             ctx.status = 200;
             ctx.body = data;
         }
     } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+        // 精简错误日志
+        console.warn(`[proxy][FETCH_FAIL] ${zUrl}`);
+
+        response(ctx, 606, "", "目标资源暂时无法访问");
     }
 });
-
 
 module.exports = proxyRouter;

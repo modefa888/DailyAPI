@@ -1,178 +1,234 @@
 const Router = require("koa-router");
 const jabletvRouter = new Router();
-const axios = require("axios");
-const {get, set, del} = require("../../utils/cacheData");
-const response = require('../../utils/response')
-const cheerio = require('cheerio');
-const {spawn} = require("child_process");
+const cheerio = require("cheerio");
+const { spawn } = require("child_process");
 
-// 接口信息
+const { get, set } = require("../../utils/cacheData");
+const response = require("../../utils/response");
+
+// ✅ 使用你封装好的 axios 工具（代理优先 → 直连 fallback）
+const axiosClient = require("../../utils/axiosClient");
+
+/* ================== 接口信息 ================== */
+
 const routerInfo = {
-    name: "jabletv", title: "jabletv影视", subtitle: "每日榜", category: ""
+    name: "jabletv",
+    title: "jabletv影视",
+    subtitle: "每日榜",
+    category: ""
 };
 
-// 缓存键名
 const cacheKey = "jabletvData";
-
-// 调用时间
 let updateTime = new Date().toISOString();
 
-// 永久导航页（需翻墙）
-const Host = "https://jabletv.icu";
+const Host = "https://jable.tv";
 
-// 数据处理
-const getData = (data) => {
-    if (!data) return [];
+/* ================== 数据解析 ================== */
+
+const getData = (html) => {
+    if (!html) return [];
+
     try {
-        var listData = [];
-        const htmlString = data;
-        const $ = cheerio.load(htmlString);
-        $('.thumbnail').each((index, element) => {
-            // 标题
-            const articleText = $(element).find('.title').text();
-            // 图片地址
-            const articleImg = $(element).find('.image').attr('style').replace("background-image: url('", "").replace("')", "");
-            // 下载链接
-            const articleHref = $(element).find('.title').find('a').attr('href');
-            // push日期 + 作者
-            // const date = $(element).find('.text-truncate').text().replace("\n",'').replace("\t",'');
-            const time = $(element).find('.duration').text();
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref}, Img:${articleImg}, time:${time}`);
-            listData.push({
-                aid: articleHref,
-                title: articleText,
-                img: articleImg,
-                href: Host + '/' + articleHref,
-                time: time
-            })
-            // console.log(`Article ${index + 1}: Text: ${articleText}, Href:${articleHref.split('/')[3]}, Img:${articleImg}, desc:${desc}`);
+        const $ = cheerio.load(html);
+        const list = [];
+
+        $(".video-img-box").each((_, el) => {
+            const title = $(el).find(".title").text().trim();
+            const href = $(el).find(".title a").attr("href");
+            const time = $(el).find(".label").text().trim();
+
+            const img = $(el).find("img").attr("data-src");
+
+            if (!title || !href) return;
+
+            list.push({
+                aid: href.split('/')[4],
+                title,
+                img,
+                href: href,
+                time,
+                video_url:null
+            });
         });
-        return {
-            // count: $('.last-page').first().text(),
-            data: listData,
-        };
-    } catch (error) {
-        console.error("数据处理出错" + error);
-        return false;
+
+        return {data:list};
+    } catch (err) {
+        console.error("[jabletv][PARSE_ERROR]", err.message);
+        return [];
     }
 };
 
-// 播放地址
+/* ================== 播放地址（Python，不动） ================== */
+
+// jabletvRouter.get("/jabletv/:uid", async (ctx) => {
+//     const { uid } = ctx.params;
+//     const lowerUid = uid.toLowerCase();
+//     const key = `${cacheKey}_${uid}`;
+
+//     console.log(`[jabletv][PLAY] uid=${lowerUid}`);
+
+//     try {
+//         let data = await get(key);
+
+//         if (data) {
+//             return response(ctx, 200, data, "从缓存获取成功");
+//         }
+
+//         console.log("[jabletv][PLAY] 缓存未命中，调用 Python");
+
+//         const pythonScriptPath = "/opt/DailyAPI/py/jable.py";
+//         const pythonProcess = spawn("python", [pythonScriptPath, lowerUid]);
+
+//         const result = await new Promise((resolve, reject) => {
+//             let buffer = Buffer.from("");
+
+//             pythonProcess.stdout.on("data", (chunk) => {
+//                 buffer = Buffer.concat([buffer, chunk]);
+//             });
+
+//             pythonProcess.on("close", (code) => {
+//                 if (code === 0) {
+//                     resolve(buffer.toString("utf8"));
+//                 } else {
+//                     reject(new Error(`Python exit code ${code}`));
+//                 }
+//             });
+//         });
+
+//         await set(key, result);
+//         response(ctx, 200, result, "从远程获取成功（Python）");
+
+//     } catch (err) {
+//         console.error("[jabletv][PLAY_ERROR]", err.message);
+//         response(ctx, 500, null, "播放地址解析失败");
+//     }
+// });
+
+/**
+ * 播放地址
+ */
 jabletvRouter.get("/jabletv/:uid", async (ctx) => {
-    const {uid} = ctx.params;
-    const lowerCaseUid = uid.toLowerCase(); // 将uid中的大写字母转换为小写字母
-    const url = Host + `/${lowerCaseUid}`;
-    console.log(`获取jabletv播放地址 => ${url}`);
+    const { uid } = ctx.params;
+    const url = Host + `/videos/${uid}/`;
     const key = `${cacheKey}_${uid}`;
+
     try {
-        // 从缓存中获取数据
         let data = await get(key);
-        const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取jabletv影视播放地址 => " + url);
-            // 从服务器拉取数据
-            const {spawn} = require('child_process');
+            console.log('[jabletv] 播放页远程获取 =>', url);
 
-            // 要执行的Python脚本路径
-            const pythonScriptPath = '/opt/DailyAPI/py/jable.py';
+            const res = await axiosClient({
+                url,
+                useProxy: true
+            });
 
-            // 要传递给Python脚本的参数
-            const pythonScriptArgs = [lowerCaseUid];
+            // ✅ 正确解析 m3u8
+            const match = res.data.match(
+                /var\s+hlsUrl\s*=\s*['"]([^'"]+\.m3u8)['"]/
+            );
 
-            // 创建Python子进程
-            const pythonProcess = spawn('python', [pythonScriptPath, ...pythonScriptArgs]);
+            if (!match) {
+                response(ctx, 500, "", "未解析到 m3u8 播放地址");
+                return;
+            }
 
-            // 定义一个Promise包装函数，用于封装Python脚本的执行过程
-            const runPythonScript = () => {
-                return new Promise((resolve, reject) => {
-                    let dataBuffer = Buffer.from('');
-                    pythonProcess.stdout.on('data', (data) => {
-                        dataBuffer = Buffer.concat([dataBuffer, data]);
-                    });
+            const $ = cheerio.load(res.data);
 
-                    pythonProcess.on('close', (code) => {
-                        if (code === 0) {
-                            const decodedData = dataBuffer.toString('utf8'); // 使用UTF-8解码数据
-                            resolve(decodedData);
-                        } else {
-                            reject(new Error(`Python脚本执行失败，退出代码：${code}`));
-                        }
-                    });
-                });
+            // 标题
+            const title = $(".header-left h4")
+                .first()
+                .text()
+                .trim();
+
+            // 发布时间
+            const publishTime = $(".header-left h6 span.mr-3")
+                .first()
+                .text()
+                .trim();
+
+            // 背景封面图（重点）
+            const cover = $('meta[property="og:image"]').attr('content') || '';
+
+            const data = {
+                m3u8: match[1],
+                title,
+                publishTime,
+                cover
             };
 
-            try {
-                console.log("从服务端重新获取jabletv影视播放地址 => " + url);
-                const decodedData = await runPythonScript();
-
-                // 将数据写入缓存
-                await set(key, decodedData);
-
-                response(ctx, 200, decodedData, "从远程获取成功");
-            } catch (error) {
-                console.error("Python脚本执行失败：", error);
-                response(ctx, 500, null, "从远程获取失败");
-            }
+            await set(key, data);
+            response(ctx, 200, data, "从远程获取成功");
         } else {
             response(ctx, 200, data, "从缓存获取成功");
         }
+
     } catch (err) {
-        response(ctx, 606, "", "此类数据有毒，但是很好看！");
+        console.error('[jabletv] 播放地址获取失败:', err.message);
+        response(ctx, 606, "", "目标站点不可达或被拦截");
     }
 });
 
-// jabletv影视搜索
-jabletvRouter.get("/jabletv/:wd/:page", async (ctx) => {
-    const {wd, page} = ctx.params;
-    const regex = /^[\u4e00-\u9fa5]{2,}$/; // 正则表达式匹配至少两个中文字符
 
-    if (!regex.test(wd)) {
-        ctx.body = "wd 参数必须包含至少两个以上的中文字符";
+
+/* ================== 搜索（代理请求） ================== */
+
+jabletvRouter.get("/jabletv/:wd/:page", async (ctx) => {
+    const { wd, page } = ctx.params;
+
+    // 至少两个中文
+    if (!/^[\u4e00-\u9fa5]{2,}$/.test(wd)) {
+        ctx.body = "wd 参数必须包含至少两个中文字符";
         return;
     }
-    const url = `${Host}/search-${page}.htm?search=${wd}`;
-    console.log(`获取jabletv影视 ${url}`);
+    const url = `${Host}/search/${wd}/?mode=async&function=get_block&block_id=list_videos_videos_list_search_result&q=${wd}&sort_by=&from=$0{page}&_=1769756466263`;
+    const key = `${cacheKey}_${url}`;
+
+    console.log(`[jabletv][SEARCH] ${wd} page=${page}`);
+
     try {
-        // 从缓存中获取数据
-        let data = await get(`${cacheKey}_${url}`);
+        let data = await get(key);
         const from = data ? "cache" : "server";
+
         if (!data) {
-            // 如果缓存中不存在数据
-            console.log("从服务端重新获取jabletv影视");
-            // 从服务器拉取数据
-            const response = await axios.get(url);
-            data = getData(response.data);
+            console.log("[jabletv][SEARCH] 缓存未命中，开始请求（代理优先）");
+
+            const res = await axiosClient({
+                url,
+                method: "GET",
+                useProxy: true,
+                headers: {
+                    Referer: Host,
+                    "User-Agent":
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+                }
+            });
+
+            data = getData(res.data);
             updateTime = new Date().toISOString();
-            if (!data) {
-                ctx.body = {
-                    code: 500,
-                    ...routerInfo,
-                    message: "获取失败",
-                };
-                return false;
-            }
-            // 将数据写入缓存
-            await set(`${cacheKey}_${url}`, data);
+
+            await set(key, data);
         }
+
         ctx.body = {
             code: 200,
             message: "获取成功",
             ...routerInfo,
             from,
-            total: data.length,
+            total: Array.isArray(data) ? data.length : 0,
             updateTime,
-            data,
+            data
         };
-    } catch (error) {
-        console.error(error);
+
+    } catch (err) {
+        console.error("[jabletv][SEARCH_ERROR]", err.message);
+        ctx.status = 502;
         ctx.body = {
-            code: 500,
-            message: "获取失败",
+            code: 502,
+            message: "目标站点访问失败（请检查代理）"
         };
     }
 });
-
 
 jabletvRouter.info = routerInfo;
 module.exports = jabletvRouter;
