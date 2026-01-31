@@ -45,8 +45,6 @@ registerRoutes(__dirname + "/video", router, allRouterInfo);
 // 遍历hot文件夹下的所有路由模块
 registerRoutes(__dirname + "/hot", router, allRouterInfo);
 
-// 遍历search文件夹下的所有路由模块
-registerRoutes(__dirname + "/search", router, allRouterInfo);
 
 // 遍历other文件夹下的所有路由模块
 registerRoutes(__dirname + "/other", router, allRouterInfo);
@@ -60,17 +58,14 @@ registerRoutes(__dirname + "/bit", router, allRouterInfo);
 // 遍历comics文件夹下的所有路由模块
 registerRoutes(__dirname + "/comics", router, allRouterInfo);
 
-// 遍历pic文件夹下的所有路由模块
-registerRoutes(__dirname + "/pic", router, allRouterInfo);
-
-// 遍历vip文件夹下的所有路由模块
-registerRoutes(__dirname + "/vip", router, allRouterInfo);
-
 // 遍历live文件夹下的所有路由模块
 registerRoutes(__dirname + "/live", router, allRouterInfo);
 
 // 遍历story文件夹下的所有路由模块
 registerRoutes(__dirname + "/story", router, allRouterInfo);
+
+// 遍历v19文件夹下的所有路由模块
+registerRoutes(__dirname + "/v19", router, allRouterInfo);
 
 // 遍历proxy文件夹下的所有路由模块
 registerRoutes(__dirname + "/proxy", router, allRouterInfo);

@@ -7,7 +7,7 @@ const { get, set, del } = require("../../utils/cacheData");
 const routerInfo = { name: "每日一言", title: "随机一言", subtitle: "每日一言"};
 
 // 缓存键名
-const cacheKey = "51cgData";
+const cacheKey = "yiyanData";
 
 // 调用时间
 let updateTime = new Date().toISOString();

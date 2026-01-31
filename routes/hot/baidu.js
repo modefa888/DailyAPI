@@ -16,29 +16,88 @@ let updateTime = new Date().toISOString();
 const url = "https://top.baidu.com/board?tab=realtime";
 
 // 数据处理
-const getData = (data) => {
-  if (!data) return [];
-  const dataList = [];
+const xpath = require('xpath');
+const { DOMParser } = require('xmldom');
+
+const getData = (html) => {
+  if (!html) return [];
+
+  const list = [];
+
   try {
-    const pattern = /<!--s-data:(.*?)-->/s;
-    const matchResult = data.match(pattern);
-    const jsonObject = JSON.parse(matchResult[1]).cards[0].content;
-    jsonObject.forEach((v) => {
-      dataList.push({
-        title: v.query,
-        desc: v.desc,
-        pic: v.img,
-        hot: Number(v.hotScore),
-        url: `https://www.baidu.com/s?wd=${encodeURIComponent(v.query)}`,
-        mobileUrl: v.url,
+    const doc = new DOMParser({
+      errorHandler: { warning: null, error: null }
+    }).parseFromString(html, 'text/html');
+
+    // 每一条热搜卡片
+    const items = xpath.select(
+      "//*[contains(@class,'category-wrap')]",
+      doc
+    );
+
+    items.forEach((node) => {
+      /* ===== 标题 ===== */
+      const titleNode = xpath.select1(
+        ".//*[contains(@class,'c-single-text-ellipsis')]",
+        node
+      );
+      const title = titleNode?.textContent.trim() || '';
+
+      /* ===== 链接 ===== */
+      const urlNode = xpath.select1(
+        ".//a[contains(@class,'title')]",
+        node
+      );
+      const url = urlNode?.getAttribute('href') || '';
+
+      /* ===== 描述（优先短描述） ===== */
+      const descNode =
+        xpath.select1(".//*[contains(@class,'hot-desc') and contains(@class,'small')]", node)
+        || xpath.select1(".//*[contains(@class,'hot-desc') and contains(@class,'large')]", node);
+
+      const desc = descNode
+        ? descNode.textContent.replace(/查看更多>.*/g, '').trim()
+        : '';
+
+      /* ===== 热度 ===== */
+      const hotNode = xpath.select1(
+        ".//*[contains(@class,'hot-index')]",
+        node
+      );
+      const hot = hotNode
+        ? Number(hotNode.textContent.replace(/\s+/g, ''))
+        : 0;
+
+      /* ===== 图片 ===== */
+      const imgNodes = xpath.select(
+        ".//img",
+        node
+      );
+      const pic =
+        imgNodes.length > 1
+          ? imgNodes[1].getAttribute('src')
+          : imgNodes[0]?.getAttribute('src') || '';
+
+      if (!title) return;
+
+      list.push({
+        title,
+        desc,
+        pic,
+        hot,
+        url,
+        mobileUrl: url
       });
     });
-    return dataList;
-  } catch (error) {
-    console.error("数据处理出错" + error);
-    return false;
+
+    return list;
+  } catch (err) {
+    console.error('[XPATH_PARSE_ERROR]', err.message);
+    return [];
   }
 };
+
+
 
 // 百度热搜
 baiduRouter.get("/baidu", async (ctx) => {

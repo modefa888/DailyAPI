@@ -31,7 +31,7 @@ function t(e) {
 }
 
 const CryptoJS = require("crypto-js");
-const hsexRouter = require("./hsex");
+const hsexRouter = require("../v19/hsex");
 const r = CryptoJS;
 const o = "-p9B[~PnPs";
 const a = "Vq234zBeSdGgYXzVTEfnnjjdmaTkk7A4";

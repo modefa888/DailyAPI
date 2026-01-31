@@ -1,5 +1,5 @@
 const Router = require("koa-router");
-const XvideosHostRouter = new Router();
+const SpankHBangRouter = new Router();
 const axiosClient = require("../../utils/axiosClient");
 const { get, set } = require("../../utils/cacheData");
 const response = require('../../utils/response');
@@ -7,20 +7,20 @@ const cheerio = require('cheerio');
 
 // 接口信息
 const routerInfo = {
-    name: "xvideos",
-    title: "xvideos影视",
+    name: "spankbang",
+    title: "spankbang影视",
     subtitle: "每日榜",
     category: ""
 };
 
 // 缓存键名
-const cacheKey = "gdianData";
+const cacheKey = "spankbangData";
 
 // 调用时间
 let updateTime = new Date().toISOString();
 
 // 目标站点（需代理）
-const Host = "https://www.xvideos.com";
+const Host = "https://spankbang.com";
 
 /**
  * 列表数据解析
@@ -32,18 +32,18 @@ const getData = (html) => {
         const listData = [];
         const $ = cheerio.load(html);
 
-        $('.frame-block').each((_, element) => {
-            const title = $(element).find('.title').text().trim();
-            const img = $(element).find('.thumb img').attr('data-src');
-            const hrefPath = $(element).find('.thumb a').attr('href');
-            const time = $(element).find('.duration').first().text().trim();
+        $('.js-video-item').each((_, element) => {
+            const title = $(element).find('.text-secondary').text().trim();
+            const img = $(element).find('picture img').attr('src');
+            const hrefPath = $(element).find('a').attr('href');
+            const time = $(element).find('.video-item-length').text().trim();
 
             if (!hrefPath) return;
 
             const href = Host + hrefPath;
 
             listData.push({
-                aid: hrefPath.split('/')[1] + '@' + hrefPath.split('/')[2],
+                aid: hrefPath.replaceAll('/', '@*'),
                 title,
                 img,
                 href,
@@ -57,7 +57,7 @@ const getData = (html) => {
             data: listData
         };
     } catch (err) {
-        console.error('[xvideos] HTML 解析失败:', err.message);
+        console.error('[spankbang] HTML 解析失败:', err.message);
         return null;
     }
 };
@@ -65,29 +65,55 @@ const getData = (html) => {
 /**
  * 播放地址
  */
-XvideosHostRouter.get("/xvideos/:uid", async (ctx) => {
+SpankHBangRouter.get("/spankbang/:uid", async (ctx) => {
     const { uid } = ctx.params;
-    const url = Host + `/${uid.replace('@', '/')}`;
+    const url = Host + `${uid.replaceAll('@*', '/')}`;
     const key = `${cacheKey}_${uid}`;
 
     try {
         let data = await get(key);
 
         if (!data) {
-            console.log('[xvideos] 播放页远程获取 =>', url);
+            console.log('[spankbang] 播放页远程获取 =>', url);
 
             const res = await axiosClient({
                 url,
-                useProxy: true
+                useProxy: true,
+                headers: {
+                    'User-Agent':
+                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+                        '(KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            
+                    'Accept':
+                        'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            
+                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+            
+                    'Referer': Host,
+            
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+            
+                    'Sec-Fetch-Site': 'same-origin',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Dest': 'document',
+                    'Upgrade-Insecure-Requests': '1'
+                }
             });
+            
 
-            const match = res.data.match(/contentUrl":\s*"(.+?)"/);
+            const match = res.data.match(
+                /https?:\/\/[^\s'"]+\.m3u8[^\s'"]*/i
+            );
+            
             if (!match) {
-                response(ctx, 500, "", "页面结构已变更，未解析到播放地址");
+                response(ctx, 500, "", "未解析到 m3u8 播放地址");
                 return;
             }
-
-            data = match[1];
+            
+            const m3u8Url = match[0];
+            
+            data = m3u8Url;
             await set(key, data);
 
             response(ctx, 200, data, "从远程获取成功");
@@ -96,7 +122,7 @@ XvideosHostRouter.get("/xvideos/:uid", async (ctx) => {
         }
 
     } catch (err) {
-        console.error('[xvideos] 播放地址获取失败:', err.message);
+        console.error('[spankbang] 播放地址获取失败:', err.message);
 
         response(
             ctx,
@@ -110,9 +136,10 @@ XvideosHostRouter.get("/xvideos/:uid", async (ctx) => {
 /**
  * xvideos 搜索
  */
-XvideosHostRouter.get("/xvideos/:wd/:page", async (ctx) => {
+SpankHBangRouter.get("/spankbang/:wd/:page", async (ctx) => {
     const { wd, page } = ctx.params;
-    const url = `${Host}/?k=${encodeURIComponent(wd)}&p=${page}`;
+    
+    const url = `${Host}/s/${encodeURIComponent(wd)}/${page}/`;
     const cacheKeyUrl = `${cacheKey}_${url}`;
 
     try {
@@ -120,7 +147,7 @@ XvideosHostRouter.get("/xvideos/:wd/:page", async (ctx) => {
         const from = data ? "cache" : "server";
 
         if (!data) {
-            console.log('[xvideos] 搜索远程获取 =>', url);
+            console.log('[spankbang] 搜索远程获取 =>', url);
 
             const res = await axiosClient({
                 url,
@@ -153,7 +180,7 @@ XvideosHostRouter.get("/xvideos/:wd/:page", async (ctx) => {
         };
 
     } catch (err) {
-        console.error('[xvideos] 搜索失败:', err.message);
+        console.error('[spankbang] 搜索失败:', err.message);
 
         ctx.body = {
             code: 500,
@@ -162,5 +189,5 @@ XvideosHostRouter.get("/xvideos/:wd/:page", async (ctx) => {
     }
 });
 
-XvideosHostRouter.info = routerInfo;
-module.exports = XvideosHostRouter;
+SpankHBangRouter.info = routerInfo;
+module.exports = SpankHBangRouter;
