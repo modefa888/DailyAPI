@@ -1,5 +1,5 @@
 const Router = require("koa-router");
-const J1HostRouter = new Router();
+const MadoutvHostRouter = new Router();
 
 const { get, set } = require("../../utils/cacheData");
 const response = require("../../utils/response");
@@ -135,7 +135,7 @@ async function search(wd, page) {
 
 /* ================== 路由 ================== */
 
-J1HostRouter.get("/madoutv/:wd/:page", async (ctx) => {
+MadoutvHostRouter.get("/madoutv/:wd/:page", async (ctx) => {
     const { wd, page } = ctx.params;
     const key = `${cacheKey}_${wd}_${page}`;
 
@@ -188,5 +188,5 @@ J1HostRouter.get("/madoutv/:wd/:page", async (ctx) => {
     }
 });
 
-J1HostRouter.info = routerInfo;
-module.exports = J1HostRouter;
+MadoutvHostRouter.info = routerInfo;
+module.exports = MadoutvHostRouter;

@@ -94,7 +94,7 @@ hsexRouter.get("/hsex/:uid", async (ctx) => {
                 return;
             }
 
-            data = { title, m3u8, img };
+            data = { title, m3u8, img, url};
             await set(key, data);
 
             response(ctx, 200, data, "从远程获取成功（代理）");

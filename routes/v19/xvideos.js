@@ -80,14 +80,22 @@ XvideosHostRouter.get("/xvideos/:uid", async (ctx) => {
                 url,
                 useProxy: true
             });
-
             const match = res.data.match(/contentUrl":\s*"(.+?)"/);
             if (!match) {
                 response(ctx, 500, "", "页面结构已变更，未解析到播放地址");
                 return;
             }
 
-            data = match[1];
+            // 2. 解析og:image:secure_url封面图
+            const ogImgMatch = res.data.match(/<meta property="og:image" content="(.+?)"/);
+            // 3. 解析<title>标签内容（去空格、去换行）
+            const titleMatch = res.data.match(/<meta property="og:title" content="(.+?)"/);
+            const img = ogImgMatch[1];
+            // 标题去空行、去多余空格，保留有效内容
+            const title = titleMatch[1].replace(/\s+/g, " ").trim();
+            const m3u8 = match[1]
+            
+            data = { m3u8, img, title, url};
             await set(key, data);
 
             response(ctx, 200, data, "从远程获取成功");

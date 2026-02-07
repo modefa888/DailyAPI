@@ -7,7 +7,7 @@
     <link rel="shortcut icon"
         href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'%3E%3Cpath d='M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 15c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V6h18v12z'/%3E%3Cpath d='M8 15h2.5l1-3 1 3H16v-5H8v5z'/%3E%3C/svg%3E"
         type="image/x-icon" />
-    <title>91密 - 视频浏览</title>
+    <title>91 - 视频浏览</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -27,7 +27,8 @@
                         secondary: '#8b5cf6',
                         accent: '#ec4899',
                         dark: '#1e293b',
-                        light: '#f8fafc'
+                        light: '#f8fafc',
+                        like: '#ef4444' // 新增：收藏颜色（红色）
                     },
                     fontFamily: {
                         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -102,6 +103,27 @@
     </style>
 
     <style>
+        body.page-loading {
+            opacity: 0;
+            visibility: hidden;
+        }
+        body.page-loaded {
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .site-watermark {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.08;
+            background-repeat: repeat;
+            background-size: 260px 180px;
+            transform: rotate(-18deg);
+            transform-origin: center;
+            mix-blend-mode: multiply;
+        }
         /* 自定义滚动条 */
         ::-webkit-scrollbar {
             width: 8px;
@@ -121,6 +143,7 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
+
 
         /* 平滑滚动 */
         html {
@@ -178,22 +201,32 @@
             }
         }
 
-
-
         /* 模糊背景效果 */
         .backdrop-blur {
             backdrop-filter: blur(5px);
             -webkit-backdrop-filter: blur(5px);
         }
+
+        /* 收藏按钮过渡效果（无背景，仅保留过渡和光标） */
+        .like-btn {
+            transition: all 0.2s ease;
+            cursor: pointer;
+            /* 彻底删掉所有background相关代码，无任何背景 */
+        }
+        /* 可选：hover时仅变颜色，无背景 */
+        .like-btn:hover {
+            transform: scale(1.1); /* 可选：hover轻微放大，提升交互 */
+        }
     </style>
 </head>
 
-<body class="bg-light text-dark min-h-screen">
+<body class="bg-light text-dark min-h-screen page-loading">
     <!-- 背景动画 -->
     <div class="bg-animation"></div>
+    <div id="siteWatermark" class="site-watermark"></div>
 
     <!-- 导航头 -->
-    <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-dark text-white shadow-lg">
+    <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-dark text-white shadow-lg transition-transform duration-300">
         <div class="container mx-auto px-4 py-3 flex items-center justify-between">
             <!-- Logo -->
             <div class="flex items-center space-x-2">
@@ -202,7 +235,7 @@
                         d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z">
                     </path>
                 </svg>
-                <h1 class="text-xl font-bold gradient-text">91密</h1>
+                <h1 class="text-xl font-bold gradient-text">91</h1>
             </div>
 
             <!-- 搜索框 -->
@@ -213,39 +246,99 @@
                     <i class="fa fa-search absolute left-3 top-3 text-white/60"></i>
                 </div>
                 <button id="searchButton" onclick="searchData()"
-                    class="absolute right-1 top-1 bg-primary hover:bg-primary/90 text-white px-4 py-1 rounded-full transition-all">
-                    搜索
+                    class="absolute right-1 top-1 bg-primary hover:bg-primary/90 text-white w-9 h-9 rounded-full transition-all flex items-center justify-center">
+                    <i class="fa fa-search"></i>
                 </button>
             </div>
 
-            <!-- 站点选择器 -->
-            <div class="relative">
-                <select id="siteSelector" onchange="changeSite(this.value)"
-                    class="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-all border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none pr-10 cursor-pointer"
-                    style="color: #6366f1 !important;">
-                    <!-- 站点选项将通过JavaScript动态生成 -->
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/60">
-                    <i class="fa fa-chevron-down text-xs"></i>
-                </div>
-            </div>
-
-            <!-- 历史按钮 -->
+            <!-- 设置按钮 + 下拉面板 -->
             <div class="relative ml-4">
-                <button id="historyButton" onclick="showHistory()"
-                    class="flex items-center space-x-1 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-all">
-                    <i class="fa fa-history"></i>
-                    <span class="hidden sm:inline">历史记录</span>
+                <button id="settingsButton" onclick="toggleSettings()"
+                    class="flex items-center justify-center bg-white/10 hover:bg-white/20 w-11 h-11 rounded-full transition-all">
+                    <i class="fa fa-cog"></i>
                 </button>
+
+                <!-- 设置面板 -->
+                <div id="settingsPanel"
+                    class="absolute right-0 mt-2 w-72 glass-dark rounded-lg shadow-xl hidden animate-fade-in p-3 space-y-2">
+                    <button id="likeButton" onclick="showLikes()"
+                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        <span class="flex items-center space-x-2">
+                            <i class="fa fa-heart text-like"></i>
+                            <span>我的喜欢</span>
+                        </span>
+                        <i class="fa fa-chevron-right text-white/60 text-xs"></i>
+                    </button>
+                    <button id="historyButton" onclick="showHistory()"
+                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        <span class="flex items-center space-x-2">
+                            <i class="fa fa-history"></i>
+                            <span>历史记录</span>
+                        </span>
+                        <i class="fa fa-chevron-right text-white/60 text-xs"></i>
+                    </button>
+                    <button id="blockButton" onclick="showBlocks()"
+                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        <span class="flex items-center space-x-2">
+                            <i class="fa fa-ban"></i>
+                            <span>黑名单</span>
+                        </span>
+                        <i class="fa fa-chevron-right text-white/60 text-xs"></i>
+                    </button>
+                    <div class="pt-2 border-t border-white/10">
+                        <div class="text-white/70 text-xs mb-2">设置站点</div>
+                        <div class="relative">
+                            <select id="siteSelector" onchange="changeSite(this.value)"
+                                class="w-full bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg transition-all border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none pr-10 cursor-pointer"
+                                style="color: #6366f1 !important;">
+                                <!-- 站点选项将通过JavaScript动态生成 -->
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/60">
+                                <i class="fa fa-chevron-down text-xs"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 收藏列表容器 -->
+                <div id="likeContainer"
+                    class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
+                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                        <h3 class="font-medium text-white">我的收藏</h3>
+                        <button onclick="clearLikes()" class="text-white/60 hover:text-white text-sm">
+                            <i class="fa fa-trash-o mr-1"></i>清空
+                        </button>
+                    </div>
+                    <div id="likeContent" class="divide-y divide-white/10">
+                        <!-- 收藏列表内容将通过JS动态添加 -->
+                    </div>
+                </div>
 
                 <!-- 历史记录容器 -->
                 <div id="historyContainer"
                     class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
-                    <div class="p-3 border-b border-white/10">
+                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
                         <h3 class="font-medium text-white">播放历史</h3>
+                        <button onclick="clearHistory()" class="text-white/60 hover:text-white text-sm">
+                            <i class="fa fa-trash-o mr-1"></i>清空
+                        </button>
                     </div>
                     <div id="historyContent" class="divide-y divide-white/10">
                         <!-- 历史记录内容将通过JS动态添加 -->
+                    </div>
+                </div>
+
+                <!-- 拉黑列表容器 -->
+                <div id="blockContainer"
+                    class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
+                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                        <h3 class="font-medium text-white">黑名单</h3>
+                        <button onclick="clearBlocks()" class="text-white/60 hover:text-white text-sm">
+                            <i class="fa fa-trash-o mr-1"></i>清空
+                        </button>
+                    </div>
+                    <div id="blockContent" class="divide-y divide-white/10">
+                        <!-- 拉黑列表内容将通过JS动态添加 -->
                     </div>
                 </div>
             </div>
@@ -344,7 +437,7 @@
             { value: 'hsex', label: 'HSEX', color: '#ec4899' },
             { value: 'jabletv', label: 'JableTV', color: '#06b6d4' },
             { value: 'madoutv', label: 'MadouTV', color: '#10b981' },
-            { value: 'spankbang', label: 'SpankBang', color: '#06b6d4' },
+            { value: 'kanav', label: 'KanAV', color: '#ec4899' },
         ];
 
         console.log('当前站点:', siteName);
@@ -352,6 +445,11 @@
         let currentPage = 1;
         let currentSearchTerm = '';
         let dp = null; // DPlayer实例
+        let isLikeContainerVisible = false; // 新增：收藏列表显示状态
+        let isHistoryContainerVisible = false; // 原有：历史列表显示状态
+        let isBlockContainerVisible = false; // 拉黑列表显示状态
+        let isSettingsPanelVisible = false; // 设置面板显示状态
+        let lastScrollTop = 0;
 
         // 初始化页面
         window.onload = () => {
@@ -365,7 +463,10 @@
                 document.getElementById('siteSelector').value = savedSite;
                 updateSiteSelectorColor(savedSite);
             }
+            updateWatermark(siteName);
             fetchData('', currentPage);
+            document.body.classList.remove('page-loading');
+            document.body.classList.add('page-loaded');
         };
 
         // 滚动监听
@@ -376,6 +477,15 @@
             } else {
                 container.classList.add('hidden');
             }
+
+            const header = document.getElementById('header');
+            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+            if (currentScroll > lastScrollTop && currentScroll > 80) {
+                header.classList.add('-translate-y-full');
+            } else {
+                header.classList.remove('-translate-y-full');
+            }
+            lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
         };
 
         // 异步获取数据
@@ -412,16 +522,25 @@
             }
         };
 
-
-
         // 渲染数据到页面
+        // 渲染数据到页面 - 最终完整版（收藏按钮右上角+无背景+红心持久）
         const renderData = (data) => {
             const videoListContainer = document.getElementById('videoList');
 
             data.forEach((video, index) => {
+                if (isBlocked(video.aid)) {
+                    return;
+                }
+                // 判断当前视频是否已收藏（核心：渲染时直接显示红心/白心）
+                const liked = isLiked(video.aid);
                 const card = document.createElement('div');
                 card.classList.add('video-card', 'bg-white', 'rounded-xl', 'overflow-hidden', 'shadow-lg', 'card-hover', 'animate-slide-up');
                 card.style.animationDelay = `${index * 0.1}s`;
+                card.dataset.aid = video.aid;
+                card.dataset.title = video.title;
+                card.dataset.img = video.img;
+                card.dataset.href = video.href;
+                card.dataset.videoUrl = video.video_url;
 
                 card.innerHTML = `
                     <div class="relative overflow-hidden">
@@ -431,14 +550,25 @@
                             onclick="openFullScreenPreview('${video.img}','${video.title}','${video.aid}','${video.video_url}')"
                             class="video-card-img w-full h-48 object-contain cursor-pointer bg-gray-100"
                         >
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end">
-                            <div class="p-3 text-white">
-                                <span class="bg-primary/80 text-white text-xs px-2 py-1 rounded-full">${video.time}</span>
-                            </div>
+                        <!-- 收藏按钮：右上角+无背景+修复图标类名冲突 -->
+                        <div class="like-btn absolute top-3 right-3 ${liked ? 'text-like' : 'text-white/90'} hover:text-like text-xl z-10" 
+                            onclick="toggleLike('${video.aid}', '${video.title}', '${video.img}', '${video.href}', '${video.video_url}')"
+                            data-aid="${video.aid}">
+                            <i class="fa ${liked ? 'fa-heart' : 'fa-heart-o'}"></i>
                         </div>
+                        <!-- 拉黑按钮：左上角 -->
+                        <div class="absolute top-3 left-3 text-white/80 hover:text-white text-lg z-10 cursor-pointer"
+                            onclick="toggleBlock('${video.aid}', '${video.title}', '${video.img}', '${video.href}', '${video.video_url}')">
+                            <i class="fa fa-ban"></i>
+                        </div>
+                        <!-- 底部时长渐变层（无收藏按钮） -->
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end">
+                            <span class="bg-primary/80 text-white text-xs px-2 py-1 rounded-full ml-3">${video.time}</span>
+                        </div>
+                        <!-- 播放按钮（右下角，无冲突） -->
                         <button 
-                            class="playButton absolute bottom-3 right-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white w-10 h-10 rounded-full flex items-center justify-center transition-all"
-                            onclick="openVideoPlayer('${video.href}','${video.title}','${video.aid}','${video.video_url}')"
+                            class="playButton absolute bottom-3 right-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white w-10 h-10 rounded-full flex items-center justify-center transition-all z-10"
+                            onclick="openVideoPlayer('${video.href}','${video.title}','${video.aid}','${video.video_url}','${siteName}','${video.img}')"
                         >
                             <i class="fa fa-play"></i>
                         </button>
@@ -446,26 +576,12 @@
                     <div class="p-4">
                         <h3 class="font-medium text-lg mb-2 line-clamp-1">${video.title}</h3>
                         <p class="text-gray-600 text-sm mb-4 line-clamp-2">${video.desc}</p>
-                        <div class="flex justify-between items-center">
-                            <a 
-                                href="${video.href}" 
-                                target="_blank"
-                                class="text-primary hover:text-primary/80 text-sm font-medium transition-all flex items-center"
-                            >
-                                <span>打开链接</span>
-                                <i class="fa fa-external-link ml-1 text-xs"></i>
-                            </a>
-                            <button 
-                                onclick="openVideoPlayer('${video.href}','${video.title}','${video.aid}','${video.video_url}')"
-                                class="bg-primary hover:bg-primary/90 text-white text-sm px-3 py-1 rounded-full transition-all"
-                            >
-                                播放
-                            </button>
-                        </div>
+                        
                     </div>
                 `;
 
                 videoListContainer.appendChild(card);
+                
             });
         };
 
@@ -537,189 +653,41 @@
         };
 
         // 打开视频播放器 - 从视频卡片打开
-        const openVideoPlayer = async (videoUrl, videoTitle, videoRid, video_url) => {
+        const openVideoPlayer = async (videoUrl, videoTitle, videoRid, video_url, siteKey, videoImg = null) => {
+        
             try {
-                showLoadingMessage();
-                let realVideoUrl = video_url;
-
-                if (video_url == 'null') {
-                    // 获取真实视频地址
-                    const response = await fetch(`/${siteName}/` + videoRid);
-                    const responseData = await response.json();
-                    realVideoUrl = responseData.data.m3u8;
-                }
-
-                // 保存播放历史
+                showLoadingMessage(); // 保留加载提示，提升交互体验
+                // 核心：拼接播放页地址（完全匹配规则：http://127.0.0.1:8800/J1/play.html?key=hsex&parm=视频Rid）
+                const playPageUrl = `${host}/J1/play.html?key=${siteKey}&parm=${videoRid}`;
+                // 新标签页打开播放页
+                openInNewTab(playPageUrl);
+                // 可选：保留播放历史记录（如需取消，直接删掉以下3行即可）
                 const timestamp = Date.now();
-                saveHistory(videoTitle, realVideoUrl, timestamp);
-
-                // 创建DPlayer实例并播放
-                await createAndPlayDPlayer(realVideoUrl, videoTitle, videoUrl);
+                const saveUrl = video_url !== 'null' ? video_url : videoRid; // 兼容video_url为null的情况
+                saveHistory(videoTitle, saveUrl, timestamp, videoRid, video_url, siteKey, videoImg);
+                showToast(`正在打开播放页：${videoTitle}`, 'success');
             } catch (error) {
-                console.error('Error fetching real video URL:', error);
-                showToast('加载视频失败，请稍后重试', 'error');
+                console.error('打开播放页失败：', error);
+                showToast('打开播放页失败，请稍后重试', 'error');
             } finally {
-                hideLoadingMessage();
+                hideLoadingMessage(); // 隐藏加载提示
             }
-        };
+                };
 
         // 播放历史视频
-        const playHistoryVideo = async (videoUrl, videoTitle) => {
-            try {
-                showLoadingMessage();
-
-                // 历史记录中保存的已经是真实视频地址，直接使用
-                const realVideoUrl = videoUrl;
-
-                // 更新播放历史
-                const timestamp = Date.now();
-                saveHistory(videoTitle, realVideoUrl, timestamp);
-
-                // 创建DPlayer实例并播放
-                await createAndPlayDPlayer(realVideoUrl, videoTitle);
-            } catch (error) {
-                console.error('Error playing history video:', error);
-                showToast('播放历史视频失败，请稍后重试', 'error');
-            } finally {
-                hideLoadingMessage();
-            }
+        const playHistoryVideo = async (videoRid, videoTitle, videoUrl, siteKey, videoImg) => {
+            const rid = videoRid;
+            const url = videoUrl || 'null';
+            const key = siteKey || siteName;
+            await openVideoPlayer('', videoTitle, rid, url, key, videoImg);
         };
 
-
-        // 创建DPlayer实例并播放视频
-        const createAndPlayDPlayer = async (videoUrl, videoTitle, originalUrl = null) => {
-            try {
-                await testVideoUrl(videoUrl)
-                // 创建DPlayer实例
-                if (dp) {
-                    dp.destroy();
-                }
-
-                // 获取视频封面图
-                let coverImage = '';
-                if (originalUrl) {
-                    // 从视频卡片获取封面图
-                    try {
-                        const cardElement = document.querySelector(`[onclick="openVideoPlayer('${originalUrl}','${videoTitle}','${video.aid}','${video.video_url}')"]`);
-                        if (cardElement) {
-                            const imgElement = cardElement.closest('.video-card').querySelector('img');
-                            if (imgElement) {
-                                coverImage = imgElement.src;
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Error getting cover image:', e);
-                    }
-                }
-
-                dp = new DPlayer({
-                    container: document.getElementById('dplayer'),
-                    video: {
-                        url: videoUrl,
-                        type: 'hls',
-                        pic: coverImage,
-                        thumbnails: coverImage,
-                    },
-                    danmaku: {
-                        id: '999999',
-                        api: 'https://api.prprpr.me/dplayer/',
-                    },
-                    contextmenu: [
-                        {
-                            text: '自定义菜单',
-                            link: 'https://github.com/MoePlayer/DPlayer',
-                        },
-                    ],
-                    highlight: [
-                        {
-                            time: 20,
-                            text: '这是第20秒',
-                        },
-                        {
-                            time: 40,
-                            text: '这是第40秒',
-                        },
-                    ],
-                    autoplay: true,
-                    theme: '#6366f1',
-                    loop: true,
-                    lang: 'zh-cn',
-                    screenshot: true,
-                    hotkey: true,
-                    preload: 'auto',
-                    logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%236366f1"%3E%3Cpath d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 15c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V6h18v12z"/%3E%3Cpath d="M8 15h2.5l1-3 1 3H16v-5H8v5z"/%3E%3C/svg%3E',
-                });
-
-                // 添加错误监听
-                dp.on('error', (err) => {
-                    console.error('DPlayer error:', err);
-                    showToast('视频播放出错，正在尝试新的播放方式...', 'warning');
-                    setTimeout(() => {
-                        closeVideoPlayer();
-                        openInNewTab(videoUrl);
-                    }, 2000);
-                });
-
-                // 显示视频播放器
-                document.getElementById('videoPlayerContainer').classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
-
-                // 确保播放器容器正确显示
-                const playerContainer = document.getElementById('dplayer').parentElement;
-                playerContainer.style.transform = '';
-            } catch (error) {
-                console.error('Video playback error:', error);
-                showToast('检测到跨域问题，正在跳转新页面播放...', 'warning');
-                setTimeout(() => {
-                    closeVideoPlayer();
-                    openInNewTab(videoUrl);
-                }, 1500);
-            }
+        // 新增：播放收藏的视频
+        const playLikeVideo = async (videoAid, videoTitle, videoImg, videoHref, videoUrl, siteKey) => {
+            const key = siteKey || siteName;
+            await openVideoPlayer(videoHref, videoTitle, videoAid, videoUrl, key, videoImg);
+            closeLikeOnClickOutside();
         };
-
-        /**
- * 判断视频是否真正可播放（m3u8 / mp4 通用）
- * @param {string} url
- * @param {number} timeout
- */
-        const testVideoUrl = (url, timeout = 8000) => {
-            return new Promise((resolve, reject) => {
-                const video = document.createElement('video');
-
-                let timer = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('Video load timeout'));
-                }, timeout);
-
-                const cleanup = () => {
-                    clearTimeout(timer);
-                    video.pause();
-                    video.removeAttribute('src');
-                    video.load();
-                    video.remove();
-                };
-
-                video.muted = true;
-                video.preload = 'auto';
-                video.crossOrigin = 'anonymous';
-
-                // ✔ 能播放（m3u8 已成功解析）
-                video.oncanplay = () => {
-                    cleanup();
-                    resolve(true);
-                };
-
-                // ❌ 播放失败（CORS / ts 被拦 / 403）
-                video.onerror = () => {
-                    cleanup();
-                    reject(new Error('Video cannot be played'));
-                };
-
-                video.src = url;
-                video.load();
-            });
-        };
-
 
         // 在新标签页打开URL
         const openInNewTab = (url) => {
@@ -738,8 +706,6 @@
         };
 
         // 历史记录相关功能
-        let isHistoryContainerVisible = false;
-
         // 获取历史记录
         const getHistory = () => {
             const historyString = localStorage.getItem('playHistory');
@@ -747,7 +713,7 @@
         };
 
         // 保存历史记录
-        const saveHistory = (title, url, timestamp) => {
+        const saveHistory = (title, url, timestamp, videoRid = null, videoUrl = null, siteKey = siteName, videoImg = null) => {
             const history = getHistory();
 
             // 查找是否存在相同的 url
@@ -758,10 +724,10 @@
                 const playCount = (history[existingIndex]?.playCount || 0) + 1;
                 // 先保存，再删除旧历史记录
                 history.splice(existingIndex, 1);
-                history.unshift({ title, url, timestamp, playCount })
+                history.unshift({ title, url, timestamp, siteName: siteKey, playCount, rid: videoRid, video_url: videoUrl, img: videoImg })
             } else {
                 // 如果不存在相同的 url，添加新的历史记录到最前面
-                history.unshift({ title, url, timestamp, playCount: 1 });
+                history.unshift({ title, url, timestamp, siteName: siteKey, playCount: 1, rid: videoRid, video_url: videoUrl, img: videoImg });
             }
 
             // 限制历史记录数量
@@ -781,8 +747,53 @@
             }
         };
 
+        // 设置面板开关
+        const toggleSettings = () => {
+            const settingsPanel = document.getElementById('settingsPanel');
+            isSettingsPanelVisible = !isSettingsPanelVisible;
+
+            if (isSettingsPanelVisible) {
+                settingsPanel.classList.remove('hidden');
+                document.addEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            } else {
+                settingsPanel.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+        };
+
+        // 点击设置面板外部关闭
+        const closeSettingsOnClickOutside = (event) => {
+            const settingsPanel = document.getElementById('settingsPanel');
+            const settingsButton = document.getElementById('settingsButton');
+
+            if (!settingsPanel.contains(event.target) && !settingsButton.contains(event.target)) {
+                isSettingsPanelVisible = false;
+                settingsPanel.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+        };
+
         // 显示历史记录
         const showHistory = () => {
+            if (isSettingsPanelVisible) {
+                isSettingsPanelVisible = false;
+                document.getElementById('settingsPanel').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+            if (isBlockContainerVisible) {
+                isBlockContainerVisible = false;
+                document.getElementById('blockContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+            }
+            // 先关闭收藏列表
+            if (isLikeContainerVisible) {
+                isLikeContainerVisible = false;
+                document.getElementById('likeContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+            }
+
             const historyContainer = document.getElementById('historyContainer');
             isHistoryContainerVisible = !isHistoryContainerVisible;
 
@@ -800,27 +811,32 @@
                     </div>
                 `;
             } else {
-                // 显示历史记录
+                // 显示历史记录（样式与我的喜欢一致）
                 history.forEach(item => {
                     const historyItem = document.createElement('div');
-                    historyItem.classList.add('p-3', 'hover:bg-white/5', 'transition-all');
+                    historyItem.classList.add('p-3', 'hover:bg-white/5', 'transition-all', 'flex', 'items-center', 'space-x-3');
 
                     historyItem.innerHTML = `
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1 min-w-0">
-                                <h4 class="text-white text-sm font-medium line-clamp-1">${item.title}</h4>
-                                <div class="flex items-center mt-1 text-xs text-white/60">
-                                    <span>观看时间: ${new Date(item.timestamp).toLocaleString()}</span>
-                                    <span class="mx-2">•</span>
-                                    <span>播放次数: ${item.playCount}</span>
-                                </div>
+                        ${item.img ? `
+                            <img src="${item.img}" alt="${item.title}" class="w-20 h-12 object-cover rounded-lg">
+                        ` : `
+                            <div class="w-20 h-12 bg-white/10 rounded-lg flex items-center justify-center text-white/40 text-xs">
+                                <i class="fa fa-history text-base"></i>
                             </div>
-                            <button 
-                                class="ml-2 bg-primary hover:bg-primary/90 text-white text-xs px-2 py-1 rounded transition-all"
-                                onclick="playHistoryVideo('${item.url}', '${item.title}')"
-                            >
-                                播放
-                            </button>
+                        `}
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-white text-sm font-medium line-clamp-2">${item.title}</h4>
+                            <div class="flex items-center mt-1 text-xs text-white/60">
+                                <span>观看时间: ${new Date(item.timestamp).toLocaleString()}</span>
+                                <span class="mx-2">•</span>
+                                <span>播放次数: ${item.playCount}</span>
+                            </div>
+                            <div class="flex items-center mt-2 space-x-2">
+                                <button onclick="playHistoryVideo('${item.rid || item.url}', '${item.title}', '${item.video_url || 'null'}', '${item.siteName || siteName}', '${item.img || ''}')"
+                                        class="bg-primary/80 hover:bg-primary text-white text-xs px-2 py-1 rounded">
+                                    <i class="fa fa-play mr-1"></i>播放
+                                </button>
+                            </div>
                         </div>
                     `;
 
@@ -831,11 +847,13 @@
             if (isHistoryContainerVisible) {
                 historyContainer.classList.remove('hidden');
                 // 添加点击事件监听器
-                document.addEventListener('click', closeHistoryOnClickOutside);
+                document.addEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.addEventListener('wheel', closeHistoryOnClickOutside, true);
             } else {
                 historyContainer.classList.add('hidden');
                 // 移除点击事件监听器
-                document.removeEventListener('click', closeHistoryOnClickOutside);
+                document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
             }
         };
 
@@ -849,9 +867,345 @@
                 isHistoryContainerVisible = false;
                 historyContainer.classList.add('hidden');
                 // 移除点击事件监听器
-                document.removeEventListener('click', closeHistoryOnClickOutside);
+                document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
             }
         };
+
+        // 新增：收藏功能核心方法 -------------------------- 开始
+        // 判断视频是否已收藏（通过aid唯一标识）
+        const isLiked = (videoAid) => {
+            const likes = getLikes();
+            return likes.some(item => item.aid === videoAid);
+        };
+
+        // 新增：拉黑功能核心方法 -------------------------- 开始
+        const isBlocked = (videoAid) => {
+            const blocks = getBlocks();
+            return blocks.some(item => item.aid === videoAid);
+        };
+
+        const getBlocks = () => {
+            const blockString = localStorage.getItem('videoBlocks');
+            return blockString ? JSON.parse(blockString) : [];
+        };
+
+        const saveBlock = (videoAid, videoTitle, videoImg, videoHref, videoUrl) => {
+            const blocks = getBlocks();
+            if (isBlocked(videoAid)) return;
+            const blockItem = {
+                aid: videoAid,
+                title: videoTitle,
+                img: videoImg,
+                href: videoHref,
+                video_url: videoUrl,
+                siteName: siteName,
+                timestamp: Date.now()
+            };
+            blocks.unshift(blockItem);
+            if (blocks.length > 100) blocks.pop();
+            localStorage.setItem('videoBlocks', JSON.stringify(blocks));
+            if (isBlockContainerVisible) renderBlocks();
+            showToast('已加入黑名单', 'success');
+        };
+
+        const removeBlock = (videoAid) => {
+            let blocks = getBlocks();
+            blocks = blocks.filter(item => item.aid !== videoAid);
+            localStorage.setItem('videoBlocks', JSON.stringify(blocks));
+            if (isBlockContainerVisible) renderBlocks();
+            showToast('已取消拉黑', 'info');
+        };
+
+        const toggleBlock = (videoAid, videoTitle, videoImg, videoHref, videoUrl) => {
+            if (isBlocked(videoAid)) {
+                removeBlock(videoAid);
+            } else {
+                saveBlock(videoAid, videoTitle, videoImg, videoHref, videoUrl);
+            }
+            currentPage = 1;
+            fetchData(currentSearchTerm, currentPage);
+        };
+
+        const renderBlocks = () => {
+            const blockContent = document.getElementById('blockContent');
+            const blocks = getBlocks();
+            blockContent.innerHTML = '';
+
+            if (blocks.length === 0) {
+                blockContent.innerHTML = `
+                    <div class="p-4 text-center text-white/60">
+                        <i class="fa fa-ban text-xl mb-2"></i>
+                        <p>暂无拉黑视频</p>
+                    </div>
+                `;
+                return;
+            }
+
+            blocks.forEach(item => {
+                const blockItem = document.createElement('div');
+                blockItem.classList.add('p-3', 'hover:bg-white/5', 'transition-all', 'flex', 'items-center', 'space-x-3');
+                blockItem.innerHTML = `
+                    <img src="${item.img}" alt="${item.title}" class="w-20 h-12 object-cover rounded-lg">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-white text-sm font-medium line-clamp-2">${item.title}</h4>
+                        <div class="flex items-center mt-2 space-x-2">
+                            <button onclick="openInNewTab('${item.href}')"
+                                    class="bg-secondary/80 hover:bg-secondary text-white text-xs px-2 py-1 rounded">
+                                <i class="fa fa-external-link mr-1"></i>详情
+                            </button>
+                            <button onclick="removeBlock('${item.aid}')"
+                                    class="bg-white/10 hover:bg-white/20 text-white/80 text-xs px-2 py-1 rounded">
+                                <i class="fa fa-ban mr-1"></i>取消拉黑
+                            </button>
+                        </div>
+                    </div>
+                `;
+                blockContent.appendChild(blockItem);
+            });
+        };
+
+        const showBlocks = () => {
+            if (isSettingsPanelVisible) {
+                isSettingsPanelVisible = false;
+                document.getElementById('settingsPanel').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+            if (isLikeContainerVisible) {
+                isLikeContainerVisible = false;
+                document.getElementById('likeContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+            }
+            if (isHistoryContainerVisible) {
+                isHistoryContainerVisible = false;
+                document.getElementById('historyContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
+            }
+
+            const blockContainer = document.getElementById('blockContainer');
+            isBlockContainerVisible = !isBlockContainerVisible;
+            renderBlocks();
+
+            if (isBlockContainerVisible) {
+                blockContainer.classList.remove('hidden');
+                document.addEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.addEventListener('wheel', closeBlockOnClickOutside, true);
+            } else {
+                blockContainer.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+            }
+        };
+
+        const closeBlockOnClickOutside = (event) => {
+            const blockContainer = document.getElementById('blockContainer');
+            const blockButton = document.getElementById('blockButton');
+
+            if (!blockContainer.contains(event.target) && !blockButton.contains(event.target)) {
+                isBlockContainerVisible = false;
+                blockContainer.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+            }
+        };
+
+        const clearBlocks = () => {
+            if (confirm('确定要清空所有拉黑的视频吗？此操作不可恢复！')) {
+                localStorage.removeItem('videoBlocks');
+                renderBlocks();
+                showToast('黑名单已清空', 'success');
+            }
+        };
+        // 新增：拉黑功能核心方法 -------------------------- 结束
+
+        // 获取收藏列表
+        const getLikes = () => {
+            const likeString = localStorage.getItem('videoLikes');
+            return likeString ? JSON.parse(likeString) : [];
+        };
+
+        // 保存收藏（核心：包含img、title、所有播放所需参数）
+        const saveLike = (videoAid, videoTitle, videoImg, videoHref, videoUrl) => {
+            const likes = getLikes();
+            // 避免重复收藏
+            if (isLiked(videoAid)) return;
+            // 收藏数据：必须包含img、title，其余为播放所需
+            const likeItem = {
+                aid: videoAid,
+                title: videoTitle,
+                img: videoImg,
+                href: videoHref,
+                video_url: videoUrl,
+                siteName: siteName,
+                timestamp: Date.now() // 收藏时间
+            };
+            likes.unshift(likeItem); // 最新收藏的在最前面
+            // 限制收藏数量（可自定义，这里设30）
+            if (likes.length > 30) likes.pop();
+            localStorage.setItem('videoLikes', JSON.stringify(likes));
+            showToast('已加入我的喜欢', 'success');
+            // 刷新收藏列表显示
+            if (isLikeContainerVisible) renderLikes();
+        };
+
+        // 取消收藏（补充：同步更新页面所有按钮样式）
+        const removeLike = (videoAid) => {
+            let likes = getLikes();
+            likes = likes.filter(item => item.aid !== videoAid);
+            localStorage.setItem('videoLikes', JSON.stringify(likes));
+            // 同步更新页面中该视频的所有收藏按钮样式
+            const allLikeBtns = document.querySelectorAll(`.like-btn[data-aid="${videoAid}"]`);
+            allLikeBtns.forEach(btn => {
+                btn.classList.remove('text-like');
+                btn.querySelector('i').className = 'fa fa-heart-o';
+            });
+            // 刷新收藏列表（如果列表正打开）
+            if (isLikeContainerVisible) renderLikes();
+        };
+
+        // 切换收藏状态（最终版：点击白空心→红实心永久，点击红实心→白空心，逻辑完全正确）
+        const toggleLike = (videoAid, videoTitle, videoImg, videoHref, videoUrl) => {
+            const isNowLiked = isLiked(videoAid); // 先判断当前是否已收藏
+            // 1. 执行收藏/取消逻辑（本地存储）
+            if (!isNowLiked) {
+                // 未收藏 → 执行收藏：加红色实心
+                saveLike(videoAid, videoTitle, videoImg, videoHref, videoUrl);
+                showToast('已加入我的喜欢', 'success');
+            } else {
+                // 已收藏 → 执行取消：恢复白色空心
+                removeLike(videoAid);
+                showToast('已取消收藏', 'info');
+            }
+            // 2. 统一更新所有同视频按钮样式（核心：判断反转为 !isNowLiked）
+            const allLikeBtns = document.querySelectorAll(`.like-btn[data-aid="${videoAid}"]`);
+            allLikeBtns.forEach(btn => {
+                const icon = btn.querySelector('i');
+                if (!isNowLiked) {
+                    // 收藏成功：强制加红色 + 实心红心
+                    btn.classList.add('text-like');
+                    icon.className = 'fa fa-heart';
+                } else {
+                    // 取消收藏：强制移除红色 + 空心白心
+                    btn.classList.remove('text-like');
+                    icon.className = 'fa fa-heart-o';
+                }
+            });
+        };
+
+        // 渲染收藏列表（核心：显示img、title，带播放/取消按钮）
+        // 渲染收藏列表（新增：详情按钮，新标签页跳转href）
+        const renderLikes = () => {
+            const likeContent = document.getElementById('likeContent');
+            const likes = getLikes();
+            likeContent.innerHTML = '';
+
+            if (likes.length === 0) {
+                likeContent.innerHTML = `
+                    <div class="p-4 text-center text-white/60">
+                        <i class="fa fa-heart-o text-xl mb-2"></i>
+                        <p>暂无收藏视频，点击视频卡片的❤️收藏</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // 遍历渲染收藏项，包含img、title + 播放/详情/取消按钮
+            likes.forEach(item => {
+                const likeItem = document.createElement('div');
+                likeItem.classList.add('p-3', 'hover:bg-white/5', 'transition-all', 'flex', 'items-center', 'space-x-3');
+                likeItem.innerHTML = `
+                    <!-- 收藏视频封面图 -->
+                    <img src="${item.img}" alt="${item.title}" class="w-20 h-12 object-cover rounded-lg">
+                    <!-- 收藏视频标题 + 操作按钮（新增详情按钮） -->
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-white text-sm font-medium line-clamp-2">${item.title}</h4>
+                        <div class="flex items-center mt-2 space-x-2">
+                            <button onclick="playLikeVideo('${item.aid}', '${item.title}', '${item.img}', '${item.href}', '${item.video_url}', '${item.siteName || siteName}')"
+                                    class="bg-primary/80 hover:bg-primary text-white text-xs px-2 py-1 rounded">
+                                <i class="fa fa-play mr-1"></i>播放
+                            </button>
+                            <!-- 新增：详情按钮 - 新标签页跳转href地址 -->
+                            <button onclick="openInNewTab('${item.href}')"
+                                    class="bg-secondary/80 hover:bg-secondary text-white text-xs px-2 py-1 rounded">
+                                <i class="fa fa-external-link mr-1"></i>详情
+                            </button>
+                            <button onclick="removeLike('${item.aid}')"
+                                    class="bg-white/10 hover:bg-white/20 text-white/80 text-xs px-2 py-1 rounded">
+                                <i class="fa fa-heart-o mr-1"></i>取消
+                            </button>
+                        </div>
+                    </div>
+                `;
+                likeContent.appendChild(likeItem);
+            });
+        };
+        // 显示收藏列表
+        const showLikes = () => {
+            if (isSettingsPanelVisible) {
+                isSettingsPanelVisible = false;
+                document.getElementById('settingsPanel').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+            if (isBlockContainerVisible) {
+                isBlockContainerVisible = false;
+                document.getElementById('blockContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+            }
+            // 先关闭历史列表
+            if (isHistoryContainerVisible) {
+                isHistoryContainerVisible = false;
+                document.getElementById('historyContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
+            }
+
+            const likeContainer = document.getElementById('likeContainer');
+            isLikeContainerVisible = !isLikeContainerVisible;
+            // 渲染收藏列表
+            renderLikes();
+
+            if (isLikeContainerVisible) {
+                likeContainer.classList.remove('hidden');
+                document.addEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.addEventListener('wheel', closeLikeOnClickOutside, true);
+            } else {
+                likeContainer.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+            }
+        };
+
+        // 清空所有收藏
+        const clearLikes = () => {
+            if (confirm('确定要清空所有收藏的视频吗？此操作不可恢复！')) {
+                localStorage.removeItem('videoLikes');
+                renderLikes();
+                showToast('所有收藏已清空', 'success');
+                // 重置页面所有收藏按钮样式
+                document.querySelectorAll('.like-btn').forEach(btn => {
+                    btn.classList.remove('text-like');
+                    btn.querySelector('i').classList.remove('fa-solid');
+                    btn.querySelector('i').classList.add('fa-regular');
+                });
+            }
+        };
+
+        // 点击收藏列表外部关闭
+        const closeLikeOnClickOutside = (event) => {
+            const likeContainer = document.getElementById('likeContainer');
+            const likeButton = document.getElementById('likeButton');
+
+            if (!likeContainer.contains(event.target) && !likeButton.contains(event.target)) {
+                isLikeContainerVisible = false;
+                likeContainer.classList.add('hidden');
+                document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+            }
+        };
+        // 新增：收藏功能核心方法 -------------------------- 结束
 
         // 显示提示消息
         const showToast = (message, type = 'info') => {
@@ -905,16 +1259,41 @@
             }
         });
 
-        // ESC键关闭弹窗
+        // ESC键关闭弹窗（新增：关闭收藏列表）
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 closeFullScreenPreview();
                 closeVideoPlayer();
 
+                // 关闭历史列表
                 if (isHistoryContainerVisible) {
                     isHistoryContainerVisible = false;
                     document.getElementById('historyContainer').classList.add('hidden');
-                    document.removeEventListener('click', closeHistoryOnClickOutside);
+                    document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                    document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
+                }
+
+                // 关闭收藏列表
+                if (isLikeContainerVisible) {
+                    isLikeContainerVisible = false;
+                    document.getElementById('likeContainer').classList.add('hidden');
+                    document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                    document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+                }
+
+                // 关闭拉黑列表
+                if (isBlockContainerVisible) {
+                    isBlockContainerVisible = false;
+                    document.getElementById('blockContainer').classList.add('hidden');
+                    document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                    document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+                }
+
+                // 关闭设置面板
+                if (isSettingsPanelVisible) {
+                    isSettingsPanelVisible = false;
+                    document.getElementById('settingsPanel').classList.add('hidden');
+                    document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
                 }
             }
         });
@@ -950,6 +1329,7 @@
                 siteName = newSite;
                 // 更新选择器颜色
                 updateSiteSelectorColor(newSite);
+                updateWatermark(newSite);
                 // 保存选择到localStorage
                 localStorage.setItem('selectedSite', newSite);
                 // 重置搜索状态并重新加载数据
@@ -961,6 +1341,24 @@
                 const siteInfo = siteOptions.find(site => site.value === newSite);
                 showToast(`已切换到${siteInfo.label}站点`, 'success');
             }
+        };
+
+        const updateWatermark = (siteValue) => {
+            const watermark = document.getElementById('siteWatermark');
+            if (!watermark) return;
+            const siteInfo = siteOptions.find(site => site.value === siteValue);
+            const label = siteInfo ? siteInfo.label : siteValue;
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="260" height="180">
+                    <style>
+                        text { font-family: Arial, sans-serif; font-size: 22px; fill: rgba(0,0,0,0.35); }
+                    </style>
+                    <text x="10" y="60">${label}</text>
+                    <text x="60" y="130">${label}</text>
+                </svg>
+            `;
+            const encoded = encodeURIComponent(svg).replace(/%0A/g, '');
+            watermark.style.backgroundImage = `url("data:image/svg+xml,${encoded}")`;
         };
     </script>
 </body>

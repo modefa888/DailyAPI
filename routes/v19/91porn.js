@@ -15,7 +15,7 @@ const routerInfo = {
     category: ""
 };
 
-const cacheKey = "gdianData";
+const cacheKey = "91Data";
 const Host = "https://91porny.com";
 let updateTime = new Date().toISOString();
 
@@ -86,7 +86,7 @@ function getData(html) {
     }
 }
 
-/* ================== 播放地址 ================== */
+/* ================== 播放地址（新增：title解析 + 整合返回） ================== */
 
 J1HostRouter.get("/91/:uid", async (ctx) => {
     const { uid } = ctx.params;
@@ -98,15 +98,27 @@ J1HostRouter.get("/91/:uid", async (ctx) => {
 
         if (!data) {
             const html = await fetchHtml(url);
-            const match = html.match(/data-src="(.+?)">/);
-            if (!match) {
-                response(ctx, 500, "", "播放地址解析失败（页面结构变更）");
+            // 1. 解析m3u8播放地址
+            const m3u8Match = html.match(/data-src="(.+?)">/);
+            // 2. 解析og:image:secure_url封面图
+            const ogImgMatch = html.match(/<meta property="og:image:secure_url" content="(.+?)"/);
+            // 3. 解析<title>标签内容（去空格、去换行）
+            const titleMatch = html.match(/<title>([\s\S]*?)<\/title>/);
+            
+            // 任一核心字段解析失败则返回错误
+            if (!m3u8Match || !ogImgMatch || !titleMatch) {
+                response(ctx, 500, "", "播放地址/封面图/标题解析失败（页面结构变更）");
                 return;
             }
 
-            m3u8 = match[1].replace("&amp;m=", "&m=");
-            data = { m3u8 } 
-            await set(key, data);
+            const m3u8 = m3u8Match[1].replace("&amp;m=", "&m=");
+            const img = ogImgMatch[1];
+            // 标题去空行、去多余空格，保留有效内容
+            const title = titleMatch[1].replace(/\s+/g, " ").trim();
+            
+            // 整合所有数据：m3u8 + 封面图 + 标题
+            data = { m3u8, img, title, url} 
+            await set(key, data); // 一起缓存，后续直接取
 
             response(ctx, 200, data, "从远程获取成功（代理自动兜底）");
         } else {

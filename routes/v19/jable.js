@@ -154,7 +154,8 @@ jabletvRouter.get("/jabletv/:uid", async (ctx) => {
                 m3u8: match[1],
                 title,
                 publishTime,
-                cover
+                cover,
+                url
             };
 
             await set(key, data);

@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>视频播放 - 高清资源</title>
+    <!-- 引入HLS.js处理M3U8 -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.14/dist/hls.min.js"></script>
+    <!-- 引入FontAwesome图标 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@6.4.0/css/all.min.css">
+    <!-- 引入二维码库 -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        }
+        body {
+            background: linear-gradient(180deg, #0a0a0a 0%, #121212 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 15px;
+            color: #fff;
+        }
+        body.light {
+            background: #f5f5f5;
+            color: #111;
+        }
+        body.light .loading,
+        body.light .video-title,
+        body.light .history-header,
+        body.light .likes-header,
+        body.light .check-result {
+            color: #222;
+        }
+        body.light .video-container,
+        body.light .m3u8-copy-box,
+        body.light .history-section,
+        body.light .likes-section,
+        body.light .history-item,
+        body.light .m3u8-check {
+            background: #fff;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        }
+        body.light .m3u8-check {
+            border-color: #e6e6e6;
+        }
+        body.light .m3u8-input {
+            background: #f3f3f3;
+            border-color: #ddd;
+            color: #222;
+        }
+        body.light .history-title {
+            color: #222;
+        }
+        body.light .history-meta {
+            color: #666;
+        }
+        body.light .history-source,
+        body.light .action-btn,
+        body.light .share-close {
+            color: #555;
+            border-color: #ddd;
+        }
+        body.light .pager {
+            background: #fff;
+            border-color: #e6e6e6;
+            color: #666;
+        }
+        body.light .pager button {
+            background: #f3f3f3;
+            border-color: #ddd;
+            color: #444;
+        }
+        body.light .history-thumb {
+            background: #f0f0f0;
+        }
+        body.light .check-source {
+            color: #2f7cff;
+        }
+        /* 加载动画 */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            color: #ccc;
+            margin-top: 100px;
+        }
+        .loading i {
+            animation: spin 1s linear infinite;
+            font-size: 20px;
+            color: #409eff;
+        }
+        /* 错误提示 */
+        .error {
+            color: #f56c6c;
+            font-size: 16px;
+            margin-top: 50px;
+            text-align: center;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+        .error i {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+        /* 视频标题 */
+        .video-title {
+            font-size: 18px;
+            font-weight: 500;
+            color: #f8f8f8;
+            margin: 0 0 20px 0;
+            text-align: center;
+            max-width: 800px;
+            line-height: 1.6;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        /* 视频容器 */
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+            margin-bottom: 25px;
+            background: #000;
+        }
+        /* 视频封面+悬浮播放图标 */
+        .video-cover {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 2;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+        .video-cover::after {
+            content: "\f04b";
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 60px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .video-cover:hover {
+            opacity: 0.9;
+        }
+        .video-cover:hover::after {
+            opacity: 1;
+        }
+        /* 视频播放器 */
+        video {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #000;
+        }
+        /* M3U8复制模块（核心） */
+        .m3u8-copy-box {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: #1e1e1e;
+            border-radius: 10px;
+            padding: 12px 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        .m3u8-input {
+            flex: 1;
+            background: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        .m3u8-input:focus {
+            border-color: #409eff;
+            box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+        }
+        .copy-btn {
+            background: #409eff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 18px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .copy-btn i {
+            font-size: 16px;
+        }
+        .copy-btn:hover {
+            background: #337ecc;
+            transform: translateY(-1px);
+        }
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+        /* M3U8联通性检查 */
+        .m3u8-check {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            background: #1a1a1a;
+            border: 1px solid #222;
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .m3u8-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .m3u8-status {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .check-btn {
+            background: #2f7cff;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .check-btn:hover {
+            background: #2b6fdf;
+        }
+        .like-btn {
+            background: #f56c6c;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .like-btn:hover {
+            background: #e35b5b;
+        }
+        .theme-btn {
+            background: #222;
+            color: #fff;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        body.light .theme-btn {
+            background: #fff;
+            color: #111;
+            border-color: #ddd;
+        }
+        .share-btn {
+            background: #23c48e;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .share-btn:hover {
+            background: #20b380;
+        }
+        /* 分享二维码弹层 */
+        .share-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .share-panel {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 18px;
+            width: 260px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .share-title {
+            font-size: 14px;
+            color: #eaeaea;
+            margin-bottom: 10px;
+        }
+        #qrcode {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 10px;
+        }
+        .share-close {
+            background: transparent;
+            color: #bbb;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .share-close:hover {
+            color: #fff;
+            border-color: #555;
+        }
+        .check-result {
+            font-size: 13px;
+            color: #c9c9c9;
+        }
+        .check-result.ok {
+            color: #67c23a;
+        }
+        .check-result.bad {
+            color: #f56c6c;
+        }
+        .check-source {
+            display: none;
+            font-size: 13px;
+            color: #8ab4ff;
+            text-decoration: none;
+        }
+        .check-source:hover {
+            text-decoration: underline;
+        }
+        /* 复制成功提示（淡入淡出） */
+        .copy-tip {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(72, 187, 120, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 999;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+        .copy-tip.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* 历史播放记录 */
+        .history-section {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 25px;
+            background: #151515;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+        .likes-section {
+            width: 100%;
+            max-width: 800px;
+            margin-top: 18px;
+            background: #151515;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        }
+        .likes-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            color: #eaeaea;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .section-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .action-btn {
+            background: transparent;
+            color: #aaa;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .action-btn:hover {
+            color: #fff;
+            border-color: #555;
+        }
+        .pager {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-top: 10px;
+            color: #bdbdbd;
+            font-size: 12px;
+            background: #1a1a1a;
+            border: 1px solid #222;
+            border-radius: 8px;
+            padding: 6px 8px;
+        }
+        .pager button {
+            background: #1e1e1e;
+            color: #d0d0d0;
+            border: 1px solid #2f2f2f;
+            border-radius: 6px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .pager button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .likes-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            color: #eaeaea;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .history-clear {
+            background: transparent;
+            color: #aaa;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .history-clear:hover {
+            color: #fff;
+            border-color: #555;
+        }
+        .history-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        .history-item {
+            display: grid;
+            grid-template-columns: 88px 1fr;
+            gap: 10px;
+            background: #1c1c1c;
+            border-radius: 10px;
+            padding: 8px;
+            align-items: center;
+        }
+        .history-thumb {
+            width: 88px;
+            height: 56px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #1a1a1a;
+        }
+        .history-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .history-title {
+            font-size: 13px;
+            color: #e0e0e0;
+            line-height: 1.4;
+            max-height: 40px;
+            overflow: hidden;
+        }
+        .history-meta {
+            font-size: 12px;
+            color: #b5b5b5;
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .history-play {
+            align-self: flex-start;
+            background: #2f7cff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .history-play:hover {
+            background: #2b6fdf;
+        }
+        .history-source {
+            align-self: flex-start;
+            background: transparent;
+            color: #d0d0d0;
+            border: 1px solid #3a3a3a;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .history-source:hover {
+            color: #fff;
+            border-color: #555;
+        }
+        /* 加载动画关键帧 */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* 手机端自适应 */
+        @media (max-width: 768px) {
+            .video-cover::after {
+                font-size: 40px;
+            }
+            .m3u8-copy-box {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .m3u8-input, .copy-btn {
+                width: 100%;
+            }
+            .m3u8-check {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .m3u8-status {
+                margin-left: 0;
+            }
+            .copy-tip {
+                top: auto;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%) translateY(20px);
+            }
+            .copy-tip.show {
+                transform: translateX(-50%) translateY(0);
+            }
+            .history-list {
+                grid-template-columns: 1fr;
+
+            }
+            .likes-list {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 加载提示 -->
+    <div class="loading">
+        <i class="fas fa-spinner"></i>
+        <span>正在加载视频信息...</span>
+    </div>
+    <!-- 视频标题 -->
+    <h1 class="video-title" style="display: none;"></h1>
+    <!-- 视频容器 -->
+    <div class="video-container" style="display: none;">
+        <img class="video-cover" src="" alt="视频封面">
+        <video id="video-player" controls preload="metadata"></video>
+    </div>
+    <!-- M3U8联通性检查 -->
+    <div class="m3u8-check" style="display: none;">
+        <div class="m3u8-actions">
+            <button class="check-btn">
+                <i class="fas fa-network-wired"></i>
+                <span>检查播放地址</span>
+            </button>
+            <button class="like-btn">
+                <i class="fas fa-heart"></i>
+                <span>喜欢</span>
+            </button>
+            <button class="share-btn">
+                <i class="fas fa-qrcode"></i>
+                <span>分享</span>
+            </button>
+            <button class="theme-btn">
+                <i class="fas fa-circle-half-stroke"></i>
+                <span>白色</span>
+            </button>
+        </div>
+        <div class="m3u8-status">
+            <span class="check-result"></span>
+            <a class="check-source" target="_blank" rel="noopener">前往原站</a>
+        </div>
+    </div>
+    <!-- M3U8复制模块 -->
+    <div class="m3u8-copy-box" style="display: none;">
+        <input type="text" class="m3u8-input" readonly placeholder="M3U8播放地址">
+        <button class="copy-btn">
+            <i class="fas fa-copy"></i>
+            <span>复制地址</span>
+        </button>
+    </div>
+    <!-- 历史播放记录 -->
+    <div class="history-section" style="display: none;">
+        <div class="history-header">
+            <span>历史播放 <span class="history-count">(0)</span></span>
+            <div class="section-actions">
+                <button class="action-btn history-toggle">折叠</button>
+                <button class="action-btn history-clear">清空</button>
+            </div>
+        </div>
+        <div class="history-list"></div>
+        <div class="pager history-pager" style="display: none;">
+            <button class="history-prev">上一页</button>
+            <span class="history-page-info"></span>
+            <button class="history-next">下一页</button>
+        </div>
+    </div>
+    <!-- 我的喜欢 -->
+    <div class="likes-section" style="display: none;">
+        <div class="likes-header">
+            <span>我的喜欢 <span class="likes-count">(0)</span></span>
+            <div class="section-actions">
+                <button class="action-btn likes-toggle">折叠</button>
+            </div>
+        </div>
+        <div class="likes-list"></div>
+        <div class="pager likes-pager" style="display: none;">
+            <button class="likes-prev">上一页</button>
+            <span class="likes-page-info"></span>
+            <button class="likes-next">下一页</button>
+        </div>
+    </div>
+    <!-- 错误提示 -->
+    <div class="error" style="display: none;">
+        <i class="fas fa-exclamation-circle"></i>
+        <span class="error-text"></span>
+    </div>
+    <!-- 复制成功提示 -->
+    <div class="copy-tip">
+        <i class="fas fa-check-circle"></i>
+        <span>复制成功！</span>
+    </div>
+    <!-- 分享二维码 -->
+    <div class="share-modal">
+        <div class="share-panel">
+            <div class="share-title">扫码分享当前地址</div>
+            <div id="qrcode"></div>
+            <button class="share-close">关闭</button>
+        </div>
+    </div>
+
+    <script>
+        const HISTORY_KEY = 'playHistoryV1';
+        const HISTORY_LIMIT = 20;
+        const LIKES_KEY = 'videoLikes';
+        const HISTORY_STORAGE_UI = 'historyUiStateV1';
+        const LIKES_STORAGE_UI = 'likesUiStateV1';
+        const THEME_KEY = 'playThemeV1';
+
+        // 1. 解析URL参数
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                key: params.get('key'),
+                parm: params.get('parm')
+            };
+        }
+
+        function formatTime(ts) {
+            if (!ts) return '—';
+            const date = new Date(ts);
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mm = String(date.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${d} ${hh}:${mm}`;
+        }
+
+        function loadHistory() {
+            try {
+                const raw = localStorage.getItem(HISTORY_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (err) {
+                console.error('读取历史记录失败：', err);
+                return [];
+            }
+        }
+
+        function saveHistory(item) {
+            const keyUrl = item.url || '';
+            const existing = loadHistory().find((it) => (it.url || '') === keyUrl);
+            const list = loadHistory().filter((it) => (it.url || '') !== keyUrl);
+            const merged = {
+                ...existing,
+                ...item,
+                playCount: item.playCount != null ? item.playCount : (existing ? existing.playCount : 0),
+                lastPlayedAt: item.lastPlayedAt != null ? item.lastPlayedAt : (existing ? existing.lastPlayedAt : 0)
+            };
+            list.unshift(merged);
+            const trimmed = list.slice(0, HISTORY_LIMIT);
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+            return trimmed;
+        }
+
+        function clearHistory() {
+            localStorage.removeItem(HISTORY_KEY);
+        }
+        function showToast(message) {
+            const tip = document.querySelector('.copy-tip');
+            if (!tip) return;
+            const text = tip.querySelector('span');
+            if (text) text.textContent = message;
+            tip.classList.add('show');
+            setTimeout(() => tip.classList.remove('show'), 2500);
+        }
+        function getPerPage() {
+            return window.matchMedia('(max-width: 768px)').matches ? 4 : 4;
+        }
+        function loadUiState(key, fallback) {
+            try {
+                const raw = localStorage.getItem(key);
+                return raw ? JSON.parse(raw) : fallback;
+            } catch (err) {
+                return fallback;
+            }
+        }
+        function saveUiState(key, state) {
+            localStorage.setItem(key, JSON.stringify(state));
+        }
+        function loadLikes() {
+            try {
+                const raw = localStorage.getItem(LIKES_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (err) {
+                console.error('读取喜欢列表失败：', err);
+                return [];
+            }
+        }
+        function isLiked(aid, siteName) {
+            const likes = loadLikes();
+            return likes.some((it) => it.aid === aid && it.siteName === siteName);
+        }
+        function saveLikeItem(item) {
+            const likes = loadLikes();
+            if (likes.some((it) => it.aid === item.aid && it.siteName === item.siteName)) return false;
+            likes.unshift(item);
+            if (likes.length > 30) likes.pop();
+            localStorage.setItem(LIKES_KEY, JSON.stringify(likes));
+            return true;
+        }
+        function removeLikeItem(aid, siteName) {
+            const likes = loadLikes().filter((it) => !(it.aid === aid && it.siteName === siteName));
+            localStorage.setItem(LIKES_KEY, JSON.stringify(likes));
+            return likes;
+        }
+
+        // 2. 一键复制功能封装
+        function copyText(text, tipEl) {
+            navigator.clipboard.writeText(text).then(() => {
+                tipEl.classList.add('show');
+                setTimeout(() => tipEl.classList.remove('show'), 3000);
+            }).catch(err => {
+                console.error('复制失败：', err);
+                alert('复制失败，请手动复制！');
+            });
+        }
+
+        // 3. 初始化播放器（无代理，直接使用原始M3U8）
+        async function initPlayer() {
+            try {
+                const { key, parm } = getUrlParams();
+                let hlsInstance = null;
+                let currentM3u8 = '';
+                let currentSourceUrl = '';
+
+                // 4. 获取所有页面元素
+                const el = {
+                    loading: document.querySelector('.loading'),
+                    title: document.querySelector('.video-title'),
+                    container: document.querySelector('.video-container'),
+                    cover: document.querySelector('.video-cover'),
+                    player: document.getElementById('video-player'),
+                    m3u8Box: document.querySelector('.m3u8-copy-box'),
+                    m3u8Input: document.querySelector('.m3u8-input'),
+                    copyBtn: document.querySelector('.copy-btn'),
+                    checkBox: document.querySelector('.m3u8-check'),
+                    checkBtn: document.querySelector('.check-btn'),
+                    likeBtn: document.querySelector('.like-btn'),
+                    shareBtn: document.querySelector('.share-btn'),
+                    themeBtn: document.querySelector('.theme-btn'),
+                    checkResult: document.querySelector('.check-result'),
+                    checkSource: document.querySelector('.check-source'),
+                    error: document.querySelector('.error'),
+                    errorText: document.querySelector('.error-text'),
+                    copyTip: document.querySelector('.copy-tip'),
+                    historySection: document.querySelector('.history-section'),
+                    historyList: document.querySelector('.history-list'),
+                    historyClear: document.querySelector('.history-clear'),
+                    historyToggle: document.querySelector('.history-toggle'),
+                    historyPager: document.querySelector('.history-pager'),
+                    historyPrev: document.querySelector('.history-prev'),
+                    historyNext: document.querySelector('.history-next'),
+                    historyPageInfo: document.querySelector('.history-page-info'),
+                    historyCount: document.querySelector('.history-count'),
+                    likesSection: document.querySelector('.likes-section'),
+                    likesList: document.querySelector('.likes-list'),
+                    likesToggle: document.querySelector('.likes-toggle'),
+                    likesPager: document.querySelector('.likes-pager'),
+                    likesPrev: document.querySelector('.likes-prev'),
+                    likesNext: document.querySelector('.likes-next'),
+                    likesPageInfo: document.querySelector('.likes-page-info'),
+                    likesCount: document.querySelector('.likes-count'),
+                    shareModal: document.querySelector('.share-modal'),
+                    shareClose: document.querySelector('.share-close')
+                };
+                const historyUi = loadUiState(HISTORY_STORAGE_UI, { collapsed: false, page: 1 });
+                const likesUi = loadUiState(LIKES_STORAGE_UI, { collapsed: false, page: 1 });
+                const savedTheme = loadUiState(THEME_KEY, { light: false });
+                document.body.classList.toggle('light', !!savedTheme.light);
+                el.themeBtn.querySelector('span').textContent = savedTheme.light ? '黑色' : '白色';
+
+                function renderHistory(list) {
+                    if (!list.length) {
+                        el.historySection.style.display = 'none';
+                        el.historyList.innerHTML = '';
+                        el.historyPager.style.display = 'none';
+                        el.historyCount.textContent = '(0)';
+                        return;
+                    }
+                    el.historySection.style.display = 'block';
+                    el.historyCount.textContent = `(${list.length})`;
+                    const perPage = getPerPage();
+                    const totalPages = Math.max(1, Math.ceil(list.length / perPage));
+                    historyUi.page = Math.min(historyUi.page, totalPages);
+                    saveUiState(HISTORY_STORAGE_UI, historyUi);
+                    const start = (historyUi.page - 1) * perPage;
+                    const pageList = list.slice(start, start + perPage);
+                    el.historyList.innerHTML = pageList.map((item, idx) => `
+                        <div class="history-item" data-index="${start + idx}">
+                            <img class="history-thumb" src="${item.img}" alt="封面">
+                            <div class="history-info">
+                                <div class="history-title">${item.title}</div>
+                                <div class="history-meta">
+                                    <span>时间：${formatTime(item.lastPlayedAt)}</span>
+                                    <span>次数：${item.playCount || 0}</span>
+                                </div>
+                                <div>
+                                    <button class="history-play">
+                                        <i class="fas fa-play"></i>
+                                        <span>播放</span>
+                                    </button>
+                                    <button class="history-source">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                        <span>原站</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    el.historyList.style.display = historyUi.collapsed ? 'none' : 'grid';
+                    el.historyPager.style.display = historyUi.collapsed || totalPages === 1 ? 'none' : 'flex';
+                    el.historyPageInfo.textContent = `${historyUi.page}/${totalPages}`;
+                    el.historyPrev.disabled = historyUi.page <= 1;
+                    el.historyNext.disabled = historyUi.page >= totalPages;
+                    el.historyToggle.textContent = historyUi.collapsed ? '展开' : '折叠';
+                }
+
+                function initHls(m3u8) {
+                    if (Hls.isSupported()) {
+                        if (hlsInstance) hlsInstance.destroy();
+                        hlsInstance = new Hls({
+                            maxBufferLength: 30,
+                            maxMaxBufferLength: 60
+                        });
+                        hlsInstance.loadSource(m3u8);
+                        hlsInstance.attachMedia(el.player);
+                        hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+                            console.log('M3U8解析成功，可正常播放');
+                        });
+                        hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+                            console.error('HLS播放错误：', data);
+                            if (data.fatal) {
+                                hlsInstance.destroy();
+                                let errMsg = '视频播放失败';
+                                if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                                    errMsg = '视频网络加载失败（大概率跨域），请开启浏览器跨域插件';
+                                } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                                    errMsg = '视频解析失败，格式不支持或地址无效';
+                                }
+                                throw new Error(errMsg);
+                            }
+                        });
+                    } else if (el.player.canPlayType('application/vnd.apple.mpegurl')) {
+                        el.player.src = m3u8;
+                    } else {
+                        throw new Error('当前浏览器不支持M3U8视频播放，请更换Chrome/Edge/Firefox');
+                    }
+                }
+
+                function applyVideo(data) {
+                    currentM3u8 = data.m3u8;
+                    el.loading.style.display = 'none';
+                    el.error.style.display = 'none';
+                    el.title.style.display = 'block';
+                    el.container.style.display = 'block';
+                    el.checkBox.style.display = 'flex';
+                    el.m3u8Box.style.display = 'flex';
+                    el.title.innerText = data.title || '未命名视频';
+                    el.cover.src = data.img || '';
+                    el.cover.style.display = 'block';
+                    el.m3u8Input.value = currentM3u8 || '';
+                    el.checkResult.textContent = '';
+                    el.checkResult.className = 'check-result';
+                    el.checkSource.style.display = 'none';
+                    if (data.url) {
+                        currentSourceUrl = data.url;
+                        el.checkSource.href = data.url;
+                    } else {
+                        currentSourceUrl = '';
+                    }
+                    const { key, parm } = getUrlParams();
+                    if (key && parm) {
+                        const liked = isLiked(parm, key);
+                        el.likeBtn.querySelector('span').textContent = liked ? '已收藏' : '喜欢';
+                    }
+                    const isM3u8 = /\.m3u8(\?|$)/i.test(currentM3u8);
+                    if (isM3u8) {
+                        initHls(currentM3u8);
+                    } else {
+                        if (hlsInstance) hlsInstance.destroy();
+                        el.player.src = currentM3u8;
+                    }
+                }
+                const host = window.location.origin;
+
+                async function fetchVideoInfo(key, parm) {
+                    const apiUrl = `${host}/${key}/${parm}`;
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) {
+                        throw new Error(`接口请求失败，状态码：${response.status}`);
+                    }
+                    const resData = await response.json();
+                    if (resData.status !== 200) {
+                        throw new Error(resData.message || '接口返回数据异常');
+                    }
+                    return resData.data;
+                }
+
+                function renderLikes(list) {
+                    if (!list.length) {
+                        el.likesSection.style.display = 'none';
+                        el.likesList.innerHTML = '';
+                        el.likesPager.style.display = 'none';
+                        el.likesCount.textContent = '(0)';
+                        return;
+                    }
+                    el.likesSection.style.display = 'block';
+                    el.likesCount.textContent = `(${list.length})`;
+                    const perPage = getPerPage();
+                    const totalPages = Math.max(1, Math.ceil(list.length / perPage));
+                    likesUi.page = Math.min(likesUi.page, totalPages);
+                    saveUiState(LIKES_STORAGE_UI, likesUi);
+                    const start = (likesUi.page - 1) * perPage;
+                    const pageList = list.slice(start, start + perPage);
+                    el.likesList.innerHTML = pageList.map((item, idx) => `
+                        <div class="history-item" data-like-index="${start + idx}">
+                            <img class="history-thumb" src="${item.img || ''}" alt="封面">
+                            <div class="history-info">
+                                <div class="history-title">${item.title || '未命名视频'}</div>
+                                <div>
+                                    <button class="history-play">
+                                        <i class="fas fa-play"></i>
+                                        <span>播放</span>
+                                    </button>
+                                    <button class="history-source">
+                                        <i class="fas fa-up-right-from-square"></i>
+                                        <span>原站</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                    el.likesList.style.display = likesUi.collapsed ? 'none' : 'grid';
+                    el.likesPager.style.display = likesUi.collapsed || totalPages === 1 ? 'none' : 'flex';
+                    el.likesPageInfo.textContent = `${likesUi.page}/${totalPages}`;
+                    el.likesPrev.disabled = likesUi.page <= 1;
+                    el.likesNext.disabled = likesUi.page >= totalPages;
+                    el.likesToggle.textContent = likesUi.collapsed ? '展开' : '折叠';
+                }
+
+                // 预先渲染历史记录并绑定事件
+                renderHistory(loadHistory());
+                renderLikes(loadLikes());
+                el.historyClear.addEventListener('click', () => {
+                    clearHistory();
+                    renderHistory([]);
+                });
+                el.historyToggle.addEventListener('click', () => {
+                    historyUi.collapsed = !historyUi.collapsed;
+                    saveUiState(HISTORY_STORAGE_UI, historyUi);
+                    renderHistory(loadHistory());
+                });
+                el.likesToggle.addEventListener('click', () => {
+                    likesUi.collapsed = !likesUi.collapsed;
+                    saveUiState(LIKES_STORAGE_UI, likesUi);
+                    renderLikes(loadLikes());
+                });
+                el.historyPrev.addEventListener('click', () => {
+                    if (historyUi.page > 1) {
+                        historyUi.page -= 1;
+                        saveUiState(HISTORY_STORAGE_UI, historyUi);
+                        renderHistory(loadHistory());
+                    }
+                });
+                el.historyNext.addEventListener('click', () => {
+                    historyUi.page += 1;
+                    saveUiState(HISTORY_STORAGE_UI, historyUi);
+                    renderHistory(loadHistory());
+                });
+                el.likesPrev.addEventListener('click', () => {
+                    if (likesUi.page > 1) {
+                        likesUi.page -= 1;
+                        saveUiState(LIKES_STORAGE_UI, likesUi);
+                        renderLikes(loadLikes());
+                    }
+                });
+                el.likesNext.addEventListener('click', () => {
+                    likesUi.page += 1;
+                    saveUiState(LIKES_STORAGE_UI, likesUi);
+                    renderLikes(loadLikes());
+                });
+                el.historyList.addEventListener('click', (event) => {
+                    const itemEl = event.target.closest('.history-item');
+                    if (!itemEl) return;
+                    const idx = Number(itemEl.dataset.index);
+                    const list = loadHistory();
+                    const item = list[idx];
+                    if (!item) return;
+                    const sourceBtn = event.target.closest('.history-source');
+                    if (sourceBtn) {
+                        if (item.url) window.open(item.url, '_blank');
+                        return;
+                    }
+                    const playBtn = event.target.closest('.history-play');
+                    if (!playBtn) return;
+                    applyVideo(item);
+                    item.lastPlayedAt = Date.now();
+                    item.playCount = (item.playCount || 0) + 1;
+                    renderHistory(saveHistory(item));
+                });
+                el.likesList.addEventListener('click', async (event) => {
+                    const itemEl = event.target.closest('.history-item');
+                    if (!itemEl) return;
+                    const idx = Number(itemEl.dataset.likeIndex);
+                    const list = loadLikes();
+                    const item = list[idx];
+                    if (!item) return;
+                    const sourceBtn = event.target.closest('.history-source');
+                    if (sourceBtn) {
+                        if (item.href) window.open(item.href, '_blank');
+                        return;
+                    }
+                    const playBtn = event.target.closest('.history-play');
+                    if (!playBtn) return;
+                    try {
+                        // aid -> parm, siteName -> key
+                        if (item.siteName && item.aid) {
+                            el.loading.style.display = 'flex';
+                            const data = await fetchVideoInfo(item.siteName, item.aid);
+                            applyVideo({
+                                title: data.title || item.title,
+                                m3u8: data.m3u8,
+                                img: data.img || item.img,
+                                url: data.url || item.href
+                            });
+                            renderHistory(saveHistory({
+                                key: item.siteName,
+                                parm: item.aid,
+                                title: data.title || item.title,
+                                m3u8: data.m3u8,
+                                img: data.img || item.img,
+                                url: data.url || item.href,
+                                lastPlayedAt: Date.now(),
+                                playCount: 1
+                            }));
+                            el.loading.style.display = 'none';
+                            return;
+                        }
+                        const playUrl = item.video_url || item.m3u8 || '';
+                        if (!playUrl) return;
+                        applyVideo({
+                            title: item.title,
+                            m3u8: playUrl,
+                            img: item.img,
+                            url: item.href
+                        });
+                        renderHistory(saveHistory({
+                            key: item.siteName || '',
+                            parm: item.aid || '',
+                            title: item.title,
+                            m3u8: playUrl,
+                            img: item.img,
+                            url: item.href,
+                            lastPlayedAt: Date.now(),
+                            playCount: 1
+                        }));
+                    } catch (err) {
+                        el.loading.style.display = 'none';
+                        el.error.style.display = 'block';
+                        el.errorText.innerText = err.message || '播放失败';
+                    }
+                });
+
+                // 校验参数
+                if (!key || !parm) {
+                    throw new Error('URL参数缺失，key或parm不能为空');
+                }
+                // 拉取接口数据
+                const { title, m3u8, img, url } = await fetchVideoInfo(key, parm);
+
+                // 5. 渲染页面数据
+                applyVideo({ title, m3u8, img, url });
+                const existing = loadHistory().find((it) => it.m3u8 === m3u8);
+                const historyItem = {
+                    key,
+                    parm,
+                    title,
+                    m3u8,
+                    img,
+                    url,
+                    lastPlayedAt: Date.now(),
+                    playCount: (existing && existing.playCount ? existing.playCount : 0) + 1
+                };
+                renderHistory(saveHistory(historyItem));
+
+                // 6. 绑定复制事件（按钮+输入框点击都可复制）
+                el.copyBtn.addEventListener('click', () => copyText(currentM3u8, el.copyTip));
+                el.m3u8Input.addEventListener('click', () => copyText(currentM3u8, el.copyTip));
+                el.checkBtn.addEventListener('click', async () => {
+                    if (!currentM3u8) return;
+                    el.checkResult.textContent = '检查中...';
+                    el.checkResult.className = 'check-result';
+                    el.checkSource.style.display = 'none';
+                    try {
+                        const res = await fetch(currentM3u8, { method: 'HEAD', mode: 'cors' });
+                        if (res.ok) {
+                            el.checkResult.textContent = '播放地址可用';
+                            el.checkResult.className = 'check-result ok';
+                        } else {
+                            el.checkResult.textContent = `不可用（状态码：${res.status}）`;
+                            el.checkResult.className = 'check-result bad';
+                            if (currentSourceUrl) el.checkSource.style.display = 'inline';
+                        }
+                    } catch (err) {
+                        el.checkResult.textContent = '不可用（可能跨域/网络问题）';
+                        el.checkResult.className = 'check-result bad';
+                        if (currentSourceUrl) el.checkSource.style.display = 'inline';
+                    }
+                });
+                el.likeBtn.addEventListener('click', () => {
+                    if (!currentM3u8) return;
+                    const { key, parm } = getUrlParams();
+                    if (!key || !parm) {
+                        showToast('缺少参数，无法收藏');
+                        return;
+                    }
+                    const liked = isLiked(parm, key);
+                    if (liked) {
+                        renderLikes(removeLikeItem(parm, key));
+                        el.likeBtn.querySelector('span').textContent = '喜欢';
+                        showToast('已取消喜欢');
+                        return;
+                    }
+                    const likeItem = {
+                        aid: parm,
+                        title: el.title.innerText || '未命名视频',
+                        img: el.cover.src || '',
+                        href: currentSourceUrl || '',
+                        video_url: currentM3u8,
+                        siteName: key,
+                        timestamp: Date.now()
+                    };
+                    const saved = saveLikeItem(likeItem);
+                    if (saved) {
+                        renderLikes(loadLikes());
+                        el.likeBtn.querySelector('span').textContent = '已收藏';
+                        showToast('已加入我的喜欢');
+                    }
+                });
+                el.shareBtn.addEventListener('click', () => {
+                    const url = window.location.href;
+                    const qrEl = document.getElementById('qrcode');
+                    qrEl.innerHTML = '';
+                    try {
+                        new QRCode(qrEl, {
+                            text: url,
+                            width: 200,
+                            height: 200,
+                            colorDark: '#ffffff',
+                            colorLight: '#1a1a1a'
+                        });
+                        el.shareModal.style.display = 'flex';
+                    } catch (err) {
+                        console.error('生成二维码失败：', err);
+                        showToast('二维码生成失败');
+                    }
+                });
+                el.shareClose.addEventListener('click', () => {
+                    el.shareModal.style.display = 'none';
+                });
+                el.shareModal.addEventListener('click', (event) => {
+                    if (event.target === el.shareModal) el.shareModal.style.display = 'none';
+                });
+                el.themeBtn.addEventListener('click', () => {
+                    const isLight = document.body.classList.toggle('light');
+                    el.themeBtn.querySelector('span').textContent = isLight ? '黑色' : '白色';
+                    saveUiState(THEME_KEY, { light: isLight });
+                });
+
+                // 8. 封面与视频联动交互
+                el.cover.addEventListener('click', () => {
+                    el.cover.style.display = 'none';
+                    el.player.play();
+                });
+                el.player.addEventListener('play', () => el.cover.style.display = 'none');
+                el.player.addEventListener('pause', () => {
+                    if (el.player.currentTime === 0) el.cover.style.display = 'block';
+                });
+
+            } catch (err) {
+                // 统一异常处理，显示错误信息
+                const [loadingEl, errorEl, errorTextEl] = [
+                    document.querySelector('.loading'),
+                    document.querySelector('.error'),
+                    document.querySelector('.error-text')
+                ];
+                const [titleEl, containerEl, m3u8BoxEl] = [
+                    document.querySelector('.video-title'),
+                    document.querySelector('.video-container'),
+                    document.querySelector('.m3u8-copy-box')
+                ];
+                const checkBoxEl = document.querySelector('.m3u8-check');
+                loadingEl.style.display = 'none';
+                titleEl.style.display = 'none';
+                containerEl.style.display = 'none';
+                m3u8BoxEl.style.display = 'none';
+                if (checkBoxEl) checkBoxEl.style.display = 'none';
+                errorEl.style.display = 'block';
+                errorTextEl.innerText = err.message;
+                console.error('播放器初始化失败：', err);
+            }
+        }
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', initPlayer);
+        // 窗口大小变化，视频自适应宽度
+        window.addEventListener('resize', () => {
+            const player = document.getElementById('video-player');
+            if (player) player.style.width = '100%';
+            renderHistory(loadHistory());
+            renderLikes(loadLikes());
+        });
+    </script>
+</body>
+</html>
