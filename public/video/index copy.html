@@ -92,7 +92,7 @@
                 </div>
                 
                 <!-- 中间：搜索框 -->
-                <div class="hidden md:flex items-center bg-white rounded-lg shadow-md max-w-xl w-full mx-4 relative">
+                <div class="hidden md:flex items-center bg-white rounded-lg shadow-md max-w-xl w-full mx-4">
                     <input 
                         type="text" 
                         id="searchInput" 
@@ -105,12 +105,8 @@
                         onclick="searchData()"
                         class="btn-primary rounded-l-none"
                     >
-                        <i class="fa fa-search mr-1"></i> <span id="searchButtonLabel">搜索</span>
+                        <i class="fa fa-search mr-1"></i> 搜索
                     </button>
-                    <div 
-                        id="searchHistoryBox" 
-                        class="absolute left-0 top-full mt-2 w-full bg-white rounded-lg shadow-lg border border-gray-200 hidden z-50"
-                    ></div>
                 </div>
                 
                 <!-- 右侧：功能按钮 -->
@@ -147,7 +143,7 @@
             </div>
             
             <!-- 移动端搜索框 -->
-            <div class="md:hidden mt-3 flex items-center bg-white rounded-lg shadow-md relative">
+            <div class="md:hidden mt-3 flex items-center bg-white rounded-lg shadow-md">
                 <input 
                     type="text" 
                     id="searchInputMobile" 
@@ -160,18 +156,14 @@
                     onclick="searchData()"
                     class="btn-primary rounded-l-none"
                 >
-                    <i class="fa fa-search"></i> <span id="searchButtonLabelMobile">搜索</span>
+                    <i class="fa fa-search"></i>
                 </button>
-                <div 
-                    id="searchHistoryBoxMobile" 
-                    class="absolute left-0 top-full mt-2 w-full bg-white rounded-lg shadow-lg border border-gray-200 hidden z-50"
-                ></div>
             </div>
         </div>
     </header>
 
     <!-- 主内容区 -->
-    <main class="container mx-auto px-4 pt-20 pb-20">
+    <main class="container mx-auto px-4 pt-28 pb-20">
         <!-- 视频列表 -->
         <div id="videoList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             <!-- 视频卡片将在这里动态生成 -->
@@ -355,22 +347,6 @@
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">聚合搜索</label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            id="aggregateSwitch" 
-                            class="sr-only"
-                            onchange="toggleAggregateSearch()"
-                        >
-                        <div class="w-10 h-6 bg-gray-300 rounded-full relative transition-colors">
-                            <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform"></div>
-                        </div>
-                    </label>
-                </div>
-                <p class="text-xs text-gray-500 -mt-2">开启后会搜索官方推荐的所有接口</p>
-
-                <div class="flex items-center justify-between">
                     <label class="block text-sm font-medium">官方推荐</label>
                     <button 
                         type="button"
@@ -431,7 +407,6 @@
         let currentVideoUrl = '';
         let currentVideoTitle = '';
         let currentVideoPic = '';
-        let currentVideoSource = '';
         
         // DOM元素
         const videoList = document.getElementById('videoList');
@@ -449,11 +424,6 @@
         const hostHistoryWrap = document.getElementById('hostHistoryWrap');
         const hostHistoryList = document.getElementById('hostHistoryList');
         const officialApiList = document.getElementById('officialApiList');
-        const aggregateSwitch = document.getElementById('aggregateSwitch');
-        const searchInput = document.getElementById('searchInput');
-        const searchInputMobile = document.getElementById('searchInputMobile');
-        const searchHistoryBox = document.getElementById('searchHistoryBox');
-        const searchHistoryBoxMobile = document.getElementById('searchHistoryBoxMobile');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
         
@@ -462,12 +432,6 @@
             // 加载保存的Host
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
-            const aggregateEnabled = isAggregateSearchEnabled();
-            if (aggregateSwitch) {
-                aggregateSwitch.checked = aggregateEnabled;
-                updateAggregateSwitchUI(aggregateEnabled);
-            }
-            updateSearchButtonLabel(aggregateEnabled);
             
             // 鼠标移出面板自动关闭
             historyPanel.addEventListener('mouseleave', closeAllPanels);
@@ -484,14 +448,11 @@
             
             // 监听滚动事件
             window.addEventListener('scroll', handleScroll);
-
-            // 搜索历史提示
-            bindSearchHistoryEvents();
         });
         
         // 加载初始数据
         function loadInitialData() {
-            if (!host && !isAggregateSearchEnabled()) {
+            if (!host) {
                 // 如果没有设置Host，显示设置提示
                 showHostModal();
                 return;
@@ -521,9 +482,6 @@
         
         // 获取数据
         async function fetchData(keyword, page) {
-            if (isAggregateSearchEnabled()) {
-                return fetchAggregatedData(keyword, page);
-            }
             try {
                 const params = {
                     wd: keyword,
@@ -545,26 +503,12 @@
                     return [];
                 }
                 
-                // 普通搜索去重：相同标题只保留一条
-                const seenTitles = new Set();
-                const deduped = [];
-                data.list.forEach(video => {
-                    const title = (video.vod_name || '').trim();
-                    if (!title) {
-                        deduped.push(video);
-                        return;
-                    }
-                    if (seenTitles.has(title)) return;
-                    seenTitles.add(title);
-                    deduped.push(video);
-                });
-                
                 // 渲染数据
                 if (page === 1) {
                     videoList.innerHTML = '';
                 }
                 
-                renderVideos(deduped);
+                renderVideos(data.list);
                 
                 // 更新分页状态
                 currentPage = page;
@@ -579,104 +523,9 @@
                     hasMore = true;
                 }
                 
-                return deduped;
+                return data.list;
             } catch (error) {
                 console.error('获取数据失败:', error);
-                if (page === 1) {
-                    showErrorState('获取数据失败，请检查网络连接或Host设置');
-                }
-                return [];
-            }
-        }
-
-        async function fetchAggregatedData(keyword, page) {
-            try {
-                const apis = await getOfficialApis();
-                if (!apis || apis.length === 0) {
-                    if (page === 1) {
-                        showEmptyState();
-                    } else {
-                        showToast('数据加载完毕');
-                    }
-                    hideLoadMoreButton();
-                    hasMore = false;
-                    return [];
-                }
-                
-                const results = await Promise.all(
-                    apis.map(item => {
-                        const params = {
-                            wd: keyword,
-                            pg: page,
-                            url: item.url
-                        };
-                        return fetch(getProxyUrl('', params))
-                            .then(res => res.json())
-                            .then(data => ({
-                                item,
-                                list: Array.isArray(data.list) ? data.list : []
-                            }))
-                            .catch(() => ({ item, list: [] }));
-                    })
-                );
-                
-                const merged = [];
-                results.forEach(({ item, list }) => {
-                    const label = getOfficialLabel(item);
-                    list.forEach(video => {
-                        merged.push({
-                            ...video,
-                            _sourceLabel: label
-                        });
-                    });
-                });
-
-                // 去重：相同标题只保留一条
-                const seenTitles = new Set();
-                const deduped = [];
-                merged.forEach(video => {
-                    const title = (video.vod_name || '').trim();
-                    if (!title) {
-                        deduped.push(video);
-                        return;
-                    }
-                    if (seenTitles.has(title)) return;
-                    seenTitles.add(title);
-                    deduped.push(video);
-                });
-                
-                if (page === 1) {
-                    videoList.innerHTML = '';
-                }
-                
-                if (deduped.length === 0) {
-                    if (page === 1) {
-                        showEmptyState();
-                    } else {
-                        showToast('数据加载完毕');
-                    }
-                    hideLoadMoreButton();
-                    hasMore = false;
-                    return [];
-                }
-                
-                renderVideos(deduped);
-                
-                currentPage = page;
-                searchTerm = keyword;
-                
-                const anyHasMore = results.some(r => r.list && r.list.length >= 20);
-                if (anyHasMore) {
-                    showLoadMoreButton();
-                    hasMore = true;
-                } else {
-                    hideLoadMoreButton();
-                    hasMore = false;
-                }
-                
-                return deduped;
-            } catch (error) {
-                console.error('聚合搜索失败:', error);
                 if (page === 1) {
                     showErrorState('获取数据失败，请检查网络连接或Host设置');
                 }
@@ -688,7 +537,7 @@
         function renderVideos(videos) {
             videos.forEach(video => {
                 const favorited = isFavorited(video.vod_play_url);
-                const sourceLabel = video._sourceLabel || getHostLabel();
+                const sourceLabel = getHostLabel();
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset';
                 card.innerHTML = `
@@ -712,14 +561,14 @@
                         </h3>
                         <div class="flex justify-between items-center">
                             <button 
-                                onclick="openVideoPlayer('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}')"
+                                onclick="openVideoPlayer('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}')"
                                 class="btn-primary text-sm"
                             >
                                 <i class="fa fa-play mr-1"></i> 播放
                             </button>
                             <div class="flex items-center space-x-2">
                                 <button 
-                                    onclick="toggleFavorite('${video.vod_name}', '${video.vod_play_url}', '${video.vod_pic}', this, '${sourceLabel}')"
+                                    onclick="toggleFavorite('${video.vod_name}', '${video.vod_play_url}', '${video.vod_pic}', this)"
                                     class="text-sm ${favorited ? 'text-red-500' : 'text-gray-500'} hover:text-red-500"
                                     title="喜欢"
                                 >
@@ -782,7 +631,7 @@
                 return;
             }
             
-            if (!host && !isAggregateSearchEnabled()) {
+            if (!host) {
                 showToast('请先设置API Host');
                 showHostModal();
                 return;
@@ -791,8 +640,6 @@
             searchTerm = input;
             currentPage = 1;
             hasMore = true;
-            saveSearchHistory(input);
-            hideSearchHistory();
             
             // 更新两个搜索框的值
             document.getElementById('searchInput').value = input;
@@ -813,76 +660,6 @@
             });
         }
 
-        // 搜索历史记录
-        function getSearchHistory() {
-            return JSON.parse(localStorage.getItem('searchHistory') || '[]');
-        }
-
-        function saveSearchHistory(term) {
-            if (!term) return;
-            const history = getSearchHistory();
-            const existingIndex = history.findIndex(item => item === term);
-            if (existingIndex >= 0) {
-                history.splice(existingIndex, 1);
-            }
-            history.unshift(term);
-            if (history.length > 20) {
-                history.splice(20);
-            }
-            localStorage.setItem('searchHistory', JSON.stringify(history));
-        }
-
-        function renderSearchHistory() {
-            const history = getSearchHistory().slice(0, 12);
-            const box = searchHistoryBox;
-            const boxMobile = searchHistoryBoxMobile;
-            const html = history.length === 0
-                ? `<div class="px-3 py-2 text-xs text-gray-500">暂无搜索历史</div>`
-                : `
-                    <div class="flex flex-wrap gap-2 p-2 max-h-[96px] overflow-hidden">
-                        ${history.map(item => `
-                            <button 
-                                class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200"
-                                onclick="selectSearchHistory('${item}')"
-                                title="${item}"
-                            >${item}</button>
-                        `).join('')}
-                    </div>
-                `;
-            if (box) box.innerHTML = html;
-            if (boxMobile) boxMobile.innerHTML = html;
-        }
-
-        function showSearchHistory() {
-            renderSearchHistory();
-            if (searchHistoryBox) searchHistoryBox.classList.remove('hidden');
-            if (searchHistoryBoxMobile) searchHistoryBoxMobile.classList.remove('hidden');
-        }
-
-        function hideSearchHistory() {
-            if (searchHistoryBox) searchHistoryBox.classList.add('hidden');
-            if (searchHistoryBoxMobile) searchHistoryBoxMobile.classList.add('hidden');
-        }
-
-        function selectSearchHistory(term) {
-            if (!term) return;
-            if (searchInput) searchInput.value = term;
-            if (searchInputMobile) searchInputMobile.value = term;
-            searchData();
-        }
-
-        function bindSearchHistoryEvents() {
-            const bind = (input) => {
-                if (!input) return;
-                input.addEventListener('focus', showSearchHistory);
-                input.addEventListener('blur', () => {
-                    setTimeout(hideSearchHistory, 150);
-                });
-            };
-            bind(searchInput);
-            bind(searchInputMobile);
-        }
-
         // 滚动到元素并避开固定导航
         function scrollToElementWithHeaderOffset(element, extraOffset = 0) {
             if (!element) return;
@@ -895,7 +672,7 @@
         
         // 加载更多
         function loadMoreData() {
-            if (isLoading || (!host && !isAggregateSearchEnabled()) || !hasMore) return;
+            if (isLoading || !host || !hasMore) return;
             
             isLoading = true;
             showLoading('加载更多内容...');
@@ -947,13 +724,11 @@
         }
         
         // 打开视频播放器
-        function openVideoPlayer(videoUrl, videoTitle, imageUrl = '', sourceLabel = '') {
+        function openVideoPlayer(videoUrl, videoTitle, imageUrl = '') {
             if (!host) {
-                if (!isAggregateSearchEnabled()) {
-                    showToast('请先设置API Host');
-                    showHostModal();
-                    return;
-                }
+                showToast('请先设置API Host');
+                showHostModal();
+                return;
             }
             
             showLoading('正在加载视频...');
@@ -964,12 +739,11 @@
                 currentVideoUrl = realVideoUrl;
                 currentVideoTitle = videoTitle || '视频播放';
                 currentVideoPic = imageUrl || '';
-                currentVideoSource = sourceLabel || getHostLabel();
+                const currentVideoSource = getHostLabel();
                 updatePlayerLikeButtons(isFavorited(realVideoUrl));
                 const playerTitle = document.getElementById('playerTitle');
                 if (playerTitle) {
-                    const label = currentVideoSource || '未知来源';
-                    playerTitle.innerHTML = `<span class="bg-white/20 text-white/90 text-[10px] px-2 py-0.5 rounded mr-2">${label}</span>${currentVideoTitle}`;
+                    playerTitle.textContent = currentVideoTitle;
                 }
                 
                 // 保存播放历史
@@ -1059,7 +833,6 @@
             currentVideoUrl = '';
             currentVideoTitle = '';
             currentVideoPic = '';
-            currentVideoSource = '';
             updatePlayerLikeButtons(false);
             const playerTitle = document.getElementById('playerTitle');
             if (playerTitle) {
@@ -1146,7 +919,7 @@
                         </div>
                         <div class="mt-3 flex space-x-2">
                             <button 
-                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
+                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}')"
                                 class="btn-primary text-xs py-1 px-2 flex-1"
                             >
                                 <i class="fa fa-play mr-1"></i> 播放
@@ -1177,7 +950,7 @@
             return favorites.some(item => item.url === realVideoUrl);
         }
 
-        function toggleFavorite(title, videoUrl, pic, buttonEl, sourceLabel = '') {
+        function toggleFavorite(title, videoUrl, pic, buttonEl) {
             const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
             const favorites = getFavorites();
             const existingIndex = favorites.findIndex(item => item.url === realVideoUrl);
@@ -1187,7 +960,7 @@
                 showToast('已取消喜欢');
                 updateFavoriteButton(buttonEl, false);
             } else {
-                const source = sourceLabel || getHostLabel();
+                const source = getHostLabel();
                 favorites.unshift({
                     title,
                     url: realVideoUrl,
@@ -1248,7 +1021,7 @@
                         </div>
                         <div class="mt-3 flex space-x-2">
                             <button 
-                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
+                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}')"
                                 class="btn-primary text-xs py-1 px-2 flex-1"
                             >
                                 <i class="fa fa-play mr-1"></i> 播放
@@ -1368,49 +1141,6 @@
             showToast('Host已重置');
         }
 
-        // 聚合搜索开关
-        function isAggregateSearchEnabled() {
-            return localStorage.getItem('aggregateSearch') === '1';
-        }
-
-        function toggleAggregateSearch() {
-            if (!aggregateSwitch) return;
-            const enabled = !!aggregateSwitch.checked;
-            localStorage.setItem('aggregateSearch', enabled ? '1' : '0');
-            updateAggregateSwitchUI(enabled);
-            if (enabled) {
-                fetchOfficialApis(false);
-                showToast('已开启聚合搜索');
-            } else {
-                showToast('已关闭聚合搜索');
-            }
-            if (!hostModal.classList.contains('hidden')) {
-                toggleHostModal();
-            }
-        }
-
-        function updateAggregateSwitchUI(enabled) {
-            if (!aggregateSwitch) return;
-            const track = aggregateSwitch.nextElementSibling;
-            if (!track) return;
-            const thumb = track.firstElementChild;
-            track.classList.toggle('bg-primary', enabled);
-            track.classList.toggle('bg-gray-300', !enabled);
-            if (thumb) {
-                thumb.classList.toggle('translate-x-4', enabled);
-                thumb.classList.toggle('translate-x-0', !enabled);
-            }
-            updateSearchButtonLabel(enabled);
-        }
-
-        function updateSearchButtonLabel(aggregateEnabled) {
-            const label = aggregateEnabled ? '聚合搜索' : '搜索';
-            const desktopLabel = document.getElementById('searchButtonLabel');
-            const mobileLabel = document.getElementById('searchButtonLabelMobile');
-            if (desktopLabel) desktopLabel.textContent = label;
-            if (mobileLabel) mobileLabel.textContent = label;
-        }
-
         // 官方推荐接口
         let officialApiCache = null;
 
@@ -1477,41 +1207,6 @@
                 ${metaHtml}
                 ${itemsHtml || '<div class="text-xs text-gray-500">暂无官方推荐</div>'}
             `;
-        }
-
-        async function getOfficialApis() {
-            if (officialApiCache && Array.isArray(officialApiCache.data)) {
-                return officialApiCache.data.filter(item => item && item.url);
-            }
-            try {
-                const cached = localStorage.getItem('officialApiList');
-                if (cached) {
-                    const list = JSON.parse(cached);
-                    if (Array.isArray(list)) {
-                        return list.filter(item => item && item.url);
-                    }
-                }
-            } catch (e) {
-                // ignore cache errors
-            }
-            const res = await fetch('/apis/official');
-            const data = await res.json();
-            if (data && data.code === 200 && Array.isArray(data.data)) {
-                officialApiCache = data;
-                try {
-                    localStorage.setItem('officialApiList', JSON.stringify(data.data));
-                } catch (e) {
-                    // ignore storage errors
-                }
-                return data.data.filter(item => item && item.url);
-            }
-            return [];
-        }
-
-        function getOfficialLabel(item) {
-            if (item && item.name) return item.name;
-            if (item && item.url) return getHostNameFromUrl(item.url);
-            return '官方推荐';
         }
 
         // Host历史记录
@@ -1663,7 +1358,7 @@
                 showToast('已取消喜欢');
                 updatePlayerLikeButtons(false);
             } else {
-                const source = currentVideoSource || getHostLabel();
+                const source = getHostLabel();
                 favorites.unshift({
                     title: currentVideoTitle || '视频播放',
                     url: currentVideoUrl,
