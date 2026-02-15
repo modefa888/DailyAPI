@@ -113,36 +113,42 @@
                     ></div>
                 </div>
                 
-                <!-- 右侧：功能按钮 -->
-                <div class="flex items-center space-x-3">
+                <!-- 右侧：更多下拉 -->
+                <div class="flex items-center space-x-3 relative">
                     <button 
-                        id="favoriteButton" 
-                        onclick="toggleFavorites()"
-                        class="btn-primary text-sm"
-                        title="我的喜欢"
-                    >
-                        <i class="fa fa-heart mr-1"></i> 喜欢
-                    </button>
-
-                    <button 
-                        id="historyButton" 
-                        onclick="toggleHistory()"
-                        class="btn-accent text-sm"
-                        title="播放历史"
-                    >
-                        <i class="fa fa-history mr-1"></i> 历史
-                    </button>
-
-                    <button 
-                        id="hostButton" 
-                        onclick="toggleHostModal()"
+                        id="moreButton"
+                        onclick="toggleMoreMenu()"
                         class="btn-secondary text-sm"
-                        title="设置Host"
+                        title="更多"
                     >
-                        <i class="fa fa-cog mr-1"></i> 设置
+                        <i class="fa fa-ellipsis-h mr-1"></i> 更多
                     </button>
-                    
-
+                    <div 
+                        id="moreMenu"
+                        class="absolute right-0 top-full mt-2 w-36 bg-white rounded-lg shadow-lg border border-gray-200 hidden z-50"
+                    >
+                        <button 
+                            onclick="handleMoreAction('favorite')"
+                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
+                        >
+                            <i class="fa fa-heart text-red-500"></i>
+                            <span class="text-right flex-1">喜欢</span>
+                        </button>
+                        <button 
+                            onclick="handleMoreAction('history')"
+                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
+                        >
+                            <i class="fa fa-history text-gray-600"></i>
+                            <span class="text-right flex-1">历史</span>
+                        </button>
+                        <button 
+                            onclick="handleMoreAction('setting')"
+                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
+                        >
+                            <i class="fa fa-cog text-gray-600"></i>
+                            <span class="text-right flex-1">设置</span>
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -328,30 +334,36 @@
         </div>
     </div>
 
-    <!-- Host设置模态框 -->
+    <!-- Host设置面板 -->
     <div 
         id="hostModal" 
-        class="fixed inset-0 z-50 hidden items-center justify-center p-4"
+        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
     >
-        <div class="relative w-full max-w-md glass-effect rounded-lg shadow-2xl p-6">
-            <button 
-                onclick="toggleHostModal()"
-                class="absolute top-4 right-4 hover:bg-gray-200 rounded-full p-1"
-            >
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">设置API Host</h3>
+            <button onclick="toggleHostModal()" class="p-2 hover:bg-gray-200 rounded-full">
                 <i class="fa fa-times"></i>
             </button>
-            
-            <h3 class="text-xl font-semibold mb-4 text-center">设置API Host</h3>
-            
+        </div>
+        
+        <div class="flex-1 overflow-y-auto scrollbar-hide p-4">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1">当前Host</label>
+                    <label class="block text-sm font-medium mb-1">当前API</label>
                     <input 
                         type="text" 
                         id="hostInput" 
                         class="input-primary w-full"
                         placeholder="请输入API Host地址"
                     >
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="saveHost()" class="btn-primary flex-1">
+                        <i class="fa fa-save mr-1"></i> 保存
+                    </button>
+                    <button onclick="resetHost()" class="btn-secondary flex-1">
+                        <i class="fa fa-refresh mr-1"></i> 重置
+                    </button>
                 </div>
 
                 <div class="flex items-center justify-between">
@@ -371,16 +383,37 @@
                 <p class="text-xs text-gray-500 -mt-2">开启后会搜索官方推荐的所有接口</p>
 
                 <div class="flex items-center justify-between">
+                    <label class="block text-sm font-medium">聚合接口选择</label>
+                    <button 
+                        type="button"
+                        onclick="toggleAggregateApiSection()"
+                        class="text-xs text-gray-600 hover:text-gray-800"
+                    >
+                        展开/收起
+                    </button>
+                </div>
+                <div id="aggregateApiSection" class="hidden space-y-2">
+                    <div class="flex space-x-2">
+                        <button onclick="selectAllAggregateApis()" class="btn-secondary text-xs flex-1">全选</button>
+                        <button onclick="clearAggregateApis()" class="btn-secondary text-xs flex-1">全不选</button>
+                        <button onclick="resetAggregateApis()" class="btn-secondary text-xs flex-1">恢复默认</button>
+                    </div>
+                    <div id="aggregateApiList" class="space-y-2"></div>
+                </div>
+
+                <div class="flex items-center justify-between">
                     <label class="block text-sm font-medium">官方推荐</label>
                     <button 
                         type="button"
-                        onclick="fetchOfficialApis(true)"
+                        onclick="toggleOfficialApiSection(); fetchOfficialApis(true)"
                         class="text-xs text-gray-600 hover:text-gray-800"
                     >
-                        获取官方接口
+                        展开/收起
                     </button>
                 </div>
-                <div id="officialApiList" class="space-y-2"></div>
+                <div id="officialApiSection" class="hidden space-y-2">
+                    <div id="officialApiList" class="space-y-2"></div>
+                </div>
 
                 <div class="flex items-center justify-between">
                     <label class="block text-sm font-medium">历史Host</label>
@@ -396,13 +429,21 @@
                     <div id="hostHistoryList" class="space-y-2"></div>
                 </div>
                 
-                <div class="flex space-x-3 pt-4">
-                    <button onclick="saveHost()" class="btn-primary flex-1">
-                        <i class="fa fa-save mr-1"></i> 保存
+                <div class="border-t border-gray-200 pt-4 mt-2"></div>
+
+                <div class="flex space-x-3 pt-2">
+                    <button onclick="exportUserData()" class="btn-secondary flex-1">
+                        <i class="fa fa-download mr-1"></i> 导出
                     </button>
-                    <button onclick="resetHost()" class="btn-secondary flex-1">
-                        <i class="fa fa-refresh mr-1"></i> 重置
-                    </button>
+                    <label class="btn-primary flex-1 text-center cursor-pointer">
+                        <i class="fa fa-upload mr-1"></i> 导入
+                        <input id="importFileInput" type="file" accept="application/json" class="hidden" onchange="importUserData(event)">
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500">导出/导入：仅包含喜欢与播放历史</p>
+                <div class="pt-2">
+                    <label class="block text-sm font-medium mb-2">导入导出历史记录</label>
+                    <div id="transferHistoryList" class="space-y-2"></div>
                 </div>
             </div>
         </div>
@@ -449,11 +490,15 @@
         const hostHistoryWrap = document.getElementById('hostHistoryWrap');
         const hostHistoryList = document.getElementById('hostHistoryList');
         const officialApiList = document.getElementById('officialApiList');
+        const aggregateApiList = document.getElementById('aggregateApiList');
         const aggregateSwitch = document.getElementById('aggregateSwitch');
+        const aggregateApiSection = document.getElementById('aggregateApiSection');
+        const officialApiSection = document.getElementById('officialApiSection');
         const searchInput = document.getElementById('searchInput');
         const searchInputMobile = document.getElementById('searchInputMobile');
         const searchHistoryBox = document.getElementById('searchHistoryBox');
         const searchHistoryBoxMobile = document.getElementById('searchHistoryBoxMobile');
+        const transferHistoryList = document.getElementById('transferHistoryList');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
         
@@ -473,7 +518,7 @@
             historyPanel.addEventListener('mouseleave', closeAllPanels);
             favoritePanel.addEventListener('mouseleave', closeAllPanels);
             hostModal.addEventListener('mouseleave', () => {
-                if (!hostModal.classList.contains('hidden')) {
+                if (!hostModal.classList.contains('translate-x-full')) {
                     toggleHostModal();
                 }
             });
@@ -487,6 +532,15 @@
 
             // 搜索历史提示
             bindSearchHistoryEvents();
+
+            // 点击空白处关闭更多菜单
+            document.addEventListener('click', (e) => {
+                const menu = document.getElementById('moreMenu');
+                const button = document.getElementById('moreButton');
+                if (!menu || !button) return;
+                if (menu.contains(e.target) || button.contains(e.target)) return;
+                menu.classList.add('hidden');
+            });
         });
         
         // 加载初始数据
@@ -592,7 +646,11 @@
         async function fetchAggregatedData(keyword, page) {
             try {
                 const apis = await getOfficialApis();
-                if (!apis || apis.length === 0) {
+                const selectedUrls = getAggregateApiSelection();
+                const targetApis = selectedUrls.length > 0
+                    ? apis.filter(item => selectedUrls.includes(item.url))
+                    : apis;
+                if (!targetApis || targetApis.length === 0) {
                     if (page === 1) {
                         showEmptyState();
                     } else {
@@ -603,8 +661,10 @@
                     return [];
                 }
                 
+                let completed = 0;
+                updateAggregateLoading(completed, targetApis.length);
                 const results = await Promise.all(
-                    apis.map(item => {
+                    targetApis.map(item => {
                         const params = {
                             wd: keyword,
                             pg: page,
@@ -616,7 +676,11 @@
                                 item,
                                 list: Array.isArray(data.list) ? data.list : []
                             }))
-                            .catch(() => ({ item, list: [] }));
+                            .catch(() => ({ item, list: [] }))
+                            .finally(() => {
+                                completed += 1;
+                                updateAggregateLoading(completed, targetApis.length);
+                            });
                     })
                 );
                 
@@ -683,6 +747,14 @@
                 return [];
             }
         }
+
+        function updateAggregateLoading(done, total) {
+            if (!isAggregateSearchEnabled()) return;
+            const text = `聚合搜索加载中... (${done}/${total})`;
+            if (loadingText) {
+                loadingText.textContent = text;
+            }
+        }
         
         // 渲染视频卡片
         function renderVideos(videos) {
@@ -694,7 +766,7 @@
                 card.innerHTML = `
                     <div class="relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
                         <img 
-                            src="/spankbang/loading.gif" 
+                            src="./loading.gif" 
                             data-src="${video.vod_pic}" 
                             alt="${video.vod_name}" 
                             class="w-full h-full object-cover lazy-image"
@@ -727,7 +799,7 @@
                                 </button>
                                 <button 
                                     onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}')"
-                                    class="btn-secondary text-sm"
+                                    class="text-sm text-gray-500 hover:text-blue-500"
                                     title="分享视频"
                                 >
                                     <i class="fa fa-share-alt mr-1"></i> 分享
@@ -1315,14 +1387,15 @@
         
         // 切换Host设置模态框
         function toggleHostModal() {
-            hostModal.classList.toggle('hidden');
-            hostModal.classList.toggle('flex');
+            hostModal.classList.toggle('translate-x-full');
+            overlay.classList.toggle('hidden');
             
-            if (!hostModal.classList.contains('hidden')) {
+            if (!hostModal.classList.contains('translate-x-full')) {
                 hostInput.value = host;
                 hostInput.focus();
                 fetchOfficialApis(false);
                 renderHostHistory();
+                renderTransferHistory();
             }
         }
         
@@ -1380,13 +1453,25 @@
             updateAggregateSwitchUI(enabled);
             if (enabled) {
                 fetchOfficialApis(false);
+                renderAggregateApiSelection(officialApiCache ? officialApiCache.data : []);
                 showToast('已开启聚合搜索');
             } else {
                 showToast('已关闭聚合搜索');
             }
-            if (!hostModal.classList.contains('hidden')) {
+            if (!hostModal.classList.contains('translate-x-full')) {
                 toggleHostModal();
             }
+        }
+
+        function toggleAggregateApiSection() {
+            if (!aggregateApiSection) return;
+            fetchOfficialApis(false);
+            aggregateApiSection.classList.toggle('hidden');
+        }
+
+        function toggleOfficialApiSection() {
+            if (!officialApiSection) return;
+            officialApiSection.classList.toggle('hidden');
         }
 
         function updateAggregateSwitchUI(enabled) {
@@ -1409,6 +1494,134 @@
             const mobileLabel = document.getElementById('searchButtonLabelMobile');
             if (desktopLabel) desktopLabel.textContent = label;
             if (mobileLabel) mobileLabel.textContent = label;
+        }
+
+        // 导出/导入喜欢和历史
+        function exportUserData() {
+            const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+            const playHistory = JSON.parse(localStorage.getItem('playHistory') || '[]');
+            const payload = {
+                favorites,
+                playHistory
+            };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+            a.download = `video-data-${timestamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            addTransferHistory('导出', a.download);
+            showToast('导出成功');
+        }
+
+        function importUserData(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const data = JSON.parse(reader.result || '{}');
+                    if (data.favorites && Array.isArray(data.favorites)) {
+                        localStorage.setItem('favorites', JSON.stringify(data.favorites));
+                    } else {
+                        localStorage.setItem('favorites', JSON.stringify([]));
+                    }
+                    if (data.playHistory && Array.isArray(data.playHistory)) {
+                        localStorage.setItem('playHistory', JSON.stringify(data.playHistory));
+                    } else {
+                        localStorage.setItem('playHistory', JSON.stringify([]));
+                    }
+                    addTransferHistory('导入', file.name);
+                    showToast('导入成功');
+                } catch (e) {
+                    showToast('导入失败：文件格式不正确');
+                } finally {
+                    event.target.value = '';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function getTransferHistory() {
+            return JSON.parse(localStorage.getItem('transferHistory') || '[]');
+        }
+
+        function addTransferHistory(type, filename) {
+            const history = getTransferHistory();
+            history.unshift({
+                type,
+                filename: filename || '',
+                timestamp: Date.now()
+            });
+            if (history.length > 10) {
+                history.splice(10);
+            }
+            localStorage.setItem('transferHistory', JSON.stringify(history));
+            renderTransferHistory();
+        }
+
+        function renderTransferHistory() {
+            if (!transferHistoryList) return;
+            const history = getTransferHistory();
+            if (history.length === 0) {
+                transferHistoryList.innerHTML = `
+                    <div class="text-xs text-gray-500">暂无记录</div>
+                `;
+                return;
+            }
+            transferHistoryList.innerHTML = history.map(item => `
+                <div class="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
+                    <div class="min-w-0 mr-2">
+                        <div class="text-xs text-gray-700 truncate">${item.type} · ${formatDate(item.timestamp)}</div>
+                        <div class="text-[11px] text-gray-500 truncate">${item.filename || ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function handleActionSelect(value) {
+            if (!value) return;
+            if (value === 'favorite') {
+                toggleFavorites();
+            } else if (value === 'history') {
+                toggleHistory();
+            } else if (value === 'setting') {
+                toggleHostModal();
+            }
+            const select = document.getElementById('actionSelect');
+            if (select) select.value = '';
+        }
+
+        function toggleMoreMenu() {
+            const menu = document.getElementById('moreMenu');
+            if (!menu) return;
+            menu.classList.toggle('hidden');
+            if (!menu.classList.contains('hidden')) {
+                menu.addEventListener('mouseleave', handleMoreMenuMouseLeave, { once: true });
+            }
+        }
+
+        function handleMoreAction(action) {
+            if (action === 'favorite') {
+                toggleFavorites();
+            } else if (action === 'history') {
+                toggleHistory();
+            } else if (action === 'setting') {
+                toggleHostModal();
+            }
+            const menu = document.getElementById('moreMenu');
+            if (menu) menu.classList.add('hidden');
+        }
+
+        function handleMoreMenuMouseLeave() {
+            const menu = document.getElementById('moreMenu');
+            if (menu) menu.classList.add('hidden');
         }
 
         // 官方推荐接口
@@ -1452,6 +1665,11 @@
                 officialApiList.innerHTML = `
                     <div class="text-xs text-gray-500">暂无官方推荐</div>
                 `;
+                if (aggregateApiList) {
+                    aggregateApiList.innerHTML = `
+                        <div class="text-xs text-gray-500">暂无可选接口</div>
+                    `;
+                }
                 return;
             }
             
@@ -1477,6 +1695,8 @@
                 ${metaHtml}
                 ${itemsHtml || '<div class="text-xs text-gray-500">暂无官方推荐</div>'}
             `;
+
+            renderAggregateApiSelection(data.data);
         }
 
         async function getOfficialApis() {
@@ -1503,6 +1723,7 @@
                 } catch (e) {
                     // ignore storage errors
                 }
+                renderAggregateApiSelection(data.data);
                 return data.data.filter(item => item && item.url);
             }
             return [];
@@ -1512,6 +1733,89 @@
             if (item && item.name) return item.name;
             if (item && item.url) return getHostNameFromUrl(item.url);
             return '官方推荐';
+        }
+
+        function getAggregateApiSelection() {
+            try {
+                const raw = localStorage.getItem('aggregateApiSelection');
+                const list = raw ? JSON.parse(raw) : [];
+                return Array.isArray(list) ? list : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function setAggregateApiSelection(urls) {
+            const unique = Array.from(new Set((urls || []).filter(Boolean)));
+            localStorage.setItem('aggregateApiSelection', JSON.stringify(unique));
+        }
+
+        function ensureDefaultAggregateSelection(apis) {
+            const current = getAggregateApiSelection();
+            if (current.length > 0) return current;
+            const defaults = (apis || []).slice(0, 3).map(item => item.url).filter(Boolean);
+            setAggregateApiSelection(defaults);
+            return defaults;
+        }
+
+        function renderAggregateApiSelection(apis) {
+            if (!aggregateApiList) return;
+            const list = (apis || []).filter(item => item && item.url);
+            if (list.length === 0) {
+                aggregateApiList.innerHTML = `
+                    <div class="text-xs text-gray-500">暂无可选接口</div>
+                `;
+                return;
+            }
+            const selected = ensureDefaultAggregateSelection(list);
+            aggregateApiList.innerHTML = list.map(item => {
+                const checked = selected.includes(item.url) ? 'checked' : '';
+                return `
+                    <label class="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
+                        <div class="min-w-0 mr-2">
+                            <div class="text-xs text-gray-700 truncate">${item.name || '官方推荐'}</div>
+                            <div class="text-[11px] text-gray-500 truncate">${item.url || ''}</div>
+                        </div>
+                        <input 
+                            type="checkbox" 
+                            class="w-4 h-4"
+                            ${checked}
+                            onchange="toggleAggregateApi('${item.url}')"
+                        >
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function toggleAggregateApi(url) {
+            const selected = getAggregateApiSelection();
+            const index = selected.indexOf(url);
+            if (index >= 0) {
+                selected.splice(index, 1);
+            } else {
+                selected.push(url);
+            }
+            setAggregateApiSelection(selected);
+        }
+
+        function selectAllAggregateApis() {
+            const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
+            const urls = list.map(item => item.url).filter(Boolean);
+            setAggregateApiSelection(urls);
+            renderAggregateApiSelection(list);
+        }
+
+        function clearAggregateApis() {
+            setAggregateApiSelection([]);
+            const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
+            renderAggregateApiSelection(list);
+        }
+
+        function resetAggregateApis() {
+            const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
+            const defaults = list.slice(0, 3).map(item => item.url).filter(Boolean);
+            setAggregateApiSelection(defaults);
+            renderAggregateApiSelection(list);
         }
 
         // Host历史记录
@@ -1572,7 +1876,7 @@
             localStorage.setItem('apiHostName', hostName);
             saveHostHistory(host);
             showToast('已切换Host');
-            if (!hostModal.classList.contains('hidden')) {
+            if (!hostModal.classList.contains('translate-x-full')) {
                 toggleHostModal();
             }
             if (videoList.children.length === 0) {
@@ -1747,8 +2051,8 @@
             }
             
             // 无限滚动加载更多
-            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 200) {
-                if (loadMoreButton.style.display !== 'none' && !isLoading) {
+            if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 200) {
+                if (hasMore && !isLoading) {
                     loadMoreData();
                 }
             }
@@ -1811,6 +2115,7 @@
         function closeAllPanels() {
             historyPanel.classList.add('translate-x-full');
             favoritePanel.classList.add('translate-x-full');
+            hostModal.classList.add('translate-x-full');
             overlay.classList.add('hidden');
         }
         

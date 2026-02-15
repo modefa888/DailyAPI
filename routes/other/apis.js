@@ -31,6 +31,51 @@ const officialApis = [
         url: "https://aosikazy.com/api.php/provide/vod/",
         type: "vod",
     },
+    {
+        name: "老色逼资源",
+        url: "https://apilsbzy1.com/api.php/provide/vod/",
+        type: "vod",
+    },
+    {
+        name: "百万资源",
+        url: "https://api.bwzyz.com/api.php/provide/vod/at/json/",
+        type: "vod",
+    },
+    {
+        name: "杏吧资源",
+        url: "https://json.xingba222.com/api.php/provide/vod/",
+        type: "vod",
+    },
+    {
+        name: "幸资资源",
+        url: "https://xzybb2.com/api.php/provide/vod/",
+        type: "vod",
+    },
+    {
+        name: "黄色仓库",
+        url: "https://hsckzy888.com/api.php/provide/vod/from/hsckm3u8/at/json/",
+        type: "vod",
+    },
+    {
+        name: "香蕉资源",
+        url: "https://www.xiangjiaozyw.com/api.php/provide/vod/",
+        type: "vod",
+    },
+    {
+        name: "小鸡资源",
+        url: "https://api.xjzyapi.xyz/provide/vod/",
+        type: "vod",
+    },
+    {
+        name: "乐播资源",
+        url: "https://lbapi9.com/api.php/provide/vod/at/json/",
+        type: "vod",
+    },
+    {
+        name: "色猫资源",
+        url: "https://caiji.semaozy.net/inc/apijson_vod.php",
+        type: "vod",
+    },
 ];
 
 
