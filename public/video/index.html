@@ -115,6 +115,14 @@
                 
                 <!-- 右侧：更多下拉 -->
                 <div class="flex items-center space-x-3 relative">
+                    <button
+                        id="mobileSearchToggle"
+                        onclick="toggleMobileSearch()"
+                        class="md:hidden btn-primary text-sm"
+                        title="搜索"
+                    >
+                        <i class="fa fa-search"></i>
+                    </button>
                     <button 
                         id="moreButton"
                         onclick="toggleMoreMenu()"
@@ -153,7 +161,7 @@
             </div>
             
             <!-- 移动端搜索框 -->
-            <div class="md:hidden mt-3 flex items-center bg-white rounded-lg shadow-md relative">
+            <div id="mobileSearchBox" class="md:hidden mt-3 flex items-center bg-white rounded-lg shadow-md relative hidden">
                 <input 
                     type="text" 
                     id="searchInputMobile" 
@@ -498,6 +506,8 @@
         const searchInputMobile = document.getElementById('searchInputMobile');
         const searchHistoryBox = document.getElementById('searchHistoryBox');
         const searchHistoryBoxMobile = document.getElementById('searchHistoryBoxMobile');
+        const searchButtonMobile = document.getElementById('searchButtonMobile');
+        let suppressHistoryClick = false;
         const transferHistoryList = document.getElementById('transferHistoryList');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
@@ -541,6 +551,38 @@
                 if (menu.contains(e.target) || button.contains(e.target)) return;
                 menu.classList.add('hidden');
             });
+
+            // 移动端搜索框打开时点击其他位置自动关闭
+            document.addEventListener('click', (e) => {
+                const box = document.getElementById('mobileSearchBox');
+                const toggle = document.getElementById('mobileSearchToggle');
+                if (!box || !toggle) return;
+                if (box.classList.contains('hidden')) return;
+                if (box.contains(e.target) || toggle.contains(e.target)) return;
+                box.classList.add('hidden');
+            });
+
+            // 移动端搜索框打开时，滑动/触摸其他位置也关闭
+            document.addEventListener('touchstart', (e) => {
+                const box = document.getElementById('mobileSearchBox');
+                const toggle = document.getElementById('mobileSearchToggle');
+                if (!box || !toggle) return;
+                if (box.classList.contains('hidden')) return;
+                if (box.contains(e.target) || toggle.contains(e.target)) return;
+                box.classList.add('hidden');
+            }, { passive: true });
+
+            // 点击导航栏任意位置关闭面板
+            const header = document.getElementById('header');
+            if (header) {
+                header.addEventListener('click', (e) => {
+                    const target = e.target;
+                    if (target && target.closest('button, input, select, textarea, a, label, #moreMenu')) {
+                        return;
+                    }
+                    closeAllPanels();
+                });
+            }
         });
         
         // 加载初始数据
@@ -846,8 +888,11 @@
         
         // 搜索功能
         function searchData() {
-            const input = document.getElementById('searchInput').value.trim() || 
-                         document.getElementById('searchInputMobile').value.trim();
+            suppressHistoryInteractions(200);
+            const isMobile = window.matchMedia('(max-width: 767px)').matches;
+            const desktopValue = document.getElementById('searchInput').value.trim();
+            const mobileValue = document.getElementById('searchInputMobile').value.trim();
+            const input = isMobile ? mobileValue : (desktopValue || mobileValue);
             
             if (!input) {
                 showToast('请输入搜索关键词');
@@ -873,6 +918,14 @@
             showLoading('正在搜索...');
             fetchData(input, 1).then((list) => {
                 if (list && list.length > 0) {
+                    if (window.matchMedia('(max-width: 767px)').matches) {
+                        setTimeout(() => {
+                            const mobileBox = document.getElementById('mobileSearchBox');
+                            if (mobileBox && !mobileBox.classList.contains('hidden')) {
+                                mobileBox.classList.add('hidden');
+                            }
+                        }, 200);
+                    }
                     setTimeout(() => {
                         const firstCard = videoList.firstElementChild;
                         if (firstCard) {
@@ -926,6 +979,7 @@
         }
 
         function showSearchHistory() {
+            if (suppressHistoryClick) return;
             renderSearchHistory();
             if (searchHistoryBox) searchHistoryBox.classList.remove('hidden');
             if (searchHistoryBoxMobile) searchHistoryBoxMobile.classList.remove('hidden');
@@ -937,6 +991,7 @@
         }
 
         function selectSearchHistory(term) {
+            if (suppressHistoryClick) return;
             if (!term) return;
             if (searchInput) searchInput.value = term;
             if (searchInputMobile) searchInputMobile.value = term;
@@ -953,6 +1008,31 @@
             };
             bind(searchInput);
             bind(searchInputMobile);
+
+            // 移动端点击输入框时清空上次搜索内容
+            if (searchInputMobile) {
+                searchInputMobile.addEventListener('focus', () => {
+                    searchInputMobile.value = '';
+                });
+            }
+            if (searchButtonMobile) {
+                const suppress = () => suppressHistoryInteractions(250);
+                searchButtonMobile.addEventListener('mousedown', suppress);
+                searchButtonMobile.addEventListener('pointerdown', suppress);
+                searchButtonMobile.addEventListener('touchstart', suppress, { passive: true });
+            }
+        }
+
+        function suppressHistoryInteractions(duration = 200) {
+            suppressHistoryClick = true;
+            hideSearchHistory();
+            if (searchHistoryBox) searchHistoryBox.style.pointerEvents = 'none';
+            if (searchHistoryBoxMobile) searchHistoryBoxMobile.style.pointerEvents = 'none';
+            setTimeout(() => {
+                suppressHistoryClick = false;
+                if (searchHistoryBox) searchHistoryBox.style.pointerEvents = '';
+                if (searchHistoryBoxMobile) searchHistoryBoxMobile.style.pointerEvents = '';
+            }, duration);
         }
 
         // 滚动到元素并避开固定导航
@@ -1494,6 +1574,15 @@
             const mobileLabel = document.getElementById('searchButtonLabelMobile');
             if (desktopLabel) desktopLabel.textContent = label;
             if (mobileLabel) mobileLabel.textContent = label;
+        }
+
+        function toggleMobileSearch() {
+            const box = document.getElementById('mobileSearchBox');
+            if (!box) return;
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden')) {
+                if (searchInputMobile) searchInputMobile.focus();
+            }
         }
 
         // 导出/导入喜欢和历史
@@ -2118,6 +2207,7 @@
             hostModal.classList.add('translate-x-full');
             overlay.classList.add('hidden');
         }
+
         
         // 显示Toast提示
         function showToast(message) {
