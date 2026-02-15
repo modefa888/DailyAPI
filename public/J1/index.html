@@ -217,6 +217,55 @@
         .like-btn:hover {
             transform: scale(1.1); /* 可选：hover轻微放大，提升交互 */
         }
+
+        /* 顶部设置相关面板统一样式 */
+        .panel-shell {
+            background: linear-gradient(145deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9));
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            box-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+            border-radius: 16px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            overflow: hidden;
+        }
+        .panel-entry {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.68rem 0.78rem;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.2s ease;
+        }
+        .panel-entry:hover {
+            background: rgba(99, 102, 241, 0.22);
+            border-color: rgba(129, 140, 248, 0.45);
+            transform: translateX(2px);
+        }
+        .panel-titlebar {
+            padding: 0.78rem 0.9rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255, 255, 255, 0.04);
+        }
+        .panel-clear-btn {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+        .panel-clear-btn:hover {
+            color: #fda4af;
+        }
+        .panel-content > div {
+            transition: all 0.2s ease;
+        }
+        .panel-content > div:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
     </style>
 </head>
 
@@ -252,17 +301,17 @@
             </div>
 
             <!-- 设置按钮 + 下拉面板 -->
-            <div class="relative ml-4">
+            <div id="panelRoot" class="relative ml-4">
                 <button id="settingsButton" onclick="toggleSettings()"
-                    class="flex items-center justify-center bg-white/10 hover:bg-white/20 w-11 h-11 rounded-full transition-all">
+                    class="flex items-center justify-center bg-white/10 hover:bg-white/20 w-11 h-11 rounded-full border border-white/20 hover:border-indigo-300/70 transition-all shadow-lg hover:shadow-indigo-500/20">
                     <i class="fa fa-cog"></i>
                 </button>
 
                 <!-- 设置面板 -->
                 <div id="settingsPanel"
-                    class="absolute right-0 mt-2 w-72 glass-dark rounded-lg shadow-xl hidden animate-fade-in p-3 space-y-2">
+                    class="absolute right-0 mt-3 w-72 hidden animate-fade-in p-3 space-y-2 panel-shell">
                     <button id="likeButton" onclick="showLikes()"
-                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        class="panel-entry">
                         <span class="flex items-center space-x-2">
                             <i class="fa fa-heart text-like"></i>
                             <span>我的喜欢</span>
@@ -270,7 +319,7 @@
                         <i class="fa fa-chevron-right text-white/60 text-xs"></i>
                     </button>
                     <button id="historyButton" onclick="showHistory()"
-                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        class="panel-entry">
                         <span class="flex items-center space-x-2">
                             <i class="fa fa-history"></i>
                             <span>历史记录</span>
@@ -278,7 +327,7 @@
                         <i class="fa fa-chevron-right text-white/60 text-xs"></i>
                     </button>
                     <button id="blockButton" onclick="showBlocks()"
-                        class="w-full flex items-center justify-between bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg transition-all">
+                        class="panel-entry">
                         <span class="flex items-center space-x-2">
                             <i class="fa fa-ban"></i>
                             <span>黑名单</span>
@@ -302,42 +351,42 @@
 
                 <!-- 收藏列表容器 -->
                 <div id="likeContainer"
-                    class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
-                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                    class="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto scrollbar-hide hidden animate-fade-in panel-shell">
+                    <div class="panel-titlebar">
                         <h3 class="font-medium text-white">我的收藏</h3>
-                        <button onclick="clearLikes()" class="text-white/60 hover:text-white text-sm">
+                        <button onclick="clearLikes()" class="panel-clear-btn">
                             <i class="fa fa-trash-o mr-1"></i>清空
                         </button>
                     </div>
-                    <div id="likeContent" class="divide-y divide-white/10">
+                    <div id="likeContent" class="divide-y divide-white/10 panel-content">
                         <!-- 收藏列表内容将通过JS动态添加 -->
                     </div>
                 </div>
 
                 <!-- 历史记录容器 -->
                 <div id="historyContainer"
-                    class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
-                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                    class="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto scrollbar-hide hidden animate-fade-in panel-shell">
+                    <div class="panel-titlebar">
                         <h3 class="font-medium text-white">播放历史</h3>
-                        <button onclick="clearHistory()" class="text-white/60 hover:text-white text-sm">
+                        <button onclick="clearHistory()" class="panel-clear-btn">
                             <i class="fa fa-trash-o mr-1"></i>清空
                         </button>
                     </div>
-                    <div id="historyContent" class="divide-y divide-white/10">
+                    <div id="historyContent" class="divide-y divide-white/10 panel-content">
                         <!-- 历史记录内容将通过JS动态添加 -->
                     </div>
                 </div>
 
                 <!-- 拉黑列表容器 -->
                 <div id="blockContainer"
-                    class="absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto scrollbar-hide glass-dark rounded-lg shadow-xl hidden animate-fade-in">
-                    <div class="p-3 border-b border-white/10 flex justify-between items-center">
+                    class="absolute right-0 mt-3 w-80 max-h-96 overflow-y-auto scrollbar-hide hidden animate-fade-in panel-shell">
+                    <div class="panel-titlebar">
                         <h3 class="font-medium text-white">黑名单</h3>
-                        <button onclick="clearBlocks()" class="text-white/60 hover:text-white text-sm">
+                        <button onclick="clearBlocks()" class="panel-clear-btn">
                             <i class="fa fa-trash-o mr-1"></i>清空
                         </button>
                     </div>
-                    <div id="blockContent" class="divide-y divide-white/10">
+                    <div id="blockContent" class="divide-y divide-white/10 panel-content">
                         <!-- 拉黑列表内容将通过JS动态添加 -->
                     </div>
                 </div>
@@ -383,7 +432,7 @@
     </main>
 
     <!-- 悬浮按钮 -->
-    <div id="floatingButtonsContainer" class="fixed bottom-6 right-6 flex flex-col space-y-3 hidden animate-fade-in">
+    <div id="floatingButtonsContainer" class="fixed bottom-6 right-6 z-40 flex flex-col space-y-3 hidden animate-fade-in">
         <button onclick="loadMoreData()"
             class="bg-primary hover:bg-primary/90 text-white w-12 h-12 rounded-full shadow-lg hover:shadow-xl flex items-center justify-center transition-all"
             title="加载更多">
@@ -450,11 +499,62 @@
         let isBlockContainerVisible = false; // 拉黑列表显示状态
         let isSettingsPanelVisible = false; // 设置面板显示状态
         let lastScrollTop = 0;
+        let panelCloseTimer = null;
+
+        const clearPanelCloseTimer = () => {
+            if (panelCloseTimer) {
+                clearTimeout(panelCloseTimer);
+                panelCloseTimer = null;
+            }
+        };
+
+        const closeAllTopPanels = () => {
+            clearPanelCloseTimer();
+            if (isHistoryContainerVisible) {
+                isHistoryContainerVisible = false;
+                document.getElementById('historyContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
+                document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
+            }
+            if (isLikeContainerVisible) {
+                isLikeContainerVisible = false;
+                document.getElementById('likeContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
+                document.removeEventListener('wheel', closeLikeOnClickOutside, true);
+            }
+            if (isBlockContainerVisible) {
+                isBlockContainerVisible = false;
+                document.getElementById('blockContainer').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
+                document.removeEventListener('wheel', closeBlockOnClickOutside, true);
+            }
+            if (isSettingsPanelVisible) {
+                isSettingsPanelVisible = false;
+                document.getElementById('settingsPanel').classList.add('hidden');
+                document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
+            }
+        };
+
+        const schedulePanelAutoClose = () => {
+            clearPanelCloseTimer();
+            panelCloseTimer = setTimeout(() => {
+                closeAllTopPanels();
+            }, 180);
+        };
+
+        const setupPanelAutoClose = () => {
+            const panelRoot = document.getElementById('panelRoot');
+            if (!panelRoot) return;
+
+            panelRoot.addEventListener('mouseenter', clearPanelCloseTimer);
+            panelRoot.addEventListener('mouseleave', schedulePanelAutoClose);
+        };
 
         // 初始化页面
         window.onload = () => {
             // 动态生成站点选择器选项
             generateSiteOptions();
+            setupPanelAutoClose();
 
             // 从localStorage加载上次选择的站点
             const savedSite = localStorage.getItem('selectedSite');
@@ -749,6 +849,7 @@
 
         // 设置面板开关
         const toggleSettings = () => {
+            clearPanelCloseTimer();
             const settingsPanel = document.getElementById('settingsPanel');
             isSettingsPanelVisible = !isSettingsPanelVisible;
 
@@ -775,6 +876,7 @@
 
         // 显示历史记录
         const showHistory = () => {
+            clearPanelCloseTimer();
             if (isSettingsPanelVisible) {
                 isSettingsPanelVisible = false;
                 document.getElementById('settingsPanel').classList.add('hidden');
@@ -966,6 +1068,7 @@
         };
 
         const showBlocks = () => {
+            clearPanelCloseTimer();
             if (isSettingsPanelVisible) {
                 isSettingsPanelVisible = false;
                 document.getElementById('settingsPanel').classList.add('hidden');
@@ -1143,6 +1246,7 @@
         };
         // 显示收藏列表
         const showLikes = () => {
+            clearPanelCloseTimer();
             if (isSettingsPanelVisible) {
                 isSettingsPanelVisible = false;
                 document.getElementById('settingsPanel').classList.add('hidden');
@@ -1266,35 +1370,7 @@
                 closeVideoPlayer();
 
                 // 关闭历史列表
-                if (isHistoryContainerVisible) {
-                    isHistoryContainerVisible = false;
-                    document.getElementById('historyContainer').classList.add('hidden');
-                    document.removeEventListener('pointerdown', closeHistoryOnClickOutside, true);
-                    document.removeEventListener('wheel', closeHistoryOnClickOutside, true);
-                }
-
-                // 关闭收藏列表
-                if (isLikeContainerVisible) {
-                    isLikeContainerVisible = false;
-                    document.getElementById('likeContainer').classList.add('hidden');
-                    document.removeEventListener('pointerdown', closeLikeOnClickOutside, true);
-                    document.removeEventListener('wheel', closeLikeOnClickOutside, true);
-                }
-
-                // 关闭拉黑列表
-                if (isBlockContainerVisible) {
-                    isBlockContainerVisible = false;
-                    document.getElementById('blockContainer').classList.add('hidden');
-                    document.removeEventListener('pointerdown', closeBlockOnClickOutside, true);
-                    document.removeEventListener('wheel', closeBlockOnClickOutside, true);
-                }
-
-                // 关闭设置面板
-                if (isSettingsPanelVisible) {
-                    isSettingsPanelVisible = false;
-                    document.getElementById('settingsPanel').classList.add('hidden');
-                    document.removeEventListener('pointerdown', closeSettingsOnClickOutside, true);
-                }
+                closeAllTopPanels();
             }
         });
 

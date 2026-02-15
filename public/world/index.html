@@ -74,6 +74,25 @@
             pointer-events: none;
             opacity: 0.3;
         }
+
+        .snowflake {
+            position: absolute;
+            top: -10px;
+            color: rgba(255, 255, 255, 0.85);
+            user-select: none;
+            pointer-events: none;
+            text-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-10px);
+            }
+            100% {
+                transform: translateY(110vh);
+            }
+        }
         
         .category-section {
             opacity: 0;
@@ -136,6 +155,8 @@
 <body class="bg-gray-50 dark:bg-dark transition-colors duration-300 bg-grid">
     <!-- 粒子背景 -->
     <div id="particles" class="fixed inset-0 -z-10"></div>
+    <!-- 雪花飘落背景 -->
+    <div id="snow" class="fixed inset-0 -z-10 pointer-events-none"></div>
     
     <!-- 主要内容 -->
     <div class="min-h-screen flex flex-col">
@@ -162,15 +183,24 @@
                         <i class="fa fa-search text-gray-600 dark:text-gray-300"></i>
                     </button>
                     
+                    <!-- 添加分类按钮 -->
+                    <button id="addCategoryBtn" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-secondary" title="添加分类">
+                        <i class="fa fa-folder-open text-gray-600 dark:text-gray-300"></i>
+                    </button>
+                    
+                    <!-- 重置按钮 -->
+                    <button id="resetBtn" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-secondary" title="重置数据">
+                        <i class="fa fa-refresh text-gray-600 dark:text-gray-300"></i>
+                    </button>
+                    
                     <!-- 添加网站按钮 -->
-                    <button id="addSiteBtn" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-secondary">
+                    <button id="addSiteBtn" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-secondary" title="添加网站">
                         <i class="fa fa-plus text-gray-600 dark:text-gray-300"></i>
                     </button>
                     
                     <!-- 主题切换按钮 -->
                     <button id="themeToggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-dark-secondary">
-                        <i class="fa fa-moon-o dark:hidden text-gray-600"></i>
-                        <i class="fa fa-sun-o hidden dark:block text-yellow-400"></i>
+                        <i class="fa fa-adjust text-gray-600"></i>
                     </button>
                 </div>
             </div>
@@ -205,6 +235,9 @@
             <div id="categories" class="space-y-8">
                 <!-- 分类将在这里动态生成 -->
             </div>
+
+            <!-- 分页 -->
+            <div id="pagination" class="mt-10 flex items-center justify-center gap-2"></div>
         </main>
         
         <!-- 底部 -->
@@ -260,6 +293,30 @@
         </div>
     </div>
     
+    <!-- 添加分类模态框 -->
+    <div id="addCategoryModal" class="add-site-modal fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-dark-secondary rounded-xl p-6 w-full max-w-md transform transition-all">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white">添加分类</h3>
+                <button id="closeCategoryModal" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="addCategoryForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">分类名称</label>
+                    <input type="text" id="categoryName" required
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary dark:bg-dark-secondary dark:text-white">
+                </div>
+                
+                <button type="submit" class="w-full bg-gradient-to-r from-primary to-accent text-white py-2 px-4 rounded-lg hover:opacity-90 transition-opacity">
+                    添加分类
+                </button>
+            </form>
+        </div>
+    </div>
+    
     <!-- Toast 提示 -->
     <div id="toast" class="toast"></div>
     
@@ -269,7 +326,8 @@
             constructor() {
                 this.data = JSON.parse(localStorage.getItem('smartnav-data')) || this.getDefaultData();
                 this.bookmarks = JSON.parse(localStorage.getItem('smartnav-bookmarks')) || [];
-                this.theme = localStorage.getItem('smartnav-theme') || 'light';
+                this.theme = localStorage.getItem('smartnav-theme') || 'system';
+                this.systemTheme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
             }
             
             getDefaultData() {
@@ -324,6 +382,41 @@
                 this.save();
                 return newSite;
             }
+
+            addCategory(category) {
+                const exists = this.data.some(cat => cat.category === category);
+                if (exists) return false;
+                this.data.push({category, links: []});
+                this.save();
+                return true;
+            }
+
+            resetData() {
+                this.data = this.getDefaultData();
+                this.bookmarks = [];
+                this.save();
+            }
+
+            removeCategory(category) {
+                const index = this.data.findIndex(cat => cat.category === category);
+                if (index === -1) return false;
+                const removed = this.data.splice(index, 1)[0];
+                const removedUrls = new Set(removed.links.map(link => link.url));
+                this.bookmarks = this.bookmarks.filter(b => !removedUrls.has(b.url));
+                this.save();
+                return true;
+            }
+
+            removeSite(category, url) {
+                const categoryData = this.data.find(cat => cat.category === category);
+                if (!categoryData) return false;
+                const before = categoryData.links.length;
+                categoryData.links = categoryData.links.filter(link => link.url !== url);
+                if (categoryData.links.length === before) return false;
+                this.bookmarks = this.bookmarks.filter(b => b.url !== url);
+                this.save();
+                return true;
+            }
             
             toggleBookmark(site) {
                 const index = this.bookmarks.findIndex(b => b.url === site.url);
@@ -342,7 +435,8 @@
             
             setTheme(theme) {
                 this.theme = theme;
-                document.documentElement.classList.toggle('dark', theme === 'dark');
+                const isDark = theme === 'dark' || (theme === 'system' && this.systemTheme && this.systemTheme.matches);
+                document.documentElement.classList.toggle('dark', isDark);
                 this.save();
             }
         }
@@ -356,10 +450,16 @@
             
             init() {
                 this.createParticles();
+                this.createSnowfall();
                 this.renderBookmarks();
+                this.currentPage = 1;
+                this.pageSize = 3;
                 this.renderCategories();
+                this.renderPagination();
                 this.bindEvents();
                 this.state.setTheme(this.state.theme);
+                this.updateThemeToggle();
+                this.refreshCategoryOptions();
                 this.showToast('欢迎使用 SmartNav！', 'success');
             }
             
@@ -391,6 +491,28 @@
                     particlesContainer.appendChild(particle);
                 }
             }
+
+            createSnowfall() {
+                const snowContainer = document.getElementById('snow');
+                if (!snowContainer) return;
+                snowContainer.innerHTML = '';
+
+                const flakeCount = 40;
+                for (let i = 0; i < flakeCount; i++) {
+                    const flake = document.createElement('div');
+                    flake.className = 'snowflake';
+                    flake.textContent = '❄️';
+
+                    const size = Math.random() * 12 + 10;
+                    flake.style.fontSize = `${size}px`;
+                    flake.style.left = `${Math.random() * 100}%`;
+                    flake.style.opacity = `${Math.random() * 0.5 + 0.3}`;
+                    flake.style.animationDuration = `${Math.random() * 10 + 8}s`;
+                    flake.style.animationDelay = `${Math.random() * 5}s`;
+
+                    snowContainer.appendChild(flake);
+                }
+            }
             
 
             
@@ -417,7 +539,7 @@
                 
                 // 渲染收藏的网站
                 this.state.bookmarks.forEach((site, index) => {
-                    const card = this.createSiteCard(site, false, true);
+                    const card = this.createSiteCard(site, false, true, '', false);
                     card.style.animationDelay = `${index * 0.1}s`;
                     bookmarksGrid.appendChild(card);
                 });
@@ -426,37 +548,121 @@
             renderCategories() {
                 const container = document.getElementById('categories');
                 container.innerHTML = '';
-                
-                this.state.data.forEach((categoryData, categoryIndex) => {
+
+                const total = this.state.data.length;
+                const totalPages = Math.max(1, Math.ceil(total / this.pageSize));
+                const safePage = Math.min(Math.max(1, this.currentPage), totalPages);
+                this.currentPage = safePage;
+
+                const startIndex = (this.currentPage - 1) * this.pageSize;
+                const endIndex = startIndex + this.pageSize;
+                const pageData = this.state.data.slice(startIndex, endIndex);
+
+                pageData.forEach((categoryData, categoryIndex) => {
+                    const globalIndex = startIndex + categoryIndex;
                     const section = document.createElement('section');
                     section.className = 'category-section';
-                    section.style.animationDelay = `${categoryIndex * 0.2}s`;
+                    section.style.animationDelay = `${globalIndex * 0.2}s`;
                     
                     section.innerHTML = `
                         <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-xl font-semibold text-gray-800 dark:text-white">${categoryData.category}</h3>
-                            <span class="text-sm text-gray-500 dark:text-gray-400">${categoryData.links.length} 个网站</span>
+                            <div class="flex items-center gap-3">
+                                <h3 class="text-xl font-semibold text-gray-800 dark:text-white">${categoryData.category}</h3>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">${categoryData.links.length} 个网站</span>
+                            </div>
+                            <button class="text-sm text-red-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-500/10"
+                                    onclick="app.deleteCategory('${encodeURIComponent(categoryData.category)}')">
+                                <i class="fa fa-trash-o mr-1"></i>删除分类
+                            </button>
                         </div>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="category-${categoryIndex}">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" id="category-${globalIndex}">
                         </div>
                     `;
                     
                     container.appendChild(section);
                     
-                    const linksContainer = section.querySelector(`#category-${categoryIndex}`);
+                    const linksContainer = section.querySelector(`#category-${globalIndex}`);
                     categoryData.links.forEach((site, linkIndex) => {
-                        const card = this.createSiteCard(site);
-                        card.style.animationDelay = `${(categoryIndex * 0.2) + (linkIndex * 0.05)}s`;
+                        const card = this.createSiteCard(site, false, false, categoryData.category, true);
+                        card.style.animationDelay = `${(globalIndex * 0.2) + (linkIndex * 0.05)}s`;
                         linksContainer.appendChild(card);
                     });
                 });
             }
+
+            renderPagination() {
+                const pagination = document.getElementById('pagination');
+                if (!pagination) return;
+
+                const total = this.state.data.length;
+                const totalPages = Math.max(1, Math.ceil(total / this.pageSize));
+
+                if (totalPages <= 1) {
+                    pagination.innerHTML = '';
+                    return;
+                }
+
+                const createButton = (label, page, disabled = false, isActive = false) => {
+                    const btn = document.createElement('button');
+                    btn.textContent = label;
+                    btn.className = `px-3 py-2 rounded-lg text-sm border transition-all ${
+                        isActive
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white dark:bg-dark-secondary text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-dark'
+                    }`;
+                    if (disabled) {
+                        btn.disabled = true;
+                        btn.classList.add('opacity-50', 'cursor-not-allowed');
+                    } else {
+                        btn.addEventListener('click', () => {
+                            this.currentPage = page;
+                            this.renderCategories();
+                            this.renderPagination();
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                        });
+                    }
+                    return btn;
+                };
+
+                pagination.innerHTML = '';
+
+                pagination.appendChild(createButton('上一页', this.currentPage - 1, this.currentPage === 1));
+
+                const maxButtons = 5;
+                let start = Math.max(1, this.currentPage - Math.floor(maxButtons / 2));
+                let end = Math.min(totalPages, start + maxButtons - 1);
+                start = Math.max(1, end - maxButtons + 1);
+
+                for (let i = start; i <= end; i++) {
+                    pagination.appendChild(createButton(String(i), i, false, i === this.currentPage));
+                }
+
+                pagination.appendChild(createButton('下一页', this.currentPage + 1, this.currentPage === totalPages));
+            }
+
+            updateThemeToggle() {
+                const btn = document.getElementById('themeToggle');
+                if (!btn) return;
+                let iconClass = 'fa-adjust';
+                let title = '跟随系统';
+                if (this.state.theme === 'light') {
+                    iconClass = 'fa-sun-o';
+                    title = '浅色模式';
+                } else if (this.state.theme === 'dark') {
+                    iconClass = 'fa-moon-o';
+                    title = '深色模式';
+                }
+                btn.innerHTML = `<i class="fa ${iconClass} ${this.state.theme === 'light' ? 'text-yellow-500' : 'text-gray-600'}"></i>`;
+                btn.setAttribute('title', title);
+            }
             
-            createSiteCard(site, isQuickAccess = false, isInBookmarks = false) {
+            createSiteCard(site, isQuickAccess = false, isInBookmarks = false, categoryName = '', showDelete = false) {
                 const card = document.createElement('div');
                 card.className = 'card-hover bg-white dark:bg-dark-secondary rounded-xl p-4 border border-gray-200 dark:border-gray-700 relative overflow-hidden';
                 
                 const isBookmarked = this.state.isBookmarked(site);
+                const safeCategory = encodeURIComponent(categoryName || '');
+                const safeUrl = encodeURIComponent(site.url);
                 
                 card.innerHTML = `
                     <div class="flex items-start">
@@ -467,12 +673,17 @@
                         
                         <!-- 右侧内容区域 -->
                         <div class="flex-1 ml-3 flex flex-col justify-between min-h-[48px]">
-                            <!-- 右上角收藏按钮 -->
-                            <div class="flex justify-end">
+                            <!-- 右上角操作按钮 -->
+                            <div class="flex justify-end gap-2">
                                 <button class="bookmark-btn ${isBookmarked ? 'active' : ''} text-gray-400 hover:text-yellow-500 text-sm" 
                                         onclick="app.toggleBookmark(event, ${JSON.stringify(site).replace(/"/g, '&quot;')})">
                                     <i class="fa ${isBookmarked ? 'fa-star' : 'fa-star-o'}"></i>
                                 </button>
+                                ${showDelete ? `
+                                <button class="text-gray-400 hover:text-red-500 text-sm"
+                                        onclick="app.deleteSite(event, '${safeCategory}', '${safeUrl}')">
+                                    <i class="fa fa-trash-o"></i>
+                                </button>` : ''}
                             </div>
                             
                             <!-- 右下角网站名称 -->
@@ -491,8 +702,11 @@
             bindEvents() {
                 // 主题切换
                 document.getElementById('themeToggle').addEventListener('click', () => {
-                    const newTheme = this.state.theme === 'light' ? 'dark' : 'light';
-                    this.state.setTheme(newTheme);
+                    const order = ['system', 'light', 'dark'];
+                    const currentIndex = order.indexOf(this.state.theme);
+                    const nextTheme = order[(currentIndex + 1) % order.length];
+                    this.state.setTheme(nextTheme);
+                    this.updateThemeToggle();
                 });
                 
                 // 移动端搜索
@@ -503,10 +717,30 @@
                 // 添加网站模态框
                 document.getElementById('addSiteBtn').addEventListener('click', () => {
                     document.getElementById('addSiteModal').classList.add('show');
+                    this.refreshCategoryOptions();
+                });
+                
+                document.getElementById('addCategoryBtn').addEventListener('click', () => {
+                    document.getElementById('addCategoryModal').classList.add('show');
+                });
+
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    if (!confirm('确定重置所有分类和网站吗？此操作不可恢复。')) return;
+                    this.state.resetData();
+                    this.currentPage = 1;
+                    this.renderCategories();
+                    this.renderPagination();
+                    this.renderBookmarks();
+                    this.refreshCategoryOptions();
+                    this.showToast('已重置为默认数据', 'success');
                 });
                 
                 document.getElementById('closeModal').addEventListener('click', () => {
                     document.getElementById('addSiteModal').classList.remove('show');
+                });
+                
+                document.getElementById('closeCategoryModal').addEventListener('click', () => {
+                    document.getElementById('addCategoryModal').classList.remove('show');
                 });
                 
                 // 点击模态框外部关闭
@@ -516,10 +750,22 @@
                     }
                 });
                 
+                document.getElementById('addCategoryModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'addCategoryModal') {
+                        document.getElementById('addCategoryModal').classList.remove('show');
+                    }
+                });
+                
                 // 添加网站表单提交
                 document.getElementById('addSiteForm').addEventListener('submit', (e) => {
                     e.preventDefault();
                     this.handleAddSite();
+                });
+                
+                // 添加分类表单提交
+                document.getElementById('addCategoryForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.handleAddCategory();
                 });
                 
                 // 搜索功能
@@ -529,6 +775,14 @@
                         this.handleSearch(e.target.value);
                     });
                 });
+
+                if (this.state.systemTheme) {
+                    this.state.systemTheme.addEventListener('change', () => {
+                        if (this.state.theme === 'system') {
+                            this.state.setTheme('system');
+                        }
+                    });
+                }
             }
             
             handleAddSite() {
@@ -550,8 +804,53 @@
                 
                 // 重新渲染
                 this.renderCategories();
+                this.renderPagination();
                 
                 this.showToast('网站添加成功！', 'success');
+            }
+
+            handleAddCategory() {
+                const category = document.getElementById('categoryName').value.trim();
+                if (!category) return;
+                
+                const added = this.state.addCategory(category);
+                if (!added) {
+                    this.showToast('该分类已存在', 'info');
+                    return;
+                }
+                
+                document.getElementById('addCategoryForm').reset();
+                document.getElementById('addCategoryModal').classList.remove('show');
+                
+                this.renderCategories();
+                this.renderPagination();
+                this.refreshCategoryOptions();
+                this.showToast('分类添加成功！', 'success');
+            }
+
+            refreshCategoryOptions() {
+                const select = document.getElementById('siteCategory');
+                if (!select) return;
+
+                const current = select.value;
+                const categories = this.state.data.map(item => item.category);
+
+                select.innerHTML = '';
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = '选择分类';
+                select.appendChild(placeholder);
+
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    select.appendChild(option);
+                });
+
+                if (categories.includes(current)) {
+                    select.value = current;
+                }
             }
             
             getIconForCategory(category) {
@@ -567,8 +866,12 @@
             handleSearch(query) {
                 const sections = document.querySelectorAll('.category-section');
                 const bookmarksSection = document.getElementById('bookmarks');
+                const pagination = document.getElementById('pagination');
                 
                 if (!query.trim()) {
+                    if (pagination) pagination.classList.remove('hidden');
+                    this.renderCategories();
+                    this.renderPagination();
                     // 显示所有内容
                     sections.forEach(section => {
                         section.style.display = 'block';
@@ -596,6 +899,7 @@
                 
                 query = query.toLowerCase();
                 let hasResults = false;
+                if (pagination) pagination.classList.add('hidden');
                 
                 // 搜索分类
                 sections.forEach(section => {
@@ -699,7 +1003,33 @@
                 // 重新渲染收藏区域
                 this.ui.renderBookmarks();
             },
-            
+            deleteCategory(categoryEncoded) {
+                const category = decodeURIComponent(categoryEncoded || '');
+                if (!category) return;
+                if (!confirm(`确定删除分类「${category}」吗？该分类下的网站也会被删除。`)) return;
+                const removed = this.state.removeCategory(category);
+                if (!removed) return;
+                this.ui.renderCategories();
+                this.ui.renderPagination();
+                this.ui.renderBookmarks();
+                this.ui.refreshCategoryOptions();
+                this.ui.showToast('分类已删除', 'success');
+            },
+
+            deleteSite(event, categoryEncoded, urlEncoded) {
+                event.stopPropagation();
+                const category = decodeURIComponent(categoryEncoded || '');
+                const url = decodeURIComponent(urlEncoded || '');
+                if (!category || !url) return;
+                if (!confirm('确定删除该网站吗？')) return;
+                const removed = this.state.removeSite(category, url);
+                if (!removed) return;
+                this.ui.renderCategories();
+                this.ui.renderPagination();
+                this.ui.renderBookmarks();
+                this.ui.refreshCategoryOptions();
+                this.ui.showToast('网站已删除', 'success');
+            },
 
         };
         
