@@ -77,68 +77,10 @@
             .scroll-offset {
                 scroll-margin-top: 140px;
             }
-
-            .privacy-mask {
-                @apply absolute inset-0 bg-black/80 opacity-0 transition-opacity duration-200;
-            }
-        }
-    </style>
-
-    <style>
-        body.privacy-on .video-thumb img {
-            filter: blur(12px);
-            transform: scale(1.05);
-            transition: filter 200ms ease, transform 200ms ease;
-        }
-
-        body.privacy-on .video-thumb:hover img {
-            filter: blur(0);
-            transform: scale(1);
-        }
-
-        body.privacy-on .video-thumb .privacy-mask {
-            opacity: 1;
-        }
-
-        body.privacy-on .video-thumb:hover .privacy-mask {
-            opacity: 0;
         }
     </style>
 </head>
 <body class="bg-gray-100 transition-colors duration-300">
-    <!-- 访问密码验证 -->
-    <div 
-        id="accessGate" 
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
-    >
-        <div class="bg-white rounded-xl shadow-2xl w-[90%] max-w-sm p-6 space-y-4">
-            <div class="flex items-center space-x-2">
-                <i class="fa fa-lock text-primary text-xl"></i>
-                <h2 class="text-lg font-semibold text-gray-800">请输入访问密码</h2>
-            </div>
-            <p class="text-sm text-gray-500">验证通过后才会显示页面内容</p>
-            <div class="space-y-2">
-                <input 
-                    id="accessPasswordInput" 
-                    type="password" 
-                    placeholder="访问密码" 
-                    class="input-primary w-full"
-                    autocomplete="current-password"
-                >
-                <div id="accessError" class="text-xs text-red-500 hidden">密码错误，请重试</div>
-            </div>
-            <button 
-                id="accessSubmitButton"
-                onclick="verifyAccessPassword()"
-                class="btn-primary w-full"
-            >
-                验证进入
-            </button>
-            <div class="text-xs text-gray-400">提示：密码在代码里配置，可自行修改</div>
-        </div>
-    </div>
-
-    <div id="appContent" class="hidden">
     <!-- 导航头 -->
     <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-effect shadow-lg">
         <div class="container mx-auto px-4 py-3">
@@ -206,13 +148,6 @@
                         >
                             <i class="fa fa-history text-gray-600"></i>
                             <span class="text-right flex-1">历史</span>
-                        </button>
-                        <button 
-                            onclick="handleMoreAction('user')"
-                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
-                        >
-                            <i class="fa fa-user text-gray-600"></i>
-                            <span class="text-right flex-1">用户信息</span>
                         </button>
                         <button 
                             onclick="handleMoreAction('setting')"
@@ -322,88 +257,6 @@
         </div>
     </div>
 
-    <!-- 用户信息面板 -->
-    <div 
-        id="userPanel" 
-        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
-    >
-        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 class="text-lg font-semibold">用户信息</h3>
-            <button onclick="toggleUserInfo()" class="p-2 hover:bg-gray-200 rounded-full">
-                <i class="fa fa-times"></i>
-            </button>
-        </div>
-        <div id="userInfoContent" class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
-            <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
-                <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500">昵称</span>
-                    <span id="userNicknameDisplay" class="font-medium text-gray-800">未设置</span>
-                </div>
-                <div class="flex items-center space-x-2">
-                    <input 
-                        id="userNicknameInput" 
-                        type="text" 
-                        placeholder="输入昵称" 
-                        class="input-primary flex-1 text-sm"
-                        maxlength="20"
-                    >
-                    <button 
-                        id="userNicknameSave" 
-                        onclick="saveUserNickname()" 
-                        class="btn-primary text-xs px-3 py-2"
-                    >
-                        保存
-                    </button>
-                    <button 
-                        id="userNicknameRandom" 
-                        onclick="setRandomNickname()" 
-                        class="btn-secondary text-xs px-3 py-2"
-                    >
-                        随机
-                    </button>
-                </div>
-            </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2 text-sm">
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-500">收藏数量</span>
-                    <span id="userFavoriteCount" class="font-medium text-gray-800">0</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-500">播放历史</span>
-                    <span id="userHistoryCount" class="font-medium text-gray-800">0</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-gray-500">搜索历史</span>
-                    <span id="userSearchCount" class="font-medium text-gray-800">0</span>
-                </div>
-            </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2 text-sm">
-                <div class="flex items-start justify-between">
-                    <span class="text-gray-500">最近访问</span>
-                    <div id="userLastVisit" class="text-right text-xs text-gray-700 space-y-1">-</div>
-                </div>
-                <div class="text-xs text-gray-500">用户信息仅保存在本地浏览器中</div>
-            </div>
-            <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
-                <div class="text-sm font-medium">导入导出</div>
-                <div class="flex space-x-3">
-                    <button onclick="exportUserData()" class="btn-secondary flex-1 text-sm">
-                        <i class="fa fa-download mr-1"></i> 导出
-                    </button>
-                    <label class="btn-primary flex-1 text-center cursor-pointer text-sm">
-                        <i class="fa fa-upload mr-1"></i> 导入
-                        <input id="importFileInput" type="file" accept="application/json" class="hidden" onchange="importUserData(event)">
-                    </label>
-                </div>
-                <p class="text-xs text-gray-500">导出/导入：包含喜欢、播放历史、搜索历史与昵称</p>
-                <div>
-                    <label class="block text-sm font-medium mb-2">导入导出历史记录</label>
-                    <div id="transferHistoryList" class="space-y-2"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 背景遮罩 -->
     <div 
         id="overlay" 
@@ -416,25 +269,13 @@
         id="floatingButtons" 
         class="fixed bottom-6 right-6 glass-effect rounded-lg shadow-lg p-2 hidden"
     >
-        <div class="flex flex-col space-y-2">
-            <div class="text-xs text-gray-600 text-center px-2 py-1 bg-white/80 rounded-full">
-                总数 <span id="loadedTotalCount" class="font-semibold text-gray-800">0</span>
-            </div>
-            <button 
-                onclick="playRandomVideo()" 
-                class="p-3 rounded-full hover:bg-gray-200 transition-colors"
-                title="随机播放"
-            >
-                <i class="fa fa-random"></i>
-            </button>
-            <button 
-                onclick="scrollToTop()" 
-                class="p-3 rounded-full hover:bg-gray-200 transition-colors"
-                title="回到顶部"
-            >
-                <i class="fa fa-arrow-up"></i>
-            </button>
-        </div>
+        <button 
+            onclick="scrollToTop()" 
+            class="p-3 rounded-full hover:bg-gray-200 transition-colors"
+            title="回到顶部"
+        >
+            <i class="fa fa-arrow-up"></i>
+        </button>
     </div>
 
     <!-- 视频播放器模态框 -->
@@ -550,22 +391,6 @@
                 <p class="text-xs text-gray-500 -mt-2">开启后会搜索官方推荐的所有接口</p>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">隐私遮挡</label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            id="privacySwitch" 
-                            class="sr-only"
-                            onchange="togglePrivacyMode()"
-                        >
-                        <div class="w-10 h-6 bg-gray-300 rounded-full relative transition-colors">
-                            <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform"></div>
-                        </div>
-                    </label>
-                </div>
-                <p class="text-xs text-gray-500 -mt-2">开启后视频缩略图默认遮挡，悬停显示</p>
-
-                <div class="flex items-center justify-between">
                     <label class="block text-sm font-medium">聚合接口选择</label>
                     <button 
                         type="button"
@@ -612,6 +437,22 @@
                     <div id="hostHistoryList" class="space-y-2"></div>
                 </div>
                 
+                <div class="border-t border-gray-200 pt-4 mt-2"></div>
+
+                <div class="flex space-x-3 pt-2">
+                    <button onclick="exportUserData()" class="btn-secondary flex-1">
+                        <i class="fa fa-download mr-1"></i> 导出
+                    </button>
+                    <label class="btn-primary flex-1 text-center cursor-pointer">
+                        <i class="fa fa-upload mr-1"></i> 导入
+                        <input id="importFileInput" type="file" accept="application/json" class="hidden" onchange="importUserData(event)">
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500">导出/导入：仅包含喜欢与播放历史</p>
+                <div class="pt-2">
+                    <label class="block text-sm font-medium mb-2">导入导出历史记录</label>
+                    <div id="transferHistoryList" class="space-y-2"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -625,7 +466,6 @@
             <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <p id="loadingText" class="text-gray-700">加载中...</p>
         </div>
-    </div>
     </div>
 
     <script>
@@ -641,10 +481,6 @@
         let currentVideoTitle = '';
         let currentVideoPic = '';
         let currentVideoSource = '';
-        let lastVisitAtStart = null;
-        let aggregateNoMore = new Set();
-        let renderedVideos = [];
-        const loadedTotalCount = document.getElementById('loadedTotalCount');
         
         // DOM元素
         const videoList = document.getElementById('videoList');
@@ -654,8 +490,6 @@
         const historyContent = document.getElementById('historyContent');
         const favoritePanel = document.getElementById('favoritePanel');
         const favoriteContent = document.getElementById('favoriteContent');
-        const userPanel = document.getElementById('userPanel');
-        const userInfoContent = document.getElementById('userInfoContent');
         const overlay = document.getElementById('overlay');
         const floatingButtons = document.getElementById('floatingButtons');
         const videoPlayerModal = document.getElementById('videoPlayerModal');
@@ -668,7 +502,6 @@
         const aggregateSwitch = document.getElementById('aggregateSwitch');
         const aggregateApiSection = document.getElementById('aggregateApiSection');
         const officialApiSection = document.getElementById('officialApiSection');
-        const privacySwitch = document.getElementById('privacySwitch');
         const searchInput = document.getElementById('searchInput');
         const searchInputMobile = document.getElementById('searchInputMobile');
         const searchHistoryBox = document.getElementById('searchHistoryBox');
@@ -678,16 +511,9 @@
         const transferHistoryList = document.getElementById('transferHistoryList');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
-        const accessGate = document.getElementById('accessGate');
-        const appContent = document.getElementById('appContent');
-        const accessPasswordInput = document.getElementById('accessPasswordInput');
-        const accessError = document.getElementById('accessError');
-        const accessSubmitButton = document.getElementById('accessSubmitButton');
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            initAccessGate();
-
             // 加载保存的Host
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
@@ -696,42 +522,16 @@
                 aggregateSwitch.checked = aggregateEnabled;
                 updateAggregateSwitchUI(aggregateEnabled);
             }
-            const privacyEnabled = isPrivacyModeEnabled();
-            if (privacySwitch) {
-                privacySwitch.checked = privacyEnabled;
-                updatePrivacySwitchUI(privacyEnabled);
-            }
-            applyPrivacyMode(privacyEnabled);
             updateSearchButtonLabel(aggregateEnabled);
             
             // 鼠标移出面板自动关闭
             historyPanel.addEventListener('mouseleave', closeAllPanels);
             favoritePanel.addEventListener('mouseleave', closeAllPanels);
-            if (userPanel) {
-                userPanel.addEventListener('mouseleave', closeAllPanels);
-            }
             hostModal.addEventListener('mouseleave', () => {
                 if (!hostModal.classList.contains('translate-x-full')) {
                     toggleHostModal();
                 }
             });
-
-            const previousVisit = localStorage.getItem('lastVisit');
-            const visitHistory = JSON.parse(localStorage.getItem('visitHistory') || '[]');
-            if (previousVisit) {
-                visitHistory.unshift(Number(previousVisit));
-            }
-            const filteredHistory = visitHistory.filter((item) => Number.isFinite(item));
-            const uniqueHistory = [];
-            for (const item of filteredHistory) {
-                if (!uniqueHistory.includes(item)) uniqueHistory.push(item);
-            }
-            const trimmedHistory = uniqueHistory.slice(0, 5);
-            localStorage.setItem('visitHistory', JSON.stringify(trimmedHistory));
-            lastVisitAtStart = trimmedHistory[0] ? String(trimmedHistory[0]) : null;
-            localStorage.setItem('lastVisit', Date.now());
-
-            renderTransferHistory();
 
             
             // 加载初始数据
@@ -784,59 +584,6 @@
                 });
             }
         });
-
-        const ACCESS_GRANT_KEY = 'accessGrantedUntil';
-        const ACCESS_GRANT_DURATION = 30 * 24 * 60 * 60 * 1000;
-
-        function initAccessGate() {
-            if (!accessGate || !appContent) return;
-            const grantedUntil = Number(localStorage.getItem(ACCESS_GRANT_KEY) || '0');
-            if (grantedUntil && Date.now() < grantedUntil) {
-                accessGate.classList.add('hidden');
-                appContent.classList.remove('hidden');
-                return;
-            }
-            localStorage.removeItem(ACCESS_GRANT_KEY);
-            appContent.classList.add('hidden');
-            accessGate.classList.remove('hidden');
-            if (accessPasswordInput) {
-                accessPasswordInput.focus();
-                accessPasswordInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        verifyAccessPassword();
-                    }
-                });
-            }
-        }
-
-        function verifyAccessPassword() {
-            if (!accessPasswordInput || !accessGate || !appContent) return;
-            const value = accessPasswordInput.value.trim();
-            if (!value) {
-                if (accessError) accessError.classList.remove('hidden');
-                return;
-            }
-            if (accessSubmitButton) accessSubmitButton.disabled = true;
-            fetch(`/apis/video/pass?password=${encodeURIComponent(value)}`)
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data && data.code === 200 && data.data === true) {
-                        localStorage.setItem(ACCESS_GRANT_KEY, String(Date.now() + ACCESS_GRANT_DURATION));
-                        accessGate.classList.add('hidden');
-                        appContent.classList.remove('hidden');
-                        accessPasswordInput.value = '';
-                        if (accessError) accessError.classList.add('hidden');
-                        return;
-                    }
-                    if (accessError) accessError.classList.remove('hidden');
-                })
-                .catch(() => {
-                    if (accessError) accessError.classList.remove('hidden');
-                })
-                .finally(() => {
-                    if (accessSubmitButton) accessSubmitButton.disabled = false;
-                });
-        }
         
         // 加载初始数据
         function loadInitialData() {
@@ -911,12 +658,9 @@
                 // 渲染数据
                 if (page === 1) {
                     videoList.innerHTML = '';
-                    renderedVideos = [];
-                    updateLoadedCount(0);
                 }
                 
                 renderVideos(deduped);
-                updateLoadedCount(renderedVideos.length);
                 
                 // 更新分页状态
                 currentPage = page;
@@ -943,16 +687,12 @@
 
         async function fetchAggregatedData(keyword, page) {
             try {
-                if (page === 1) {
-                    aggregateNoMore = new Set();
-                }
                 const apis = await getOfficialApis();
                 const selectedUrls = getAggregateApiSelection();
                 const targetApis = selectedUrls.length > 0
                     ? apis.filter(item => selectedUrls.includes(item.url))
                     : apis;
-                const activeApis = targetApis.filter(item => !aggregateNoMore.has(item.url));
-                if (!activeApis || activeApis.length === 0) {
+                if (!targetApis || targetApis.length === 0) {
                     if (page === 1) {
                         showEmptyState();
                     } else {
@@ -964,9 +704,9 @@
                 }
                 
                 let completed = 0;
-                updateAggregateLoading(completed, activeApis.length);
+                updateAggregateLoading(completed, targetApis.length);
                 const results = await Promise.all(
-                    activeApis.map(item => {
+                    targetApis.map(item => {
                         const params = {
                             wd: keyword,
                             pg: page,
@@ -981,16 +721,13 @@
                             .catch(() => ({ item, list: [] }))
                             .finally(() => {
                                 completed += 1;
-                                updateAggregateLoading(completed, activeApis.length);
+                                updateAggregateLoading(completed, targetApis.length);
                             });
                     })
                 );
                 
                 const merged = [];
                 results.forEach(({ item, list }) => {
-                    if (!list || list.length === 0) {
-                        aggregateNoMore.add(item.url);
-                    }
                     const label = getOfficialLabel(item);
                     list.forEach(video => {
                         merged.push({
@@ -1016,8 +753,6 @@
                 
                 if (page === 1) {
                     videoList.innerHTML = '';
-                    renderedVideos = [];
-                    updateLoadedCount(0);
                 }
                 
                 if (deduped.length === 0) {
@@ -1032,7 +767,6 @@
                 }
                 
                 renderVideos(deduped);
-                updateLoadedCount(renderedVideos.length);
                 
                 currentPage = page;
                 searchTerm = keyword;
@@ -1069,27 +803,16 @@
             videos.forEach(video => {
                 const favorited = isFavorited(video.vod_play_url);
                 const sourceLabel = video._sourceLabel || getHostLabel();
-                if (video.vod_play_url) {
-                    renderedVideos.push({
-                        url: video.vod_play_url,
-                        title: video.vod_name || '未命名',
-                        pic: video.vod_pic || '',
-                        source: sourceLabel
-                    });
-                }
                 const card = document.createElement('div');
                 card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset';
                 card.innerHTML = `
-                    <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
+                    <div class="relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
                         <img 
                             src="./loading.gif" 
                             data-src="${video.vod_pic}" 
                             alt="${video.vod_name}" 
-                            onerror="this.onerror=null;this.src='./loading.gif';"
                             class="w-full h-full object-cover lazy-image"
                         >
-                        <div class="privacy-mask"></div>
-                        <div class="count-badge hidden absolute top-2 right-2 bg-black/70 text-white text-[11px] px-2 py-1 rounded-full"></div>
                         <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end">
                             <div class="p-3 w-full">
                                 <h3 class="text-white font-medium line-clamp-2">${video.vod_name}</h3>
@@ -1128,66 +851,11 @@
                     </div>
                 `;
                 
-                const index = renderedVideos.length;
-                card.dataset.index = String(index);
-                const thumb = card.querySelector('.video-thumb');
-                if (thumb) {
-                    thumb.addEventListener('mouseenter', () => {
-                        showCardCount(thumb, index);
-                    });
-                    thumb.addEventListener('mouseleave', () => {
-                        hideCardCount(thumb);
-                    });
-                }
                 videoList.appendChild(card);
             });
             
             // 初始化懒加载
             initLazyLoading();
-        }
-
-        function updateLoadedCount(totalCount) {
-            let changed = false;
-            if (loadedTotalCount && totalCount !== null && totalCount !== undefined) {
-                loadedTotalCount.textContent = String(totalCount);
-                changed = true;
-            }
-            if (!changed) return;
-            const targets = [loadedTotalCount].filter(Boolean);
-            targets.forEach((el) => el.classList.add('animate-pulse'));
-            setTimeout(() => {
-                targets.forEach((el) => el.classList.remove('animate-pulse'));
-            }, 500);
-        }
-
-        function showCardCount(thumbEl, index) {
-            if (!thumbEl) return;
-            const badge = thumbEl.querySelector('.count-badge');
-            if (!badge) return;
-            const total = renderedVideos.length;
-            badge.textContent = `${index}/${total}`;
-            badge.classList.remove('hidden');
-        }
-
-        function hideCardCount(thumbEl) {
-            if (!thumbEl) return;
-            const badge = thumbEl.querySelector('.count-badge');
-            if (!badge) return;
-            badge.classList.add('hidden');
-        }
-
-        function playRandomVideo() {
-            if (!renderedVideos || renderedVideos.length === 0) {
-                showToast('暂无可播放视频');
-                return;
-            }
-            const index = Math.floor(Math.random() * renderedVideos.length);
-            const target = renderedVideos[index];
-            if (!target || !target.url) {
-                showToast('暂无可播放视频');
-                return;
-            }
-            openVideoPlayer(target.url, target.title, target.pic, target.source || '');
         }
         
         // 初始化图片懒加载
@@ -1613,8 +1281,8 @@
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='./loading.gif';" class="w-full h-full object-cover">`
-                                        : `<img src="./loading.gif" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" class="w-full h-full object-cover">`
+                                        : `<div class="w-full h-full bg-gray-200"></div>`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -1716,8 +1384,8 @@
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='./loading.gif';" class="w-full h-full object-cover">`
-                                        : `<img src="./loading.gif" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" class="w-full h-full object-cover">`
+                                        : `<div class="w-full h-full bg-gray-200"></div>`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -1900,36 +1568,6 @@
             updateSearchButtonLabel(enabled);
         }
 
-        function isPrivacyModeEnabled() {
-            return localStorage.getItem('privacyMode') === '1';
-        }
-
-        function togglePrivacyMode() {
-            if (!privacySwitch) return;
-            const enabled = !!privacySwitch.checked;
-            localStorage.setItem('privacyMode', enabled ? '1' : '0');
-            updatePrivacySwitchUI(enabled);
-            applyPrivacyMode(enabled);
-            showToast(enabled ? '已开启隐私遮挡' : '已关闭隐私遮挡');
-        }
-
-        function updatePrivacySwitchUI(enabled) {
-            if (!privacySwitch) return;
-            const track = privacySwitch.nextElementSibling;
-            if (!track) return;
-            const thumb = track.firstElementChild;
-            track.classList.toggle('bg-primary', enabled);
-            track.classList.toggle('bg-gray-300', !enabled);
-            if (thumb) {
-                thumb.classList.toggle('translate-x-4', enabled);
-                thumb.classList.toggle('translate-x-0', !enabled);
-            }
-        }
-
-        function applyPrivacyMode(enabled) {
-            document.body.classList.toggle('privacy-on', !!enabled);
-        }
-
         function updateSearchButtonLabel(aggregateEnabled) {
             const label = aggregateEnabled ? '聚合搜索' : '搜索';
             const desktopLabel = document.getElementById('searchButtonLabel');
@@ -1947,17 +1585,13 @@
             }
         }
 
-        // 导出/导入喜欢、历史、昵称与搜索记录
+        // 导出/导入喜欢和历史
         function exportUserData() {
             const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
             const playHistory = JSON.parse(localStorage.getItem('playHistory') || '[]');
-            const searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
-            const userNickname = localStorage.getItem('userNickname') || '';
             const payload = {
                 favorites,
-                playHistory,
-                searchHistory,
-                userNickname
+                playHistory
             };
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1992,17 +1626,6 @@
                     } else {
                         localStorage.setItem('playHistory', JSON.stringify([]));
                     }
-                    if (data.searchHistory && Array.isArray(data.searchHistory)) {
-                        localStorage.setItem('searchHistory', JSON.stringify(data.searchHistory));
-                    } else {
-                        localStorage.setItem('searchHistory', JSON.stringify([]));
-                    }
-                    if (typeof data.userNickname === 'string' && data.userNickname.trim()) {
-                        localStorage.setItem('userNickname', data.userNickname.trim());
-                    } else {
-                        localStorage.removeItem('userNickname');
-                    }
-                    renderUserInfo();
                     addTransferHistory('导入', file.name);
                     showToast('导入成功');
                 } catch (e) {
@@ -2057,8 +1680,6 @@
                 toggleFavorites();
             } else if (value === 'history') {
                 toggleHistory();
-            } else if (value === 'user') {
-                toggleUserInfo();
             } else if (value === 'setting') {
                 toggleHostModal();
             }
@@ -2080,8 +1701,6 @@
                 toggleFavorites();
             } else if (action === 'history') {
                 toggleHistory();
-            } else if (action === 'user') {
-                toggleUserInfo();
             } else if (action === 'setting') {
                 toggleHostModal();
             }
@@ -2092,82 +1711,6 @@
         function handleMoreMenuMouseLeave() {
             const menu = document.getElementById('moreMenu');
             if (menu) menu.classList.add('hidden');
-        }
-
-        function renderUserInfo() {
-            if (!userInfoContent) return;
-            const nickname = localStorage.getItem('userNickname') || '';
-            const nicknameDisplay = document.getElementById('userNicknameDisplay');
-            const nicknameInput = document.getElementById('userNicknameInput');
-            if (nicknameDisplay) {
-                nicknameDisplay.textContent = nickname ? nickname : '未设置';
-            }
-            if (nicknameInput) {
-                nicknameInput.value = nickname;
-            }
-            const favorites = getFavorites();
-            const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
-            const searchHistory = getSearchHistory();
-            const favoriteCountEl = document.getElementById('userFavoriteCount');
-            const historyCountEl = document.getElementById('userHistoryCount');
-            const searchCountEl = document.getElementById('userSearchCount');
-            if (favoriteCountEl) favoriteCountEl.textContent = String(favorites.length);
-            if (historyCountEl) historyCountEl.textContent = String(history.length);
-            if (searchCountEl) searchCountEl.textContent = String(searchHistory.length);
-
-            const lastVisitEl = document.getElementById('userLastVisit');
-            if (lastVisitEl) {
-                const historyList = JSON.parse(localStorage.getItem('visitHistory') || '[]');
-                if (!historyList || historyList.length === 0) {
-                    lastVisitEl.textContent = '首次访问';
-                } else {
-                    lastVisitEl.innerHTML = historyList
-                        .slice(0, 5)
-                        .map((timestamp) => `<div>${formatDate(Number(timestamp))}</div>`)
-                        .join('');
-                }
-            }
-        }
-
-        function saveUserNickname() {
-            const nicknameInput = document.getElementById('userNicknameInput');
-            if (!nicknameInput) return;
-            const value = nicknameInput.value.trim();
-            if (!value) {
-                localStorage.removeItem('userNickname');
-                renderUserInfo();
-                showToast('已清空昵称');
-                return;
-            }
-            localStorage.setItem('userNickname', value);
-            renderUserInfo();
-            showToast('昵称已保存');
-        }
-
-        function generateRandomNickname() {
-            const adjectives = ['清风', '星河', '晨曦', '夜航', '远山', '春雨', '蓝鲸', '微光', '白露', '晚晴'];
-            const nouns = ['旅人', '观影者', '探路者', '追光者', '小屋', '电台', '风铃', '岛屿', '长歌', '碎片'];
-            const adjective = adjectives[Math.floor(Math.random() * adjectives.length)];
-            const noun = nouns[Math.floor(Math.random() * nouns.length)];
-            const number = Math.floor(Math.random() * 900) + 100;
-            return `${adjective}${noun}${number}`;
-        }
-
-        function setRandomNickname() {
-            const nicknameInput = document.getElementById('userNicknameInput');
-            if (!nicknameInput) return;
-            const value = generateRandomNickname();
-            nicknameInput.value = value;
-            localStorage.setItem('userNickname', value);
-            renderUserInfo();
-            showToast('随机昵称已生成');
-        }
-
-        function toggleUserInfo() {
-            if (!userPanel) return;
-            renderUserInfo();
-            userPanel.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
         }
 
         // 官方推荐接口
@@ -2661,7 +2204,6 @@
         function closeAllPanels() {
             historyPanel.classList.add('translate-x-full');
             favoritePanel.classList.add('translate-x-full');
-            if (userPanel) userPanel.classList.add('translate-x-full');
             hostModal.classList.add('translate-x-full');
             overlay.classList.add('hidden');
         }

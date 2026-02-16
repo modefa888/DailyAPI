@@ -3,6 +3,7 @@ const apisRouter = new Router();
 
 // 接口信息
 const routerInfo = { name: "官方推荐API", title: "官方推荐", subtitle: "视频资源接口" };
+const videoAccessPassword = process.env.VIDEO_ACCESS_PASSWORD || "123456";
 
 // 官方推荐 API 列表
 const officialApis = [
@@ -89,6 +90,17 @@ apisRouter.get("/apis/official", async (ctx) => {
         ...routerInfo,
         total: officialApis.length,
         data: officialApis,
+    };
+});
+
+// 校验访问密码
+apisRouter.get("/apis/video/pass", async (ctx) => {
+    const password = String(ctx.query.password || "");
+    const ok = password === videoAccessPassword;
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: ok,
     };
 });
 
