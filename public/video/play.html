@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分享播放</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        body {
+            background: #0f172a;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-white">
+    <div class="max-w-5xl mx-auto px-4 py-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-play-circle text-blue-400 text-2xl"></i>
+                <h1 class="text-lg font-semibold">分享播放</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button id="shareButton" class="text-xs bg-blue-500/80 hover:bg-blue-500 px-3 py-1 rounded-full">
+                    <i class="fa fa-share-alt mr-1"></i> 分享
+                </button>
+                <a href="./index.html" class="text-xs text-blue-300 hover:text-blue-200">返回首页</a>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/70 rounded-xl p-4 mb-4">
+            <div class="flex items-center justify-between text-sm text-slate-300 mb-2">
+                <div id="shareSource">来源：-</div>
+                <div id="shareCountdown" class="text-xs text-slate-400">有效期：-</div>
+            </div>
+            <div class="text-xl font-semibold mb-3" id="shareTitle">加载中...</div>
+            <div class="w-full aspect-video rounded-lg overflow-hidden bg-black">
+                <div id="dplayer" class="w-full h-full"></div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900/70 rounded-xl p-4">
+            <div class="flex items-start space-x-4">
+                <img id="sharePoster" src="./loading.gif" alt="poster" class="w-28 h-16 rounded-md object-cover bg-slate-800">
+                <div class="flex-1 min-w-0">
+                    <div class="text-xs text-slate-400 mb-1">视频地址</div>
+                    <div id="shareUrl" class="text-xs text-slate-200 break-all">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="errorBox" class="hidden mt-4 bg-red-500/20 border border-red-400/40 text-red-200 p-3 rounded-lg text-sm"></div>
+    </div>
+
+    <script>
+        function safeDecodeBase64(value) {
+            try {
+                return atob(value);
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function parseShareKey() {
+            const params = new URLSearchParams(window.location.search);
+            const key = params.get('key') || '';
+            if (!key) return null;
+            const raw = safeDecodeBase64(key);
+            if (!raw) return null;
+            const parts = raw.split('|').map((item) => {
+                try {
+                    return decodeURIComponent(item || '');
+                } catch (e) {
+                    return item || '';
+                }
+            });
+            const [url, title, pic, source, expiresAtRaw] = parts;
+            if (!url) return null;
+            const expiresAt = Number(expiresAtRaw || 0);
+            return { url, title: title || '分享视频', pic: pic || '', source: source || '', expiresAt };
+        }
+
+        function showError(message) {
+            const box = document.getElementById('errorBox');
+            if (!box) return;
+            box.textContent = message;
+            box.classList.remove('hidden');
+        }
+
+        function formatRemaining(ms) {
+            if (ms <= 0) return '00:00';
+            const total = Math.floor(ms / 1000);
+            const days = Math.floor(total / 86400);
+            const hours = Math.floor((total % 86400) / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const seconds = total % 60;
+            if (days > 0) {
+                return `${days}天 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function startCountdown(expiresAt) {
+            const countdownEl = document.getElementById('shareCountdown');
+            if (!countdownEl) return null;
+            if (!expiresAt) {
+                countdownEl.textContent = '有效期：永久';
+                return null;
+            }
+            let timer = null;
+            const tick = () => {
+                const remaining = expiresAt - Date.now();
+                if (remaining <= 0) {
+                    countdownEl.textContent = '有效期：已过期';
+                    showError('分享链接已过期');
+                    return false;
+                }
+                countdownEl.textContent = `有效期：${formatRemaining(remaining)}`;
+                return true;
+            };
+            tick();
+            timer = setInterval(() => {
+                if (!tick()) {
+                    clearInterval(timer);
+                }
+            }, 1000);
+            return timer;
+        }
+
+        function copyToClipboard(text) {
+            try {
+                navigator.clipboard.writeText(text).then(() => {
+                    showError('分享链接已复制到剪贴板');
+                }).catch(() => {
+                    prompt('请复制分享链接:', text);
+                });
+            } catch (e) {
+                prompt('请复制分享链接:', text);
+            }
+        }
+
+        function bindShareButton() {
+            const shareButton = document.getElementById('shareButton');
+            if (!shareButton) return;
+            shareButton.addEventListener('click', () => {
+                const url = window.location.href;
+                const titleEl = document.getElementById('shareTitle');
+                const shareTitle = titleEl ? titleEl.textContent || '分享视频' : '分享视频';
+                if (navigator.share) {
+                    navigator.share({
+                        title: shareTitle,
+                        text: '分享一个精彩视频',
+                        url
+                    }).catch(() => {
+                        copyToClipboard(url);
+                    });
+                } else {
+                    copyToClipboard(url);
+                }
+                showError('已打开分享');
+            });
+        }
+
+        function initPlayer(payload) {
+            const titleEl = document.getElementById('shareTitle');
+            const sourceEl = document.getElementById('shareSource');
+            const urlEl = document.getElementById('shareUrl');
+            const posterEl = document.getElementById('sharePoster');
+
+            if (titleEl) titleEl.textContent = payload.title;
+            if (sourceEl) sourceEl.textContent = `来源：${payload.source || '未知来源'}`;
+            if (urlEl) urlEl.textContent = payload.url;
+            if (posterEl) {
+                posterEl.src = payload.pic || './loading.gif';
+                posterEl.onerror = () => {
+                    posterEl.src = './loading.gif';
+                };
+            }
+
+            const player = new DPlayer({
+                container: document.getElementById('dplayer'),
+                video: {
+                    url: payload.url,
+                    type: 'hls',
+                    pic: payload.pic || '',
+                    title: payload.title
+                },
+                autoplay: true,
+                theme: '#3b82f6',
+                loop: false,
+                screenshot: true,
+                hotkey: true,
+                preload: 'auto'
+            });
+
+            player.on('error', () => {
+                showError('视频加载失败，请检查链接是否有效');
+            });
+        }
+
+        const payload = parseShareKey();
+        if (!payload) {
+            showError('分享链接无效或已过期');
+        } else if (payload.expiresAt && Date.now() > payload.expiresAt) {
+            showError('分享链接已过期');
+            startCountdown(payload.expiresAt);
+        } else {
+            initPlayer(payload);
+            startCountdown(payload.expiresAt);
+        }
+
+        bindShareButton();
+    </script>
+</body>
+</html>

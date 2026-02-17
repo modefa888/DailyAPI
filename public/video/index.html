@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
     <!-- hls.js -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <!-- qrcode.js -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     
     <script>
         tailwind.config = {
@@ -103,7 +105,26 @@
         body.privacy-on .video-thumb:hover .privacy-mask {
             opacity: 0;
         }
+
+        .access-granted #accessGate {
+            display: none !important;
+        }
+
+        .access-granted #appContent {
+            display: block !important;
+        }
     </style>
+
+    <script>
+        try {
+            const grantedUntil = Number(localStorage.getItem('accessGrantedUntil') || '0');
+            if (grantedUntil && Date.now() < grantedUntil) {
+                document.documentElement.classList.add('access-granted');
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
+    </script>
 </head>
 <body class="bg-gray-100 transition-colors duration-300">
     <!-- 访问密码验证 -->
@@ -146,7 +167,7 @@
                 <!-- 左侧：应用标题 -->
                 <div class="flex items-center space-x-2">
                     <i class="fa fa-play-circle text-primary text-2xl"></i>
-                    <h1 class="text-xl font-bold text-primary">视频搜索</h1>
+                    <h1 id="siteTitle" class="text-xl font-bold text-primary cursor-pointer select-none">视频搜索</h1>
                 </div>
                 
                 <!-- 中间：搜索框 -->
@@ -376,6 +397,10 @@
                     <span class="text-gray-500">搜索历史</span>
                     <span id="userSearchCount" class="font-medium text-gray-800">0</span>
                 </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">今日观看时长</span>
+                    <span id="userWatchToday" class="font-medium text-gray-800">00:00</span>
+                </div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2 text-sm">
                 <div class="flex items-start justify-between">
@@ -395,7 +420,7 @@
                         <input id="importFileInput" type="file" accept="application/json" class="hidden" onchange="importUserData(event)">
                     </label>
                 </div>
-                <p class="text-xs text-gray-500">导出/导入：包含喜欢、播放历史、搜索历史与昵称</p>
+                <p class="text-xs text-gray-500">导出/导入：包含喜欢、播放历史、搜索历史、播放进度与昵称</p>
                 <div>
                     <label class="block text-sm font-medium mb-2">导入导出历史记录</label>
                     <div id="transferHistoryList" class="space-y-2"></div>
@@ -410,6 +435,33 @@
         class="fixed inset-0 bg-black/50 z-30 hidden"
         onclick="closeAllPanels()"
     ></div>
+
+    <!-- 分享弹窗 -->
+    <div id="shareModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/60 p-4">
+        <div class="bg-white rounded-xl w-full max-w-sm p-5 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">分享视频</h3>
+                <button onclick="closeShareModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    <i class="fa fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="flex flex-col items-center">
+                <div class="w-full mt-2">
+                    <label class="block text-xs text-gray-500 mb-2">分享链接有效时间</label>
+                    <select id="shareExpireSelect" class="input-primary w-full text-sm">
+                        <option value="1800">30分钟</option>
+                        <option value="7200">2小时</option>
+                        <option value="86400">1天</option>
+                        <option value="604800">7天</option>
+                        <option value="0">永久</option>
+                    </select>
+                </div>
+                <button onclick="copyShareUrl()" class="btn-primary w-full mt-4">
+                    <i class="fa fa-copy mr-1"></i> 点击复制地址
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- 悬浮控制按钮 -->
     <div 
@@ -550,26 +602,11 @@
                 <p class="text-xs text-gray-500 -mt-2">开启后会搜索官方推荐的所有接口</p>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">隐私遮挡</label>
-                    <label class="inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            id="privacySwitch" 
-                            class="sr-only"
-                            onchange="togglePrivacyMode()"
-                        >
-                        <div class="w-10 h-6 bg-gray-300 rounded-full relative transition-colors">
-                            <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform"></div>
-                        </div>
-                    </label>
-                </div>
-                <p class="text-xs text-gray-500 -mt-2">开启后视频缩略图默认遮挡，悬停显示</p>
-
-                <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">聚合接口选择</label>
+                    <label class="block text-sm font-medium">聚合接口选择（🌈已选 <span id="aggregateSelectedCount">0</span>）</label>
                     <button 
                         type="button"
                         onclick="toggleAggregateApiSection()"
+                        id="aggregateApiToggleButton"
                         class="text-xs text-gray-600 hover:text-gray-800"
                     >
                         展开/收起
@@ -582,13 +619,17 @@
                         <button onclick="resetAggregateApis()" class="btn-secondary text-xs flex-1">恢复默认</button>
                     </div>
                     <div id="aggregateApiList" class="space-y-2"></div>
+                    <button onclick="confirmAggregateSelection()" class="btn-primary text-xs w-full">
+                        确认并关闭
+                    </button>
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">官方推荐</label>
+                    <label class="block text-sm font-medium">官方推荐（🌈数量 <span id="officialApiCount">0</span>）</label>
                     <button 
                         type="button"
                         onclick="toggleOfficialApiSection(); fetchOfficialApis(true)"
+                        id="officialApiToggleButton"
                         class="text-xs text-gray-600 hover:text-gray-800"
                     >
                         展开/收起
@@ -603,6 +644,7 @@
                     <button 
                         type="button"
                         onclick="toggleHostHistory()"
+                        id="hostHistoryToggleButton"
                         class="text-xs text-gray-600 hover:text-gray-800"
                     >
                         切换显示
@@ -611,6 +653,23 @@
                 <div id="hostHistoryWrap" class="hidden space-y-2">
                     <div id="hostHistoryList" class="space-y-2"></div>
                 </div>
+
+                <div class="flex items-center justify-between">
+                    <label class="block text-sm font-medium">隐私遮挡</label>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            id="privacySwitch" 
+                            class="sr-only"
+                            onchange="togglePrivacyMode()"
+                        >
+                        <div class="w-10 h-6 bg-gray-300 rounded-full relative transition-colors">
+                            <div class="w-5 h-5 bg-white rounded-full absolute top-0.5 left-0.5 transition-transform"></div>
+                        </div>
+                    </label>
+                </div>
+                <p class="text-xs text-gray-500 -mt-2">开启后视频缩略图默认遮挡，悬停显示</p>
+                <p class="text-xs text-gray-400 -mt-2">快捷操作：连续点击“视频搜索”2次关闭隐私，3次开启隐私</p>
                 
             </div>
         </div>
@@ -644,6 +703,17 @@
         let lastVisitAtStart = null;
         let aggregateNoMore = new Set();
         let renderedVideos = [];
+        const FALLBACK_IMAGE = './loading.gif';
+        const RESUME_STORAGE_KEY = 'playbackResume';
+        const RESUME_MAX_ITEMS = 200;
+        const RESUME_MIN_SECONDS = 5;
+        const RESUME_SAVE_THROTTLE_MS = 3000;
+        let resumeLastSaveAt = 0;
+        let resumeLastUrl = '';
+        const WATCH_TIME_KEY = 'videoWatchTimeDaily';
+        const WATCH_TIME_MAX_DAYS = 60;
+        let lastWatchTime = 0;
+        let lastWatchUrl = '';
         const loadedTotalCount = document.getElementById('loadedTotalCount');
         
         // DOM元素
@@ -668,6 +738,11 @@
         const aggregateSwitch = document.getElementById('aggregateSwitch');
         const aggregateApiSection = document.getElementById('aggregateApiSection');
         const officialApiSection = document.getElementById('officialApiSection');
+        const aggregateApiToggleButton = document.getElementById('aggregateApiToggleButton');
+        const officialApiToggleButton = document.getElementById('officialApiToggleButton');
+        const hostHistoryToggleButton = document.getElementById('hostHistoryToggleButton');
+        const aggregateSelectedCount = document.getElementById('aggregateSelectedCount');
+        const officialApiCount = document.getElementById('officialApiCount');
         const privacySwitch = document.getElementById('privacySwitch');
         const searchInput = document.getElementById('searchInput');
         const searchInputMobile = document.getElementById('searchInputMobile');
@@ -683,6 +758,192 @@
         const accessPasswordInput = document.getElementById('accessPasswordInput');
         const accessError = document.getElementById('accessError');
         const accessSubmitButton = document.getElementById('accessSubmitButton');
+        const shareModal = document.getElementById('shareModal');
+        const shareExpireSelect = document.getElementById('shareExpireSelect');
+        let currentShareUrl = '';
+
+        function getResumeStore() {
+            try {
+                return JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
+            } catch (error) {
+                console.error('读取播放进度失败:', error);
+                return {};
+            }
+        }
+
+        function setResumeStore(store) {
+            try {
+                localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(store));
+            } catch (error) {
+                console.error('保存播放进度失败:', error);
+            }
+        }
+
+        function getEntryTime(entry) {
+            if (!entry) return 0;
+            const time = Number(entry.time);
+            return Number.isFinite(time) ? time : 0;
+        }
+
+        function loadResumeTime(url) {
+            if (!url) return 0;
+            const store = getResumeStore();
+            const entry = store[url];
+            return getEntryTime(entry);
+        }
+
+        function resolveResumeTime(rawUrl) {
+            if (!rawUrl) return 0;
+            const url = String(rawUrl).trim();
+            const store = getResumeStore();
+            const direct = store[url];
+            const directTime = getEntryTime(direct);
+            if (directTime) return directTime;
+
+            const decoded = (() => {
+                try { return decodeURIComponent(url); } catch (e) { return url; }
+            })();
+            const decodedEntry = store[decoded];
+            const decodedTime = getEntryTime(decodedEntry);
+            if (decodedTime) return decodedTime;
+
+            const stripQueryHash = (value) => value.split('#')[0].split('?')[0];
+            const stripped = stripQueryHash(url);
+            const strippedEntry = store[stripped];
+            const strippedTime = getEntryTime(strippedEntry);
+            if (strippedTime) return strippedTime;
+
+            const strippedDecoded = stripQueryHash(decoded);
+            const strippedDecodedEntry = store[strippedDecoded];
+            const strippedDecodedTime = getEntryTime(strippedDecodedEntry);
+            if (strippedDecodedTime) return strippedDecodedTime;
+
+            const keys = Object.keys(store);
+            if (keys.length === 0) return 0;
+            const match = keys
+                .map((key) => {
+                    const base = stripQueryHash(key);
+                    if (base === strippedDecoded || strippedDecoded.startsWith(base) || base.startsWith(strippedDecoded)) {
+                        return { key, entry: store[key] };
+                    }
+                    return null;
+                })
+                .filter(Boolean)
+                .sort((a, b) => (b.entry.updatedAt || 0) - (a.entry.updatedAt || 0))[0];
+            if (match && match.entry) {
+                const matchTime = getEntryTime(match.entry);
+                if (matchTime) return matchTime;
+            }
+            return 0;
+        }
+
+        function getResumeTimeForHistory(item) {
+            if (!item || !item.url) return 0;
+            const raw = String(item.url).trim();
+            const fromRaw = resolveResumeTime(raw);
+            if (fromRaw) return fromRaw;
+            const decoded = (() => {
+                try { return decodeURIComponent(raw); } catch (e) { return raw; }
+            })();
+            const fromDecoded = resolveResumeTime(decoded);
+            if (fromDecoded) return fromDecoded;
+            const splitUrl = raw.split('$')[1] || raw;
+            const fromSplit = resolveResumeTime(splitUrl);
+            if (fromSplit) return fromSplit;
+            const decodedSplit = decoded.split('$')[1] || decoded;
+            return resolveResumeTime(decodedSplit);
+        }
+
+        function saveResumeTime(url, time, duration) {
+            if (!url || !Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) return;
+            if (time < 1) return;
+            const now = Date.now();
+            if (resumeLastUrl === url && now - resumeLastSaveAt < RESUME_SAVE_THROTTLE_MS) return;
+            resumeLastSaveAt = now;
+            resumeLastUrl = url;
+            const store = getResumeStore();
+            store[url] = { time, duration, updatedAt: now };
+            const keys = Object.keys(store);
+            if (keys.length > RESUME_MAX_ITEMS) {
+                keys
+                    .sort((a, b) => (store[a].updatedAt || 0) - (store[b].updatedAt || 0))
+                    .slice(0, keys.length - RESUME_MAX_ITEMS)
+                    .forEach((key) => delete store[key]);
+            }
+            setResumeStore(store);
+
+            try {
+                const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
+                const index = history.findIndex(item => item.url === url);
+                if (index >= 0) {
+                    history[index].lastPosition = time;
+                    history[index].lastPositionUpdatedAt = now;
+                    localStorage.setItem('videoPlayHistory', JSON.stringify(history));
+                }
+            } catch (e) {
+                // ignore history update errors
+            }
+        }
+
+        function saveResumeNow(url) {
+            if (!url || !dplayer || !dplayer.video) return;
+            const current = dplayer.video.currentTime || 0;
+            const duration = dplayer.video.duration || 0;
+            saveResumeTime(url, current, duration);
+        }
+
+        function clearResumeTime(url) {
+            if (!url) return;
+            const store = getResumeStore();
+            if (!store[url]) return;
+            delete store[url];
+            setResumeStore(store);
+        }
+
+        function getTodayKey() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function getWatchTimeStore() {
+            try {
+                return JSON.parse(localStorage.getItem(WATCH_TIME_KEY) || '{}');
+            } catch (error) {
+                console.error('读取观看时长失败:', error);
+                return {};
+            }
+        }
+
+        function setWatchTimeStore(store) {
+            try {
+                localStorage.setItem(WATCH_TIME_KEY, JSON.stringify(store));
+            } catch (error) {
+                console.error('保存观看时长失败:', error);
+            }
+        }
+
+        function addWatchTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) return;
+            const store = getWatchTimeStore();
+            const todayKey = getTodayKey();
+            store[todayKey] = (store[todayKey] || 0) + seconds;
+            const keys = Object.keys(store);
+            if (keys.length > WATCH_TIME_MAX_DAYS) {
+                keys
+                    .sort()
+                    .slice(0, keys.length - WATCH_TIME_MAX_DAYS)
+                    .forEach((key) => delete store[key]);
+            }
+            setWatchTimeStore(store);
+        }
+
+        function getTodayWatchTime() {
+            const store = getWatchTimeStore();
+            return store[getTodayKey()] || 0;
+        }
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -715,6 +976,16 @@
                     toggleHostModal();
                 }
             });
+
+            if (aggregateApiToggleButton) {
+                aggregateApiToggleButton.textContent = aggregateApiSection && aggregateApiSection.classList.contains('hidden') ? '展开' : '收起';
+            }
+            if (officialApiToggleButton) {
+                officialApiToggleButton.textContent = officialApiSection && officialApiSection.classList.contains('hidden') ? '展开' : '收起';
+            }
+            if (hostHistoryToggleButton) {
+                hostHistoryToggleButton.textContent = hostHistoryWrap && hostHistoryWrap.classList.contains('hidden') ? '展开' : '收起';
+            }
 
             const previousVisit = localStorage.getItem('lastVisit');
             const visitHistory = JSON.parse(localStorage.getItem('visitHistory') || '[]');
@@ -783,10 +1054,62 @@
                     closeAllPanels();
                 });
             }
+
+            if (shareModal) {
+                shareModal.addEventListener('click', (e) => {
+                    if (e.target === shareModal) {
+                        closeShareModal();
+                    }
+                });
+            }
+
+            const siteTitle = document.getElementById('siteTitle');
+            if (siteTitle) {
+                let clickCount = 0;
+                let clickTimer = null;
+                const CLICK_WINDOW_MS = 600;
+
+                siteTitle.addEventListener('click', () => {
+                    clickCount += 1;
+                    if (clickTimer) clearTimeout(clickTimer);
+                    clickTimer = setTimeout(() => {
+                        if (clickCount === 2) {
+                            if (privacySwitch) {
+                                privacySwitch.checked = false;
+                                togglePrivacyMode();
+                            } else {
+                                localStorage.setItem('privacyMode', '0');
+                                applyPrivacyMode(false);
+                            }
+                        } else if (clickCount >= 3) {
+                            if (privacySwitch) {
+                                privacySwitch.checked = true;
+                                togglePrivacyMode();
+                            } else {
+                                localStorage.setItem('privacyMode', '1');
+                                applyPrivacyMode(true);
+                            }
+                        }
+                        clickCount = 0;
+                        clickTimer = null;
+                    }, CLICK_WINDOW_MS);
+                });
+            }
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState !== 'visible') {
+                    saveResumeNow(currentVideoUrl);
+                }
+            }, { passive: true });
+
+            window.addEventListener('pagehide', () => {
+                saveResumeNow(currentVideoUrl);
+            }, { passive: true });
         });
 
         const ACCESS_GRANT_KEY = 'accessGrantedUntil';
         const ACCESS_GRANT_DURATION = 30 * 24 * 60 * 60 * 1000;
+        const OFFICIAL_API_TOKEN_KEY = 'officialApiToken';
 
         function initAccessGate() {
             if (!accessGate || !appContent) return;
@@ -794,11 +1117,13 @@
             if (grantedUntil && Date.now() < grantedUntil) {
                 accessGate.classList.add('hidden');
                 appContent.classList.remove('hidden');
+                document.documentElement.classList.add('access-granted');
                 return;
             }
             localStorage.removeItem(ACCESS_GRANT_KEY);
             appContent.classList.add('hidden');
             accessGate.classList.remove('hidden');
+            document.documentElement.classList.remove('access-granted');
             if (accessPasswordInput) {
                 accessPasswordInput.focus();
                 accessPasswordInput.addEventListener('keydown', (event) => {
@@ -822,8 +1147,12 @@
                 .then((data) => {
                     if (data && data.code === 200 && data.data === true) {
                         localStorage.setItem(ACCESS_GRANT_KEY, String(Date.now() + ACCESS_GRANT_DURATION));
+                        if (data.token) {
+                            localStorage.setItem(OFFICIAL_API_TOKEN_KEY, String(data.token));
+                        }
                         accessGate.classList.add('hidden');
                         appContent.classList.remove('hidden');
+                        document.documentElement.classList.add('access-granted');
                         accessPasswordInput.value = '';
                         if (accessError) accessError.classList.add('hidden');
                         return;
@@ -836,6 +1165,12 @@
                 .finally(() => {
                     if (accessSubmitButton) accessSubmitButton.disabled = false;
                 });
+        }
+
+        function getOfficialApiUrl() {
+            const token = localStorage.getItem(OFFICIAL_API_TOKEN_KEY) || '';
+            if (!token) return '/apis/official';
+            return `/apis/official?token=${encodeURIComponent(token)}`;
         }
         
         // 加载初始数据
@@ -1082,10 +1417,10 @@
                 card.innerHTML = `
                     <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
                         <img 
-                            src="./loading.gif" 
+                            src="${FALLBACK_IMAGE}" 
                             data-src="${video.vod_pic}" 
                             alt="${video.vod_name}" 
-                            onerror="this.onerror=null;this.src='./loading.gif';"
+                            onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
                             class="w-full h-full object-cover lazy-image"
                         >
                         <div class="privacy-mask"></div>
@@ -1117,7 +1452,7 @@
                                     <i class="fa ${favorited ? 'fa-heart' : 'fa-heart-o'} mr-1"></i> 喜欢
                                 </button>
                                 <button 
-                                    onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}')"
+                                    onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}')"
                                     class="text-sm text-gray-500 hover:text-blue-500"
                                     title="分享视频"
                                 >
@@ -1412,6 +1747,7 @@
                     <img 
                         src="${imageUrl}" 
                         alt="${title}" 
+                        onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
                         class="max-w-full max-h-[90vh] object-contain rounded-lg"
                     >
                     <p class="text-white text-center mt-4">${title}</p>
@@ -1468,6 +1804,9 @@
                     dplayer.destroy();
                 }
                 
+                const resumeTarget = loadResumeTime(realVideoUrl);
+                let resumeApplied = false;
+
                 dplayer = new DPlayer({
                     container: document.getElementById('dplayer'),
                     video: {
@@ -1515,6 +1854,45 @@
                     hideLoading();
                     isLoading = false;
                 });
+
+                dplayer.on('loadedmetadata', () => {
+                    if (resumeApplied || !resumeTarget) return;
+                    const duration = dplayer?.video?.duration || 0;
+                    if (duration > 0 && resumeTarget < duration - RESUME_MIN_SECONDS) {
+                        dplayer.seek(resumeTarget);
+                        resumeApplied = true;
+                        showToast('已恢复到上次播放位置');
+                    }
+                });
+
+                dplayer.on('timeupdate', () => {
+                    if (!dplayer || !dplayer.video) return;
+                    const current = dplayer.video.currentTime || 0;
+                    if (lastWatchUrl !== realVideoUrl) {
+                        lastWatchUrl = realVideoUrl;
+                        lastWatchTime = current;
+                    }
+                    const delta = current - lastWatchTime;
+                    if (delta > 0 && delta <= 5) {
+                        addWatchTime(delta);
+                    }
+                    lastWatchTime = current;
+                    saveResumeTime(realVideoUrl, dplayer.video.currentTime, dplayer.video.duration);
+                });
+
+                dplayer.on('pause', () => {
+                    saveResumeNow(realVideoUrl);
+                });
+
+                dplayer.on('seeked', () => {
+                    saveResumeNow(realVideoUrl);
+                });
+
+                dplayer.on('ended', () => {
+                    clearResumeTime(realVideoUrl);
+                    lastWatchTime = 0;
+                    lastWatchUrl = '';
+                });
                 
                 dplayer.on('error', (e) => {
                     // 只有在加载过程中发生错误才显示提示
@@ -1534,6 +1912,7 @@
         // 关闭视频播放器
         function closeVideoPlayer() {
             if (dplayer) {
+                saveResumeNow(currentVideoUrl);
                 dplayer.destroy();
                 dplayer = null;
             }
@@ -1562,7 +1941,7 @@
         // 保存到播放历史
         function saveToHistory(title, url, pic, source) {
             try {
-                const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+                const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
                 
                 // 检查是否已存在
                 const existingIndex = history.findIndex(item => item.url === url);
@@ -1573,7 +1952,9 @@
                     pic: pic || '',
                     source: source || '',
                     timestamp: Date.now(),
-                    playCount: existingIndex >= 0 ? (history[existingIndex].playCount || 0) + 1 : 1
+                    playCount: existingIndex >= 0 ? (history[existingIndex].playCount || 0) + 1 : 1,
+                    lastPosition: existingIndex >= 0 ? (history[existingIndex].lastPosition || 0) : 0,
+                    lastPositionUpdatedAt: existingIndex >= 0 ? (history[existingIndex].lastPositionUpdatedAt || 0) : 0
                 };
                 
                 // 如果已存在，先移除
@@ -1589,7 +1970,7 @@
                     history.splice(50);
                 }
                 
-                localStorage.setItem('playHistory', JSON.stringify(history));
+                localStorage.setItem('videoPlayHistory', JSON.stringify(history));
             } catch (error) {
                 console.error('保存播放历史失败:', error);
             }
@@ -1597,7 +1978,7 @@
         
         // 显示历史记录
         function toggleHistory() {
-            const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+            const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
             
             if (history.length === 0) {
                 historyContent.innerHTML = `
@@ -1607,14 +1988,20 @@
                     </div>
                 `;
             } else {
-                historyContent.innerHTML = history.map(item => `
+                historyContent.innerHTML = history.map(item => {
+                    const resumeFromStore = getResumeTimeForHistory(item);
+                    const resumeFromHistory = Number(item.lastPosition || 0);
+                    const resumeTime = resumeFromStore > 0 ? resumeFromStore : resumeFromHistory;
+                    const resumeLabelText = resumeTime > 0 ? formatDuration(resumeTime) : '暂无';
+                    const resumeLabel = resumeTime > 0 ? `上次播放: ${resumeLabelText}` : '';
+                    return `
                     <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
                         <div class="flex space-x-3">
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='./loading.gif';" class="w-full h-full object-cover">`
-                                        : `<img src="./loading.gif" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" class="w-full h-full object-cover">`
+                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" class="w-full h-full object-cover">`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -1622,8 +2009,9 @@
                                     <span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${item.source || '未知来源'}</span>
                                     ${item.title}
                                 </h4>
-                                <div class="flex justify-between items-center text-xs text-gray-500">
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <span>播放次数: ${item.playCount}</span>
+                                    ${resumeLabel ? `<span>${resumeLabel}</span>` : ''}
                                     <span>${formatDate(item.timestamp)}</span>
                                 </div>
                             </div>
@@ -1643,7 +2031,8 @@
                             </button>
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             }
             
             historyPanel.classList.toggle('translate-x-full');
@@ -1652,7 +2041,7 @@
 
         // 喜欢功能
         function getFavorites() {
-            return JSON.parse(localStorage.getItem('favorites') || '[]');
+            return JSON.parse(localStorage.getItem('videoFavorites') || '[]');
         }
 
         function isFavorited(videoUrl) {
@@ -1686,7 +2075,7 @@
                 updateFavoriteButton(buttonEl, true);
             }
             
-            localStorage.setItem('favorites', JSON.stringify(favorites));
+            localStorage.setItem('videoFavorites', JSON.stringify(favorites));
         }
 
         function updateFavoriteButton(buttonEl, isLiked) {
@@ -1716,8 +2105,8 @@
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='./loading.gif';" class="w-full h-full object-cover">`
-                                        : `<img src="./loading.gif" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" class="w-full h-full object-cover">`
+                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" class="w-full h-full object-cover">`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -1726,7 +2115,7 @@
                                     ${item.title}
                                 </h4>
                                 <div class="text-xs text-gray-500">
-                                    <span>${formatDate(item.timestamp)}</span>
+                                    <span>收藏时间: ${formatDate(item.timestamp)}</span>
                                 </div>
                             </div>
                         </div>
@@ -1755,7 +2144,7 @@
         function removeFavorite(url) {
             try {
                 const favorites = getFavorites().filter(item => item.url !== url);
-                localStorage.setItem('favorites', JSON.stringify(favorites));
+                localStorage.setItem('videoFavorites', JSON.stringify(favorites));
                 toggleFavorites();
                 toggleFavorites();
             } catch (error) {
@@ -1765,7 +2154,7 @@
 
         function clearFavorites() {
             if (confirm('确定要清空所有喜欢内容吗？')) {
-                localStorage.removeItem('favorites');
+                localStorage.removeItem('videoFavorites');
                 toggleFavorites();
                 toggleFavorites();
                 showToast('喜欢内容已清空');
@@ -1775,9 +2164,9 @@
         // 从历史记录中移除
         function removeFromHistory(url) {
             try {
-                const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+                const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
                 const filteredHistory = history.filter(item => item.url !== url);
-                localStorage.setItem('playHistory', JSON.stringify(filteredHistory));
+                localStorage.setItem('videoPlayHistory', JSON.stringify(filteredHistory));
                 
                 // 重新渲染历史记录
                 toggleHistory();
@@ -1790,7 +2179,7 @@
         // 清空历史记录
         function clearHistory() {
             if (confirm('确定要清空所有播放历史吗？')) {
-                localStorage.removeItem('playHistory');
+                localStorage.removeItem('videoPlayHistory');
                 toggleHistory();
                 toggleHistory();
                 showToast('历史记录已清空');
@@ -1808,6 +2197,13 @@
                 fetchOfficialApis(false);
                 renderHostHistory();
                 renderTransferHistory();
+            }
+        }
+
+        function showHostModal() {
+            if (!hostModal) return;
+            if (hostModal.classList.contains('translate-x-full')) {
+                toggleHostModal();
             }
         }
         
@@ -1866,10 +2262,20 @@
             if (enabled) {
                 fetchOfficialApis(false);
                 renderAggregateApiSelection(officialApiCache ? officialApiCache.data : []);
+                if (aggregateApiSection && aggregateApiSection.classList.contains('hidden')) {
+                    aggregateApiSection.classList.remove('hidden');
+                    if (aggregateApiToggleButton) {
+                        aggregateApiToggleButton.textContent = '收起';
+                    }
+                }
                 showToast('已开启聚合搜索');
             } else {
                 showToast('已关闭聚合搜索');
             }
+        }
+
+        function confirmAggregateSelection() {
+            showToast('聚合接口已保存');
             if (!hostModal.classList.contains('translate-x-full')) {
                 toggleHostModal();
             }
@@ -1879,11 +2285,17 @@
             if (!aggregateApiSection) return;
             fetchOfficialApis(false);
             aggregateApiSection.classList.toggle('hidden');
+            if (aggregateApiToggleButton) {
+                aggregateApiToggleButton.textContent = aggregateApiSection.classList.contains('hidden') ? '展开' : '收起';
+            }
         }
 
         function toggleOfficialApiSection() {
             if (!officialApiSection) return;
             officialApiSection.classList.toggle('hidden');
+            if (officialApiToggleButton) {
+                officialApiToggleButton.textContent = officialApiSection.classList.contains('hidden') ? '展开' : '收起';
+            }
         }
 
         function updateAggregateSwitchUI(enabled) {
@@ -1901,7 +2313,9 @@
         }
 
         function isPrivacyModeEnabled() {
-            return localStorage.getItem('privacyMode') === '1';
+            const value = localStorage.getItem('privacyMode');
+            if (value === null) return true;
+            return value === '1';
         }
 
         function togglePrivacyMode() {
@@ -1949,15 +2363,17 @@
 
         // 导出/导入喜欢、历史、昵称与搜索记录
         function exportUserData() {
-            const favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
-            const playHistory = JSON.parse(localStorage.getItem('playHistory') || '[]');
+            const favorites = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            const playHistory = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
             const searchHistory = JSON.parse(localStorage.getItem('searchHistory') || '[]');
             const userNickname = localStorage.getItem('userNickname') || '';
+            const playbackResume = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || '{}');
             const payload = {
                 favorites,
                 playHistory,
                 searchHistory,
-                userNickname
+                userNickname,
+                playbackResume
             };
             const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -1983,14 +2399,14 @@
                 try {
                     const data = JSON.parse(reader.result || '{}');
                     if (data.favorites && Array.isArray(data.favorites)) {
-                        localStorage.setItem('favorites', JSON.stringify(data.favorites));
+                        localStorage.setItem('videoFavorites', JSON.stringify(data.favorites));
                     } else {
-                        localStorage.setItem('favorites', JSON.stringify([]));
+                        localStorage.setItem('videoFavorites', JSON.stringify([]));
                     }
                     if (data.playHistory && Array.isArray(data.playHistory)) {
-                        localStorage.setItem('playHistory', JSON.stringify(data.playHistory));
+                        localStorage.setItem('videoPlayHistory', JSON.stringify(data.playHistory));
                     } else {
-                        localStorage.setItem('playHistory', JSON.stringify([]));
+                        localStorage.setItem('videoPlayHistory', JSON.stringify([]));
                     }
                     if (data.searchHistory && Array.isArray(data.searchHistory)) {
                         localStorage.setItem('searchHistory', JSON.stringify(data.searchHistory));
@@ -2001,6 +2417,11 @@
                         localStorage.setItem('userNickname', data.userNickname.trim());
                     } else {
                         localStorage.removeItem('userNickname');
+                    }
+                    if (data.playbackResume && typeof data.playbackResume === 'object') {
+                        localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(data.playbackResume));
+                    } else {
+                        localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({}));
                     }
                     renderUserInfo();
                     addTransferHistory('导入', file.name);
@@ -2106,14 +2527,16 @@
                 nicknameInput.value = nickname;
             }
             const favorites = getFavorites();
-            const history = JSON.parse(localStorage.getItem('playHistory') || '[]');
+            const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
             const searchHistory = getSearchHistory();
             const favoriteCountEl = document.getElementById('userFavoriteCount');
             const historyCountEl = document.getElementById('userHistoryCount');
             const searchCountEl = document.getElementById('userSearchCount');
+            const watchTodayEl = document.getElementById('userWatchToday');
             if (favoriteCountEl) favoriteCountEl.textContent = String(favorites.length);
             if (historyCountEl) historyCountEl.textContent = String(history.length);
             if (searchCountEl) searchCountEl.textContent = String(searchHistory.length);
+            if (watchTodayEl) watchTodayEl.textContent = formatDuration(getTodayWatchTime());
 
             const lastVisitEl = document.getElementById('userLastVisit');
             if (lastVisitEl) {
@@ -2184,7 +2607,7 @@
                 <div class="text-xs text-gray-500">正在获取官方推荐...</div>
             `;
             
-            fetch('/apis/official')
+            fetch(getOfficialApiUrl())
                 .then(res => res.json())
                 .then(data => {
                     if (!data || data.code !== 200 || !Array.isArray(data.data)) {
@@ -2211,6 +2634,9 @@
                 officialApiList.innerHTML = `
                     <div class="text-xs text-gray-500">暂无官方推荐</div>
                 `;
+                if (officialApiCount) {
+                    officialApiCount.textContent = '0';
+                }
                 if (aggregateApiList) {
                     aggregateApiList.innerHTML = `
                         <div class="text-xs text-gray-500">暂无可选接口</div>
@@ -2236,7 +2662,10 @@
                     >使用</button>
                 </div>
             `).join('');
-            
+
+            if (officialApiCount) {
+                officialApiCount.textContent = String(data.data.length);
+            }
             officialApiList.innerHTML = `
                 ${metaHtml}
                 ${itemsHtml || '<div class="text-xs text-gray-500">暂无官方推荐</div>'}
@@ -2260,7 +2689,7 @@
             } catch (e) {
                 // ignore cache errors
             }
-            const res = await fetch('/apis/official');
+            const res = await fetch(getOfficialApiUrl());
             const data = await res.json();
             if (data && data.code === 200 && Array.isArray(data.data)) {
                 officialApiCache = data;
@@ -2294,6 +2723,9 @@
         function setAggregateApiSelection(urls) {
             const unique = Array.from(new Set((urls || []).filter(Boolean)));
             localStorage.setItem('aggregateApiSelection', JSON.stringify(unique));
+            if (aggregateSelectedCount) {
+                aggregateSelectedCount.textContent = String(unique.length);
+            }
         }
 
         function ensureDefaultAggregateSelection(apis) {
@@ -2311,9 +2743,15 @@
                 aggregateApiList.innerHTML = `
                     <div class="text-xs text-gray-500">暂无可选接口</div>
                 `;
+                if (aggregateSelectedCount) {
+                    aggregateSelectedCount.textContent = '0';
+                }
                 return;
             }
             const selected = ensureDefaultAggregateSelection(list);
+            if (aggregateSelectedCount) {
+                aggregateSelectedCount.textContent = String(selected.length);
+            }
             aggregateApiList.innerHTML = list.map(item => {
                 const checked = selected.includes(item.url) ? 'checked' : '';
                 return `
@@ -2412,6 +2850,9 @@
             if (!hostHistoryWrap.classList.contains('hidden')) {
                 renderHostHistory();
             }
+            if (hostHistoryToggleButton) {
+                hostHistoryToggleButton.textContent = hostHistoryWrap.classList.contains('hidden') ? '展开' : '收起';
+            }
         }
 
         function selectHost(value, name = '') {
@@ -2470,23 +2911,59 @@
 
         
         // 分享视频
-        function shareVideo(videoUrl, videoTitle) {
-            const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
-            
-            if (navigator.share) {
-                // 使用Web Share API
-                navigator.share({
-                    title: videoTitle,
-                    text: '分享一个精彩视频',
-                    url: realVideoUrl
-                }).catch(err => {
-                    console.log('分享失败:', err);
-                    fallbackShare(realVideoUrl);
+        function encodeSharePayload(fields) {
+            const payload = (fields || [])
+                .map(value => encodeURIComponent(value || ''))
+                .join('|');
+            return btoa(payload);
+        }
+
+        function getShareExpireSeconds() {
+            if (!shareExpireSelect) return 0;
+            const value = Number(shareExpireSelect.value || 0);
+            return Number.isFinite(value) ? value : 0;
+        }
+
+        function buildShareUrl(videoUrl, videoTitle, videoPic, sourceLabel, expireSeconds) {
+            const now = Date.now();
+            const expiresAt = expireSeconds > 0 ? now + expireSeconds * 1000 : 0;
+            const payload = encodeSharePayload([videoUrl, videoTitle, videoPic, sourceLabel, String(expiresAt)]);
+            const url = new URL(`./video/play.html?key=${encodeURIComponent(payload)}`, window.location.href);
+            return url.toString();
+        }
+
+        function openShareModal(shareUrl) {
+            if (!shareModal) return;
+            currentShareUrl = shareUrl;
+            shareModal.classList.remove('hidden');
+            shareModal.classList.add('flex');
+            showToast('分享面板已打开');
+        }
+
+        function closeShareModal() {
+            if (!shareModal) return;
+            shareModal.classList.add('hidden');
+            shareModal.classList.remove('flex');
+        }
+
+        function copyShareUrl() {
+            if (!currentShareUrl) return;
+            try {
+                navigator.clipboard.writeText(currentShareUrl).then(() => {
+                    showToast('分享链接已复制到剪贴板');
+                }).catch(() => {
+                    prompt('请复制分享链接:', currentShareUrl);
                 });
-            } else {
-                // 回退方案
-                fallbackShare(realVideoUrl);
+            } catch (err) {
+                prompt('请复制分享链接:', currentShareUrl);
             }
+        }
+
+        function shareVideo(videoUrl, videoTitle, videoPic = '', sourceLabel = '') {
+            const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
+            const expireSeconds = getShareExpireSeconds();
+            const shareUrl = buildShareUrl(realVideoUrl, videoTitle, videoPic, sourceLabel, expireSeconds);
+            openShareModal(shareUrl);
         }
 
         // 播放器内分享当前视频
@@ -2495,7 +2972,7 @@
                 showToast('暂无可分享的视频');
                 return;
             }
-            shareVideo(currentVideoUrl, currentVideoTitle || '视频播放');
+            shareVideo(currentVideoUrl, currentVideoTitle || '视频播放', currentVideoPic || '', currentVideoSource || getHostLabel());
         }
 
         // 播放器内喜欢/取消喜欢
@@ -2528,7 +3005,7 @@
                 updatePlayerLikeButtons(true);
             }
             
-            localStorage.setItem('favorites', JSON.stringify(favorites));
+            localStorage.setItem('videoFavorites', JSON.stringify(favorites));
         }
 
         function updatePlayerLikeButtons(isLiked) {
@@ -2709,6 +3186,18 @@
             
             // 其他情况显示具体日期
             return date.toLocaleDateString('zh-CN');
+        }
+
+        function formatDuration(seconds) {
+            if (!Number.isFinite(seconds) || seconds <= 0) return '00:00';
+            const total = Math.floor(seconds);
+            const hours = Math.floor(total / 3600);
+            const minutes = Math.floor((total % 3600) / 60);
+            const secs = total % 60;
+            if (hours > 0) {
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         }
         
 

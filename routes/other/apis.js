@@ -1,9 +1,40 @@
 const Router = require("koa-router");
+const crypto = require("crypto");
 const apisRouter = new Router();
 
 // 接口信息
 const routerInfo = { name: "官方推荐API", title: "官方推荐", subtitle: "视频资源接口" };
 const videoAccessPassword = process.env.VIDEO_ACCESS_PASSWORD || "123456";
+const accessTokenTtlMs = Number(process.env.VIDEO_ACCESS_TOKEN_TTL_MS || 86400000);
+const accessTokens = new Map();
+
+function issueAccessToken() {
+    const token = crypto.randomBytes(24).toString("hex");
+    accessTokens.set(token, Date.now() + accessTokenTtlMs);
+    return token;
+}
+
+function isAccessTokenValid(token) {
+    if (!token) return false;
+    const expiresAt = accessTokens.get(token);
+    if (!expiresAt) return false;
+    if (expiresAt <= Date.now()) {
+        accessTokens.delete(token);
+        return false;
+    }
+    return true;
+}
+
+function getAccessTokenFromRequest(ctx) {
+    const queryToken = String(ctx.query.token || "").trim();
+    if (queryToken) return queryToken;
+    const headerToken = String(ctx.get("x-video-token") || "").trim();
+    if (headerToken) return headerToken;
+    const authHeader = String(ctx.get("authorization") || "").trim();
+    if (!authHeader) return "";
+    const match = authHeader.match(/^Bearer\s+(.+)$/i);
+    return match ? match[1].trim() : "";
+}
 
 // 官方推荐 API 列表
 const officialApis = [
@@ -84,6 +115,16 @@ const officialApis = [
 
 // 官方推荐 API
 apisRouter.get("/apis/official", async (ctx) => {
+    const token = getAccessTokenFromRequest(ctx);
+    if (!isAccessTokenValid(token)) {
+        ctx.status = 401;
+        ctx.body = {
+            code: 401,
+            message: "未授权",
+            ...routerInfo,
+        };
+        return;
+    }
     ctx.body = {
         code: 200,
         message: "获取成功",
@@ -101,6 +142,7 @@ apisRouter.get("/apis/video/pass", async (ctx) => {
         code: 200,
         message: "获取成功",
         data: ok,
+        token: ok ? issueAccessToken() : "",
     };
 });
 
