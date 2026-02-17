@@ -11,18 +11,75 @@
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         body {
-            background: #0f172a;
+            background: radial-gradient(circle at top, #1e293b 0%, #0f172a 45%, #0b1220 100%);
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(circle at 20% 10%, rgba(59, 130, 246, 0.12), transparent 45%),
+                radial-gradient(circle at 80% 20%, rgba(56, 189, 248, 0.10), transparent 40%),
+                radial-gradient(circle at 50% 100%, rgba(15, 23, 42, 0.6), transparent 55%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        .page-wrap {
+            position: relative;
+            z-index: 1;
+        }
+        body.light-mode {
+            background: radial-gradient(circle at top, #ffffff 0%, #f1f5f9 45%, #e2e8f0 100%);
+            color: #0f172a;
+        }
+        body.light-mode::before {
+            background-image:
+                radial-gradient(circle at 20% 10%, rgba(59, 130, 246, 0.10), transparent 45%),
+                radial-gradient(circle at 80% 20%, rgba(14, 116, 144, 0.08), transparent 40%),
+                radial-gradient(circle at 50% 100%, rgba(148, 163, 184, 0.35), transparent 55%);
+        }
+        body.light-mode .bg-slate-900\/70 {
+            background-color: rgba(226, 232, 240, 0.7);
+        }
+        body.light-mode .text-white {
+            color: #0f172a;
+        }
+        body.light-mode .text-slate-300,
+        body.light-mode .text-slate-400,
+        body.light-mode .text-slate-200 {
+            color: #334155;
+        }
+        body.light-mode .text-blue-300 {
+            color: #2563eb;
+        }
+        body.light-mode .bg-slate-900\/70,
+        body.light-mode .bg-slate-900\/70 * {
+            color: #0f172a;
+        }
+        body.light-mode .dplayer .dplayer-controller,
+        body.light-mode .dplayer .dplayer-controller * {
+            color: #ffffff !important;
+        }
+        body.light-mode .dplayer .dplayer-controller .dplayer-icons i {
+            color: #ffffff !important;
+        }
+        body.light-mode .dplayer .dplayer-time {
+            color: #ffffff !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
         }
     </style>
 </head>
 <body class="min-h-screen text-white">
-    <div class="max-w-5xl mx-auto px-4 py-6">
+    <div class="max-w-5xl mx-auto px-4 py-6 page-wrap">
         <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2">
                 <i class="fa fa-play-circle text-blue-400 text-2xl"></i>
                 <h1 class="text-lg font-semibold">分享播放</h1>
             </div>
             <div class="flex items-center space-x-3">
+                <button id="themeToggle" class="text-xs bg-slate-700/80 hover:bg-slate-700 px-3 py-1 rounded-full">
+                    <i class="fa fa-adjust mr-1"></i> 黑白切换
+                </button>
                 <button id="shareButton" class="text-xs bg-blue-500/80 hover:bg-blue-500 px-3 py-1 rounded-full">
                     <i class="fa fa-share-alt mr-1"></i> 分享
                 </button>
@@ -52,6 +109,13 @@
         </div>
 
         <div id="errorBox" class="hidden mt-4 bg-red-500/20 border border-red-400/40 text-red-200 p-3 rounded-lg text-sm"></div>
+    </div>
+
+    <div id="expiredOverlay" class="fixed inset-0 hidden items-center justify-center bg-black/90 z-50">
+        <div class="text-center px-6">
+            <div class="text-4xl md:text-6xl font-bold text-white tracking-widest">已过期</div>
+            <div class="mt-3 text-sm md:text-base text-white/70">分享链接已失效</div>
+        </div>
     </div>
 
     <script>
@@ -89,6 +153,13 @@
             box.classList.remove('hidden');
         }
 
+        function showExpiredOverlay() {
+            const overlay = document.getElementById('expiredOverlay');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+        }
+
         function formatRemaining(ms) {
             if (ms <= 0) return '00:00';
             const total = Math.floor(ms / 1000);
@@ -115,6 +186,7 @@
                 if (remaining <= 0) {
                     countdownEl.textContent = '有效期：已过期';
                     showError('分享链接已过期');
+                    showExpiredOverlay();
                     return false;
                 }
                 countdownEl.textContent = `有效期：${formatRemaining(remaining)}`;
@@ -163,6 +235,20 @@
             });
         }
 
+        function bindThemeToggle() {
+            const btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            const saved = localStorage.getItem('playTheme') || 'light';
+            if (saved === 'light') {
+                document.body.classList.add('light-mode');
+            }
+            btn.addEventListener('click', () => {
+                document.body.classList.toggle('light-mode');
+                const isLight = document.body.classList.contains('light-mode');
+                localStorage.setItem('playTheme', isLight ? 'light' : 'dark');
+            });
+        }
+
         function initPlayer(payload) {
             const titleEl = document.getElementById('shareTitle');
             const sourceEl = document.getElementById('shareSource');
@@ -203,8 +289,10 @@
         const payload = parseShareKey();
         if (!payload) {
             showError('分享链接无效或已过期');
+            showExpiredOverlay();
         } else if (payload.expiresAt && Date.now() > payload.expiresAt) {
             showError('分享链接已过期');
+            showExpiredOverlay();
             startCountdown(payload.expiresAt);
         } else {
             initPlayer(payload);
@@ -212,6 +300,7 @@
         }
 
         bindShareButton();
+        bindThemeToggle();
     </script>
 </body>
 </html>
