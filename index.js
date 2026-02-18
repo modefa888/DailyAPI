@@ -79,51 +79,56 @@ const fs = require("fs");
 app.use(router.routes());
 app.use(router.allowedMethods());
 
-// 启动应用程序并监听端口
-const startApp = (port) => {
-    app.listen(port, () => {
-        console.info(`成功在 ${port} 端口上运行`);
-        console.info(`地址：http://127.0.0.1:${port}`)
-    });
-};
-
-// 检测端口是否被占用
-const checkPort = (port) => {
-    return new Promise((resolve, reject) => {
-        const server = net
-            .createServer()
-            .once("error", (err) => {
-                if (err.code === "EADDRINUSE") {
-                    console.info(`端口 ${port} 已被占用, 正在尝试其他端口...`);
-                    server.close();
-                    resolve(false);
-                } else {
-                    reject(err);
-                }
-            })
-            .once("listening", () => {
-                server.close();
-                resolve(true);
-            })
-            .listen(port);
-    });
-};
-
 // 设置404页面的路由处理程序
 app.use(async (ctx) => {
   await ctx.render("404"); // 渲染404页面
 });
 
-// 尝试启动应用程序
-const tryStartApp = async (port) => {
-    let isPortAvailable = await checkPort(port);
-    while (!isPortAvailable) {
-        port++;
-        isPortAvailable = await checkPort(port);
-    }
-    startApp(port);
-};
+const isVercel = !!process.env.VERCEL;
 
+// Vercel Serverless 入口
+if (isVercel) {
+    module.exports = app.callback();
+} else {
+    // 启动应用程序并监听端口（本地开发）
+    const startApp = (port) => {
+        app.listen(port, () => {
+            console.info(`成功在 ${port} 端口上运行`);
+            console.info(`地址：http://127.0.0.1:${port}`)
+        });
+    };
 
+    // 检测端口是否被占用
+    const checkPort = (port) => {
+        return new Promise((resolve, reject) => {
+            const server = net
+                .createServer()
+                .once("error", (err) => {
+                    if (err.code === "EADDRINUSE") {
+                        console.info(`端口 ${port} 已被占用, 正在尝试其他端口...`);
+                        server.close();
+                        resolve(false);
+                    } else {
+                        reject(err);
+                    }
+                })
+                .once("listening", () => {
+                    server.close();
+                    resolve(true);
+                })
+                .listen(port);
+        });
+    };
 
-tryStartApp(port);
+    // 尝试启动应用程序
+    const tryStartApp = async (port) => {
+        let isPortAvailable = await checkPort(port);
+        while (!isPortAvailable) {
+            port++;
+            isPortAvailable = await checkPort(port);
+        }
+        startApp(port);
+    };
+
+    tryStartApp(port);
+}
