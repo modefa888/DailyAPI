@@ -512,7 +512,7 @@
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
         
-        // 初始化
+        // 初��化
         document.addEventListener('DOMContentLoaded', () => {
             // 加载保存的Host
             host = localStorage.getItem('apiHost') || '';
@@ -1190,7 +1190,7 @@
                         hideLoading();
                         showToast('视频加载失败，请尝试其他视频');
                     }
-                    console.error('视频播放错误:', e);
+                    console.error('视频���放错误:', e);
                 });
             } catch (error) {
                 hideLoading();
@@ -2255,5 +2255,9 @@
         
 
     </script>
+    <script>
+      window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
+    </script>
+    <script defer src="/_vercel/speed-insights/script.js"></script>
 </body>
 </html>
