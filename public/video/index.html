@@ -638,7 +638,7 @@
         <div class="flex-1 overflow-y-auto scrollbar-hide p-4">
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium mb-1">当前API</label>
+                    <label class="block text-sm font-medium mb-1">当前API（<span id="hostNameDisplay" class="text-xs text-gray-500">未设置</span>）</label>
                     <input 
                         type="text" 
                         id="hostInput" 
@@ -802,6 +802,7 @@
         const videoPlayerModal = document.getElementById('videoPlayerModal');
         const hostModal = document.getElementById('hostModal');
         const hostInput = document.getElementById('hostInput');
+        const hostNameDisplay = document.getElementById('hostNameDisplay');
         const hostHistoryWrap = document.getElementById('hostHistoryWrap');
         const hostHistoryList = document.getElementById('hostHistoryList');
         const officialApiList = document.getElementById('officialApiList');
@@ -1023,6 +1024,7 @@
             // 加载保存的Host
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
+            updateHostNameDisplay(host);
             const aggregateEnabled = isAggregateSearchEnabled();
             if (aggregateSwitch) {
                 aggregateSwitch.checked = aggregateEnabled;
@@ -2376,6 +2378,7 @@
 
             if (willOpen) {
                 hostInput.value = host;
+                updateHostNameDisplay(host);
                 hostInput.focus();
                 fetchOfficialApis(false);
                 renderHostHistory();
@@ -2412,6 +2415,7 @@
             hostName = getOfficialNameByUrl(host) || getHostNameFromUrl(host);
             localStorage.setItem('apiHostName', hostName);
             saveHostHistory(host);
+            updateHostNameDisplay(host);
             
             toggleHostModal();
             showToast('Host设置已保存');
@@ -2429,6 +2433,7 @@
             hostInput.value = '';
             localStorage.removeItem('apiHost');
             localStorage.removeItem('apiHostName');
+            updateHostNameDisplay('');
             showToast('Host已重置');
         }
 
@@ -2881,6 +2886,7 @@
             `;
 
             renderAggregateApiSelection(data.data);
+            updateHostNameDisplay(host);
         }
 
         async function getOfficialApis() {
@@ -3070,6 +3076,7 @@
             localStorage.setItem('apiHost', host);
             hostName = name || getOfficialNameByUrl(host) || getHostNameFromUrl(host);
             localStorage.setItem('apiHostName', hostName);
+            updateHostNameDisplay(host);
             saveHostHistory(host);
             showToast('已切换Host');
             if (!hostModal.classList.contains('translate-x-full')) {
@@ -3078,6 +3085,18 @@
             if (videoList.children.length === 0) {
                 loadInitialData();
             }
+        }
+
+        function getCurrentHostDisplayName(url) {
+            if (!url) return '未设置';
+            const officialName = getOfficialNameByUrl(url);
+            if (officialName) return officialName;
+            return '自定义';
+        }
+
+        function updateHostNameDisplay(url) {
+            if (!hostNameDisplay) return;
+            hostNameDisplay.textContent = getCurrentHostDisplayName(url);
         }
 
         function getHostNameFromUrl(url) {
