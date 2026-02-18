@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/bizhangjie/DailyAPI#readme",
   "dependencies": {
+    "@vercel/speed-insights": "^1.3.1",
     "axios": "^1.6.3",
     "cheerio": "1.0.0-rc.12",
     "cloudscraper": "^4.6.0",
