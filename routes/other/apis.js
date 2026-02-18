@@ -1,6 +1,7 @@
 const Router = require("koa-router");
 const crypto = require("crypto");
 const apisRouter = new Router();
+const { encryptUrl } = require("../../utils/urlCipher");
 
 // 接口信息
 const routerInfo = { name: "官方推荐API", title: "官方推荐", subtitle: "视频资源接口" };
@@ -125,12 +126,16 @@ apisRouter.get("/apis/official", async (ctx) => {
         };
         return;
     }
+    const data = officialApis.map((api) => ({
+        ...api,
+        url: encryptUrl(api.url),
+    }));
     ctx.body = {
         code: 200,
         message: "获取成功",
         ...routerInfo,
-        total: officialApis.length,
-        data: officialApis,
+        total: data.length,
+        data,
     };
 });
 

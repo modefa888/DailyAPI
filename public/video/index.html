@@ -113,12 +113,14 @@
         .access-granted #appContent {
             display: block !important;
         }
+
     </style>
 
     <script>
         try {
             const grantedUntil = Number(localStorage.getItem('accessGrantedUntil') || '0');
-            if (grantedUntil && Date.now() < grantedUntil) {
+            const token = String(localStorage.getItem('officialApiToken') || '');
+            if (grantedUntil && Date.now() < grantedUntil && token) {
                 document.documentElement.classList.add('access-granted');
             }
         } catch (e) {
@@ -242,6 +244,13 @@
                             <i class="fa fa-cog text-gray-600"></i>
                             <span class="text-right flex-1">设置</span>
                         </button>
+                        <button 
+                            onclick="handleMoreAction('about')"
+                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
+                        >
+                            <i class="fa fa-info-circle text-gray-600"></i>
+                            <span class="text-right flex-1">关于</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -300,7 +309,7 @@
     <!-- 播放历史面板 -->
     <div 
         id="historyPanel" 
-        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
     >
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg font-semibold">播放历史</h3>
@@ -323,7 +332,7 @@
     <!-- 喜欢面板 -->
     <div 
         id="favoritePanel" 
-        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
     >
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg font-semibold">我的喜欢</h3>
@@ -346,7 +355,7 @@
     <!-- 用户信息面板 -->
     <div 
         id="userPanel" 
-        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
     >
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg font-semibold">用户信息</h3>
@@ -360,25 +369,25 @@
                     <span class="text-gray-500">昵称</span>
                     <span id="userNicknameDisplay" class="font-medium text-gray-800">未设置</span>
                 </div>
-                <div class="flex items-center space-x-2">
+                <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                     <input 
                         id="userNicknameInput" 
                         type="text" 
                         placeholder="输入昵称" 
-                        class="input-primary flex-1 text-sm"
+                        class="input-primary w-full sm:flex-1 text-sm"
                         maxlength="20"
                     >
                     <button 
                         id="userNicknameSave" 
                         onclick="saveUserNickname()" 
-                        class="btn-primary text-xs px-3 py-2"
+                        class="btn-primary text-xs px-3 py-2 w-full sm:w-auto"
                     >
                         保存
                     </button>
                     <button 
                         id="userNicknameRandom" 
                         onclick="setRandomNickname()" 
-                        class="btn-secondary text-xs px-3 py-2"
+                        class="btn-secondary text-xs px-3 py-2 w-full sm:w-auto"
                     >
                         随机
                     </button>
@@ -429,6 +438,44 @@
         </div>
     </div>
 
+    <!-- 关于面板 -->
+    <div 
+        id="aboutPanel" 
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+    >
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">关于本网站</h3>
+            <button onclick="toggleAboutPanel()" class="p-2 hover:bg-gray-200 rounded-full">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 text-sm">
+            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
+                <div class="text-base font-medium text-gray-800">功能概览</div>
+                <div class="text-gray-600">这是一个视频搜索与播放工具，支持多接口聚合、收藏与历史记录、观看进度续播、隐私模式与分享。</div>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
+                <div class="text-base font-medium text-gray-800">使用方法</div>
+                <div class="space-y-1 text-gray-600">
+                    <div>1. 在搜索框输入关键词开始搜索。</div>
+                    <div>2. 点“设置”选择或填写接口地址。</div>
+                    <div>3. “官方推荐”需要通过访问密码验证。</div>
+                    <div>4. 可开启“聚合搜索”一次查询多个接口。</div>
+                    <div>5. 进入视频后支持断点续播与播放历史记录。</div>
+                    <div>6. “喜欢”和“历史”可在更多菜单中查看。</div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
+                <div class="text-base font-medium text-gray-800">小贴士</div>
+                <div class="text-gray-600">隐私模式会对缩略图打码；分享链接可设置有效期。</div>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
+                <div class="text-base font-medium text-gray-800">数据说明</div>
+                <div class="text-gray-600">收藏、历史、搜索记录等信息只保存在本地浏览器。</div>
+            </div>
+        </div>
+    </div>
+
     <!-- 背景遮罩 -->
     <div 
         id="overlay" 
@@ -460,6 +507,29 @@
                     <i class="fa fa-copy mr-1"></i> 点击复制地址
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- 计算验证弹窗 -->
+    <div id="mathChallengeModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/60 p-4">
+        <div class="bg-white rounded-xl w-full max-w-sm p-6 shadow-2xl">
+            <div class="text-lg font-semibold text-gray-800 mb-2">操作过快，请完成计算</div>
+            <div id="mathChallengeQuestion" class="text-2xl font-bold text-center text-gray-900 my-4">0 + 0 = ?</div>
+            <input
+                id="mathChallengeInput"
+                type="text"
+                inputmode="numeric"
+                placeholder="请输入答案"
+                class="input-primary w-full text-center text-lg"
+                autocomplete="off"
+            >
+            <div id="mathChallengeError" class="text-xs text-red-500 mt-2 hidden">答案错误，请重试</div>
+            <button
+                id="mathChallengeSubmit"
+                class="btn-primary w-full mt-4"
+            >
+                提交答案
+            </button>
         </div>
     </div>
 
@@ -556,7 +626,7 @@
     <!-- Host设置面板 -->
     <div 
         id="hostModal" 
-        class="fixed top-0 right-0 bottom-0 w-full md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
     >
         <div class="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 class="text-lg font-semibold">设置API Host</h3>
@@ -726,6 +796,7 @@
         const favoriteContent = document.getElementById('favoriteContent');
         const userPanel = document.getElementById('userPanel');
         const userInfoContent = document.getElementById('userInfoContent');
+        const aboutPanel = document.getElementById('aboutPanel');
         const overlay = document.getElementById('overlay');
         const floatingButtons = document.getElementById('floatingButtons');
         const videoPlayerModal = document.getElementById('videoPlayerModal');
@@ -971,6 +1042,9 @@
             if (userPanel) {
                 userPanel.addEventListener('mouseleave', closeAllPanels);
             }
+            if (aboutPanel) {
+                aboutPanel.addEventListener('mouseleave', closeAllPanels);
+            }
             hostModal.addEventListener('mouseleave', () => {
                 if (!hostModal.classList.contains('translate-x-full')) {
                     toggleHostModal();
@@ -1111,16 +1185,39 @@
         const ACCESS_GRANT_DURATION = 30 * 24 * 60 * 60 * 1000;
         const OFFICIAL_API_TOKEN_KEY = 'officialApiToken';
 
+        function revokeAccess(message) {
+            try {
+                localStorage.removeItem(ACCESS_GRANT_KEY);
+                localStorage.removeItem(OFFICIAL_API_TOKEN_KEY);
+            } catch (e) {
+                // ignore storage errors
+            }
+            if (accessGate && appContent) {
+                accessGate.classList.remove('hidden');
+                appContent.classList.add('hidden');
+                document.documentElement.classList.remove('access-granted');
+            }
+            if (accessPasswordInput) {
+                accessPasswordInput.value = '';
+                accessPasswordInput.focus();
+            }
+            if (message) {
+                showToast(message);
+            }
+        }
+
         function initAccessGate() {
             if (!accessGate || !appContent) return;
             const grantedUntil = Number(localStorage.getItem(ACCESS_GRANT_KEY) || '0');
-            if (grantedUntil && Date.now() < grantedUntil) {
+            const token = String(localStorage.getItem(OFFICIAL_API_TOKEN_KEY) || '');
+            if (grantedUntil && Date.now() < grantedUntil && token) {
                 accessGate.classList.add('hidden');
                 appContent.classList.remove('hidden');
                 document.documentElement.classList.add('access-granted');
                 return;
             }
             localStorage.removeItem(ACCESS_GRANT_KEY);
+            localStorage.removeItem(OFFICIAL_API_TOKEN_KEY);
             appContent.classList.add('hidden');
             accessGate.classList.remove('hidden');
             document.documentElement.classList.remove('access-granted');
@@ -1145,16 +1242,18 @@
             fetch(`/apis/video/pass?password=${encodeURIComponent(value)}`)
                 .then((res) => res.json())
                 .then((data) => {
-                    if (data && data.code === 200 && data.data === true) {
+                    if (data && data.code === 200 && data.data === true && data.token) {
                         localStorage.setItem(ACCESS_GRANT_KEY, String(Date.now() + ACCESS_GRANT_DURATION));
-                        if (data.token) {
-                            localStorage.setItem(OFFICIAL_API_TOKEN_KEY, String(data.token));
-                        }
+                        localStorage.setItem(OFFICIAL_API_TOKEN_KEY, String(data.token));
                         accessGate.classList.add('hidden');
                         appContent.classList.remove('hidden');
                         document.documentElement.classList.add('access-granted');
                         accessPasswordInput.value = '';
                         if (accessError) accessError.classList.add('hidden');
+                        return;
+                    }
+                    if (data && data.code === 200 && data.data === true && !data.token) {
+                        revokeAccess('服务未返回访问令牌，请稍后重试');
                         return;
                     }
                     if (accessError) accessError.classList.remove('hidden');
@@ -1421,6 +1520,7 @@
                             data-src="${video.vod_pic}" 
                             alt="${video.vod_name}" 
                             onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
+                            loading="lazy"
                             class="w-full h-full object-cover lazy-image"
                         >
                         <div class="privacy-mask"></div>
@@ -1712,9 +1812,85 @@
             window.scrollTo({ top: Math.max(targetTop, 0), behavior: 'smooth' });
         }
         
+        let lastLoadMoreAt = 0;
+        let mathChallengeAnswer = null;
+        let mathChallengeResolver = null;
+
+        function showMathChallengeModal() {
+            const ops = ['+', '-', '*'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            let a = Math.floor(Math.random() * 9) + 1;
+            let b = Math.floor(Math.random() * 9) + 1;
+            if (op === '-' && a < b) {
+                const tmp = a;
+                a = b;
+                b = tmp;
+            }
+            mathChallengeAnswer = op === '+' ? a + b : op === '-' ? a - b : a * b;
+            const questionEl = document.getElementById('mathChallengeQuestion');
+            const inputEl = document.getElementById('mathChallengeInput');
+            const errorEl = document.getElementById('mathChallengeError');
+            const modalEl = document.getElementById('mathChallengeModal');
+            if (!questionEl || !inputEl || !errorEl || !modalEl) return Promise.resolve(false);
+            questionEl.textContent = `${a} ${op} ${b} = ?`;
+            inputEl.value = '';
+            errorEl.classList.add('hidden');
+            modalEl.classList.remove('hidden');
+            modalEl.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => inputEl.focus(), 0);
+            return new Promise(resolve => {
+                mathChallengeResolver = resolve;
+            });
+        }
+
+        function hideMathChallengeModal() {
+            const modalEl = document.getElementById('mathChallengeModal');
+            if (!modalEl) return;
+            modalEl.classList.add('hidden');
+            modalEl.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+
+        function submitMathChallenge() {
+            const inputEl = document.getElementById('mathChallengeInput');
+            const errorEl = document.getElementById('mathChallengeError');
+            if (!inputEl || !errorEl) return;
+            const answer = Number(String(inputEl.value).trim());
+            if (!Number.isFinite(answer) || answer !== mathChallengeAnswer) {
+                errorEl.classList.remove('hidden');
+                inputEl.focus();
+                return;
+            }
+            errorEl.classList.add('hidden');
+            hideMathChallengeModal();
+            if (typeof mathChallengeResolver === 'function') {
+                mathChallengeResolver(true);
+                mathChallengeResolver = null;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const inputEl = document.getElementById('mathChallengeInput');
+            const submitEl = document.getElementById('mathChallengeSubmit');
+            if (submitEl) submitEl.addEventListener('click', submitMathChallenge);
+            if (inputEl) {
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') submitMathChallenge();
+                });
+            }
+        });
+
         // 加载更多
-        function loadMoreData() {
+        async function loadMoreData() {
             if (isLoading || (!host && !isAggregateSearchEnabled()) || !hasMore) return;
+
+            const now = Date.now();
+            if (now - lastLoadMoreAt < 5000) {
+                const ok = await showMathChallengeModal();
+                if (!ok) return;
+            }
+            lastLoadMoreAt = now;
             
             isLoading = true;
             showLoading('加载更多内容...');
@@ -1748,6 +1924,7 @@
                         src="${imageUrl}" 
                         alt="${title}" 
                         onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
+                        loading="lazy"
                         class="max-w-full max-h-[90vh] object-contain rounded-lg"
                     >
                     <p class="text-white text-center mt-4">${title}</p>
@@ -2000,8 +2177,8 @@
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" class="w-full h-full object-cover">`
-                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
+                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -2035,8 +2212,10 @@
                 }).join('');
             }
             
+            const willOpen = historyPanel.classList.contains('translate-x-full');
+            if (willOpen) closePanelsExcept(historyPanel);
             historyPanel.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
+            updateOverlayForPanels();
         }
 
         // 喜欢功能
@@ -2105,8 +2284,8 @@
                             <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
                                 ${
                                     item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" class="w-full h-full object-cover">`
-                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" class="w-full h-full object-cover">`
+                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
+                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -2137,8 +2316,10 @@
                 `).join('');
             }
             
+            const willOpen = favoritePanel.classList.contains('translate-x-full');
+            if (willOpen) closePanelsExcept(favoritePanel);
             favoritePanel.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
+            updateOverlayForPanels();
         }
 
         function removeFavorite(url) {
@@ -2188,10 +2369,12 @@
         
         // 切换Host设置模态框
         function toggleHostModal() {
+            const willOpen = hostModal.classList.contains('translate-x-full');
+            if (willOpen) closePanelsExcept(hostModal);
             hostModal.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
-            
-            if (!hostModal.classList.contains('translate-x-full')) {
+            updateOverlayForPanels();
+
+            if (willOpen) {
                 hostInput.value = host;
                 hostInput.focus();
                 fetchOfficialApis(false);
@@ -2482,6 +2665,8 @@
                 toggleUserInfo();
             } else if (value === 'setting') {
                 toggleHostModal();
+            } else if (value === 'about') {
+                toggleAboutPanel();
             }
             const select = document.getElementById('actionSelect');
             if (select) select.value = '';
@@ -2505,6 +2690,8 @@
                 toggleUserInfo();
             } else if (action === 'setting') {
                 toggleHostModal();
+            } else if (action === 'about') {
+                toggleAboutPanel();
             }
             const menu = document.getElementById('moreMenu');
             if (menu) menu.classList.add('hidden');
@@ -2589,8 +2776,18 @@
         function toggleUserInfo() {
             if (!userPanel) return;
             renderUserInfo();
+            const willOpen = userPanel.classList.contains('translate-x-full');
+            if (willOpen) closePanelsExcept(userPanel);
             userPanel.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
+            updateOverlayForPanels();
+        }
+
+        function toggleAboutPanel() {
+            if (!aboutPanel) return;
+            const willOpen = aboutPanel.classList.contains('translate-x-full');
+            if (willOpen) closePanelsExcept(aboutPanel);
+            aboutPanel.classList.toggle('translate-x-full');
+            updateOverlayForPanels();
         }
 
         // 官方推荐接口
@@ -2608,7 +2805,16 @@
             `;
             
             fetch(getOfficialApiUrl())
-                .then(res => res.json())
+                .then(res => {
+                    if (res.status === 401) {
+                        officialApiList.innerHTML = `
+                            <div class="text-xs text-red-500">访问已过期，请重新验证</div>
+                        `;
+                        revokeAccess('访问已过期，请重新验证');
+                        throw new Error('unauthorized');
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (!data || data.code !== 200 || !Array.isArray(data.data)) {
                         throw new Error('官方接口返回异常');
@@ -2622,6 +2828,9 @@
                     renderOfficialApis(data);
                 })
                 .catch(err => {
+                    if (err && err.message === 'unauthorized') {
+                        return;
+                    }
                     console.error('获取官方接口失败:', err);
                     officialApiList.innerHTML = `
                         <div class="text-xs text-red-500">获取失败，请稍后再试</div>
@@ -2928,7 +3137,14 @@
             const now = Date.now();
             const expiresAt = expireSeconds > 0 ? now + expireSeconds * 1000 : 0;
             const payload = encodeSharePayload([videoUrl, videoTitle, videoPic, sourceLabel, String(expiresAt)]);
-            const url = new URL(`./video/play.html?key=${encodeURIComponent(payload)}`, window.location.href);
+            const pathname = window.location.pathname || '/';
+            const isFilePath = pathname.split('/').pop().includes('.');
+            const basePath = pathname.endsWith('/')
+                ? pathname
+                : (isFilePath ? pathname.replace(/[^/]*$/, '') : `${pathname}/`);
+            const url = new URL(window.location.origin);
+            url.pathname = `${basePath}play.html`;
+            url.searchParams.set('key', payload);
             return url.toString();
         }
 
@@ -3134,12 +3350,24 @@
             loadMoreButton.classList.add('hidden');
         }
         
+        function getPanels() {
+            return [historyPanel, favoritePanel, userPanel, aboutPanel, hostModal].filter(Boolean);
+        }
+
+        function updateOverlayForPanels() {
+            const anyOpen = getPanels().some(panel => !panel.classList.contains('translate-x-full'));
+            overlay.classList.toggle('hidden', !anyOpen);
+        }
+
+        function closePanelsExcept(activePanel) {
+            getPanels().forEach(panel => {
+                if (panel !== activePanel) panel.classList.add('translate-x-full');
+            });
+        }
+
         // 关闭所有面板
         function closeAllPanels() {
-            historyPanel.classList.add('translate-x-full');
-            favoritePanel.classList.add('translate-x-full');
-            if (userPanel) userPanel.classList.add('translate-x-full');
-            hostModal.classList.add('translate-x-full');
+            getPanels().forEach(panel => panel.classList.add('translate-x-full'));
             overlay.classList.add('hidden');
         }
 

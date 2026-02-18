@@ -3,6 +3,7 @@ const proxyRouter = new Router();
 const axios = require("axios");
 const { get, set } = require("../../utils/cacheData");
 const response = require('../../utils/response');
+const { decryptUrl } = require("../../utils/urlCipher");
 
 // 缓存键名
 const cacheKey = "proxyData";
@@ -23,8 +24,15 @@ proxyRouter.get("/proxy", async (ctx) => {
 
     let zUrl = url;
 
+    try {
+        zUrl = decryptUrl(url);
+    } catch (err) {
+        // not encrypted, use raw url
+        zUrl = url;
+    }
+
     if ((wd && wd !== '') || (pg && pg !== '')) {
-        zUrl = `${url}?ac=videolist&wd=${wd || ''}&pg=${pg || ''}`;
+        zUrl = `${zUrl}?ac=videolist&wd=${wd || ''}&pg=${pg || ''}`;
     }
 
     const key = `${cacheKey}_${zUrl}`;
