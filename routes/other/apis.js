@@ -1,6 +1,7 @@
 const Router = require("koa-router");
 const crypto = require("crypto");
 const apisRouter = new Router();
+const client = require("../../utils/mongo");
 const { encryptUrl } = require("../../utils/urlCipher");
 
 // 接口信息
@@ -8,6 +9,7 @@ const routerInfo = { name: "官方推荐API", title: "官方推荐", subtitle: "
 const videoAccessPassword = process.env.VIDEO_ACCESS_PASSWORD || "123456";
 const accessTokenTtlMs = Number(process.env.VIDEO_ACCESS_TOKEN_TTL_MS || 86400000);
 const accessTokens = new Map();
+const DB_NAME = process.env.MONGODB_DB || undefined;
 
 function issueAccessToken() {
     const token = crypto.randomBytes(24).toString("hex");
@@ -35,6 +37,21 @@ function getAccessTokenFromRequest(ctx) {
     if (!authHeader) return "";
     const match = authHeader.match(/^Bearer\s+(.+)$/i);
     return match ? match[1].trim() : "";
+}
+
+async function isUserTokenValid(token) {
+    if (!token) return false;
+    try {
+        await client.connect();
+        const db = DB_NAME ? client.db(DB_NAME) : client.db();
+        const session = await db.collection("user_sessions").findOne({ token });
+        if (!session || session.expiresAt <= new Date()) return false;
+        const user = await db.collection("users").findOne({ _id: session.userId });
+        if (!user || user.isDisabled) return false;
+        return true;
+    } catch (err) {
+        return false;
+    }
 }
 
 // 官方推荐 API 列表
@@ -117,7 +134,8 @@ const officialApis = [
 // 官方推荐 API
 apisRouter.get("/apis/official", async (ctx) => {
     const token = getAccessTokenFromRequest(ctx);
-    if (!isAccessTokenValid(token)) {
+    const hasAccess = isAccessTokenValid(token) || (await isUserTokenValid(token));
+    if (!hasAccess) {
         ctx.status = 401;
         ctx.body = {
             code: 401,

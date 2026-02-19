@@ -277,37 +277,6 @@
     <div class="bg-animation"></div>
     <div id="siteWatermark" class="site-watermark"></div>
 
-    <!-- 密码验证悬浮框 -->
-    <div id="accessGate" class="fixed inset-0 z-[80] hidden items-center justify-center bg-slate-900/70 backdrop-blur-sm p-4">
-        <div class="w-full max-w-sm">
-            <div class="relative rounded-2xl p-[1px] bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 shadow-2xl">
-                <div class="bg-white rounded-2xl p-6">
-                    <div class="flex items-center space-x-2 mb-2">
-                        <i class="fa fa-lock text-primary text-xl"></i>
-                        <h2 class="text-lg font-semibold text-gray-800">请输入访问密码</h2>
-                    </div>
-                    <p class="text-sm text-gray-500 mb-4">验证通过后才会加载页面内容</p>
-                    <div class="space-y-2">
-                        <input
-                            id="accessPasswordInput"
-                            type="password"
-                            placeholder="访问密码"
-                            class="w-full px-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/60"
-                            autocomplete="current-password"
-                        >
-                        <div id="accessError" class="text-xs text-red-500 hidden">密码错误，请重试</div>
-                    </div>
-                    <button
-                        id="accessSubmitButton"
-                        class="mt-4 w-full bg-primary hover:bg-primary/90 text-white font-medium py-2 rounded-lg transition-all"
-                    >
-                        验证进入
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- 导航头 -->
     <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-dark text-white shadow-lg transition-transform duration-300">
         <div class="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -587,94 +556,10 @@
         // 初始化页面
         let accessResolver = null;
 
-        const showAccessGate = () => {
-            const gate = document.getElementById('accessGate');
-            if (!gate) return;
-            gate.classList.remove('hidden');
-            gate.classList.add('flex');
-            document.body.classList.remove('page-loading');
-            document.body.classList.add('page-loaded');
-            document.body.classList.add('access-locked');
-        };
-
-        const hideAccessGate = () => {
-            const gate = document.getElementById('accessGate');
-            if (!gate) return;
-            gate.classList.add('hidden');
-            gate.classList.remove('flex');
-            document.body.classList.remove('access-locked');
-        };
-
-        const setupAccessGate = () => {
-            const submitBtn = document.getElementById('accessSubmitButton');
-            const inputEl = document.getElementById('accessPasswordInput');
-            if (submitBtn) submitBtn.addEventListener('click', verifyAccessPassword);
-            if (inputEl) {
-                inputEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') verifyAccessPassword();
-                });
-            }
-        };
-
-        const ensureAccess = () => {
-            const existingToken = localStorage.getItem('videoPassToken');
-            if (existingToken) return Promise.resolve(true);
-            showAccessGate();
-            const inputEl = document.getElementById('accessPasswordInput');
-            setTimeout(() => inputEl && inputEl.focus(), 0);
-            return new Promise(resolve => {
-                accessResolver = resolve;
-            });
-        };
-
-        const verifyAccessPassword = async () => {
-            const inputEl = document.getElementById('accessPasswordInput');
-            const errorEl = document.getElementById('accessError');
-            const submitBtn = document.getElementById('accessSubmitButton');
-            if (!inputEl || !errorEl || !submitBtn) return;
-            const password = inputEl.value.trim();
-            if (!password) {
-                errorEl.textContent = '请输入密码';
-                errorEl.classList.remove('hidden');
-                inputEl.focus();
-                return;
-            }
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-            errorEl.classList.add('hidden');
-            try {
-                const resp = await fetch(`/apis/video/pass?password=${encodeURIComponent(password)}`);
-                const data = await resp.json();
-                if (data && data.code === 200 && data.data === true) {
-                    if (data.token) {
-                        localStorage.setItem('videoPassToken', data.token);
-                    } else {
-                        localStorage.setItem('videoPassToken', 'ok');
-                    }
-                    hideAccessGate();
-                    if (typeof accessResolver === 'function') {
-                        accessResolver(true);
-                        accessResolver = null;
-                    }
-                    return;
-                }
-                errorEl.textContent = data && data.message ? data.message : '密码错误，请重试';
-                errorEl.classList.remove('hidden');
-            } catch (err) {
-                errorEl.textContent = '验证失败，请稍后重试';
-                errorEl.classList.remove('hidden');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
-            }
-        };
-
         const startApp = async () => {
             // 动态生成站点选择器选项
             generateSiteOptions();
             setupPanelAutoClose();
-            setupAccessGate();
-            await ensureAccess();
 
             // 从localStorage加载上次选择的站点
             const savedSite = localStorage.getItem('selectedSite');
@@ -1584,6 +1469,8 @@
             watermark.style.backgroundImage = `url("data:image/svg+xml,${encoded}")`;
         };
     </script>
-</body>
+    <script src="/assets/login-guard.js"></script>
+  <script src="/assets/page-permission.js"></script>
+  </body>
 
 </html>

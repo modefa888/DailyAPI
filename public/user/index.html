@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div id="appContent" class="max-w-6xl mx-auto p-4 space-y-6">
+    <header class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold">用户管理</h1>
+      <div class="flex items-center space-x-2">
+        <span id="authStatus" class="text-sm text-slate-500">校验中...</span>
+        <button id="logoutBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">退出</button>
+      </div>
+    </header>
+
+
+    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">我的信息</h2>
+      </div>
+      <div id="profileBox" class="text-sm text-slate-600 flex items-center justify-center min-h-[32px]">
+        <span class="inline-flex items-center space-x-2 text-slate-500">
+          <span class="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+          <span>加载中...</span>
+        </span>
+      </div>
+      <div>
+        <button id="openUpdateModal" class="hidden bg-slate-800 text-white rounded px-4 py-2">修改个人信息</button>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">用户列表（管理员）</h2>
+        <div class="flex items-center space-x-2 text-sm">
+          <button id="loadUsersBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white">刷新</button>
+        </div>
+      </div>
+      <div id="usersMeta" class="text-sm text-slate-500"></div>
+      <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead id="usersThead" class="text-left text-slate-500">
+            <tr>
+              <th class="py-2">ID</th>
+              <th>用户名</th>
+              <th>昵称</th>
+              <th>角色</th>
+              <th>状态</th>
+              <th>备注</th>
+              <th class="min-w-[240px]">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span>统计</span>
+                  <button class="text-xs text-blue-600" data-sort="favoriteCount">收藏</button>
+                  <button class="text-xs text-blue-600" data-sort="historyCount">历史</button>
+                  <button class="text-xs text-blue-600" data-sort="searchCount">搜索</button>
+                  <button class="text-xs text-blue-600" data-sort="watchSeconds">时长</button>
+                </div>
+              </th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="usersTbody" class="divide-y"></tbody>
+        </table>
+      </div>
+      <div id="paginationBar" class="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <div class="flex items-center gap-2">
+          <span id="paginationInfo" class="text-slate-500"></span>
+          <div id="pageSizeBox" class="hidden items-center gap-1 text-slate-600">
+            <span>每页</span>
+            <input id="pageSizeInput" type="number" min="1" max="100" class="w-20 border rounded px-2 py-1" value="20">
+            <span>条</span>
+          </div>
+        </div>
+        <div id="paginationButtons" class="flex flex-wrap items-center gap-1"></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded hidden z-[70]"></div>
+
+  <!-- 加载遮罩 -->
+  <div id="loadingOverlay" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black">
+    <div class="flex items-center space-x-3 bg-white px-5 py-3 rounded-full shadow-lg">
+      <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <span id="loadingText" class="text-sm text-slate-700">处理中...</span>
+    </div>
+  </div>
+
+  <!-- 个人信息修改弹窗 -->
+  <div id="updateModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">修改个人信息</h2>
+        <button id="closeUpdateModal" class="text-slate-500">✕</button>
+      </div>
+      <div class="text-sm text-slate-600 space-y-1">
+        <div>用户名：<span id="updateUsername" class="text-slate-800"></span></div>
+        <div>角色：<span id="updateRole" class="text-slate-800"></span></div>
+      </div>
+      <input id="updateNickname" class="w-full border rounded px-3 py-2" placeholder="更新昵称">
+      <input id="updatePassword" type="password" class="w-full border rounded px-3 py-2" placeholder="如不修改请留空">
+      <button id="updateSelfBtn" class="w-full bg-slate-800 text-white rounded py-2">更新</button>
+    </div>
+  </div>
+
+  <!-- 禁用备注弹窗 -->
+  <div id="disableModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">禁用用户</h2>
+        <button id="closeDisableModal" class="text-slate-500">✕</button>
+      </div>
+      <div class="text-sm text-slate-600 space-y-1">
+        <div>用户名：<span id="disableUserName" class="text-slate-800"></span></div>
+        <div>昵称：<span id="disableUserNickname" class="text-slate-800"></span></div>
+      </div>
+      <textarea id="disableReasonInput" class="w-full border rounded px-3 py-2 text-sm" rows="3" placeholder="请输入禁用原因/备注"></textarea>
+      <button id="confirmDisableBtn" class="w-full bg-rose-600 text-white rounded py-2">确认禁用</button>
+    </div>
+  </div>
+
+  <!-- 备注编辑弹窗（无遮罩） -->
+  <div id="notePanel" class="fixed inset-0 z-50 hidden items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3 pointer-events-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">备注</h2>
+        <button id="closeNotePanel" class="text-slate-500">✕</button>
+      </div>
+      <textarea id="notePanelInput" class="w-full border rounded px-3 py-2 text-sm" rows="4" placeholder="备注..."></textarea>
+      <div class="flex items-center justify-end gap-2">
+        <button id="cancelNotePanel" class="text-slate-600 text-sm">取消</button>
+        <button id="saveNotePanel" class="bg-blue-600 text-white rounded px-4 py-2 text-sm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 页面权限弹窗（无遮罩） -->
+  <div id="permissionPanel" class="fixed inset-0 z-50 hidden items-center justify-center p-4 pointer-events-none">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-xl p-5 space-y-3 pointer-events-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">页面权限</h2>
+        <button id="closePermissionPanel" class="text-slate-500">✕</button>
+      </div>
+      <div id="permissionUserInfo" class="text-sm text-slate-600"></div>
+      <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <span>勾选表示禁止访问。</span>
+        <button id="permSelectAll" class="text-blue-600">全选</button>
+        <span class="text-slate-300">/</span>
+        <button id="permClearAll" class="text-blue-600">反选</button>
+      </div>
+      <div id="permissionList" class="border rounded p-2 max-h-64 overflow-auto space-y-1 text-sm"></div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="cancelPermissionPanel" class="text-slate-600 text-sm">取消</button>
+        <button id="savePermissionPanel" class="bg-emerald-600 text-white rounded px-4 py-2 text-sm">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TOKEN_KEY = "userToken";
+    const toast = (msg) => {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), 1800);
+    };
+
+    const setLoading = (isLoading, text = "处理中...") => {
+      const overlay = document.getElementById("loadingOverlay");
+      const label = document.getElementById("loadingText");
+      if (!overlay || !label) return;
+      label.textContent = text;
+      if (isLoading) {
+        overlay.classList.remove("hidden");
+        overlay.classList.add("flex");
+        document.body.style.overflow = "hidden";
+      } else {
+        overlay.classList.add("hidden");
+        overlay.classList.remove("flex");
+        document.body.style.overflow = "";
+      }
+    };
+
+    const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
+    const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+    const clearToken = () => localStorage.removeItem(TOKEN_KEY);
+    let isCheckingAuth = true;
+    let hasAutoLoadedUsers = false;
+    let currentProfile = null;
+    let pendingDisableUserId = null;
+    let pendingNoteUserId = null;
+    let currentUsersPage = 1;
+    let currentUsersPageSize = 20;
+    let currentUsersTotalPages = 1;
+    let currentUsersTotal = 0;
+    let pendingPermissionUserId = null;
+    let availablePages = null;
+    let pageAliasMap = {};
+    let userPermissionsById = {};
+    let statsSort = { key: "", dir: "" };
+
+    const authHeaders = () => {
+      const token = getToken();
+      return token ? { Authorization: "Bearer " + token } : {};
+    };
+
+    const redirectToLogin = () => {
+      const redirect = encodeURIComponent("/user/index.html");
+      window.location.href = `/login/index.html?redirect=${redirect}`;
+    };
+
+    const refreshAuthUI = async () => {
+      setLoading(true, "校验登录...");
+      const status = document.getElementById("authStatus");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const updateBtn = document.getElementById("openUpdateModal");
+      const loadUsersBtn = document.getElementById("loadUsersBtn");
+      const token = getToken();
+      if (!token) {
+        status.textContent = isCheckingAuth ? "校验中..." : "未登录";
+        logoutBtn.classList.add("hidden");
+        if (updateBtn) updateBtn.classList.add("hidden");
+        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+        document.getElementById("profileBox").innerHTML = isCheckingAuth
+          ? '<span class="inline-flex items-center space-x-2 text-slate-500"><span class="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span><span>加载中...</span></span>'
+          : "未登录";
+        if (!isCheckingAuth) redirectToLogin();
+        isCheckingAuth = false;
+        setLoading(false);
+        return;
+      }
+      let res;
+      let data;
+      try {
+        res = await fetch("/user/profile", { headers: authHeaders() });
+        data = await res.json();
+      } catch (err) {
+        status.textContent = "未登录";
+        logoutBtn.classList.add("hidden");
+        if (updateBtn) updateBtn.classList.add("hidden");
+        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+        document.getElementById("profileBox").textContent = "未登录";
+        toast("登录状态校验失败");
+        redirectToLogin();
+        isCheckingAuth = false;
+        setLoading(false);
+        return;
+      }
+      if (data.code !== 200) {
+        status.textContent = "未登录";
+        logoutBtn.classList.add("hidden");
+        if (updateBtn) updateBtn.classList.add("hidden");
+        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+        document.getElementById("profileBox").textContent = "未登录";
+        redirectToLogin();
+        isCheckingAuth = false;
+        setLoading(false);
+        return;
+      }
+      status.textContent = "已登录";
+      logoutBtn.classList.remove("hidden");
+      if (updateBtn) updateBtn.classList.remove("hidden");
+      if (loadUsersBtn) loadUsersBtn.classList.remove("hidden");
+      document.getElementById("profileBox").textContent =
+        `用户名：${data.data.username}，昵称：${data.data.nickname}，角色：${data.data.role}`;
+      currentProfile = data.data;
+      if (data.data.role !== "admin") {
+        clearToken();
+        status.textContent = "未登录";
+        logoutBtn.classList.add("hidden");
+        document.getElementById("profileBox").textContent = "仅管理员可进入，正在跳转登录...";
+        toast("仅管理员可登录此页面");
+        setLoading(true, "仅管理员可进入");
+        isCheckingAuth = false;
+        setTimeout(() => redirectToLogin(), 800);
+        return;
+      }
+      isCheckingAuth = false;
+      setLoading(false);
+      if (data.data.role === "admin" && !hasAutoLoadedUsers) {
+        hasAutoLoadedUsers = true;
+        document.getElementById("loadUsersBtn").click();
+      }
+    };
+
+    const showModal = (id, lock = false) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove("hidden");
+      el.classList.add("flex");
+      if (id !== "disableModal" && id !== "updateModal") {
+        document.body.style.overflow = "hidden";
+        const app = document.getElementById("appContent");
+        if (app) app.classList.add("hidden");
+      }
+      if (lock) {
+        const closeBtn = el.querySelector("button");
+        if (closeBtn) closeBtn.classList.add("hidden");
+      }
+    };
+    const hideModal = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+      if (id !== "disableModal" && id !== "updateModal") {
+        document.body.style.overflow = "";
+        const app = document.getElementById("appContent");
+        if (app) app.classList.remove("hidden");
+      }
+    };
+
+    document.getElementById("closeUpdateModal").addEventListener("click", () => hideModal("updateModal"));
+    document.getElementById("closeDisableModal").addEventListener("click", () => hideModal("disableModal"));
+    document.getElementById("openUpdateModal").addEventListener("click", async () => {
+      if (!getToken()) {
+        toast("请先登录");
+        return;
+      }
+      setLoading(true, "正在获取资料...");
+      try {
+        const res = await fetch("/user/profile", { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast("请先登录");
+          return;
+        }
+        currentProfile = data.data;
+        document.getElementById("updateUsername").textContent = currentProfile.username || "";
+        document.getElementById("updateRole").textContent = currentProfile.role || "";
+        document.getElementById("updateNickname").value = currentProfile.nickname || "";
+        document.getElementById("updatePassword").value = "";
+        showModal("updateModal");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await fetch("/user/logout", { method: "POST", headers: authHeaders() });
+      clearToken();
+      toast("已退出");
+      refreshAuthUI();
+      redirectToLogin();
+    });
+
+    document.getElementById("updateSelfBtn").addEventListener("click", async () => {
+      if (!currentProfile) {
+        await refreshAuthUI();
+      }
+      if (!currentProfile) {
+        toast("请先登录");
+        return;
+      }
+      const nickname = document.getElementById("updateNickname").value.trim();
+      const password = document.getElementById("updatePassword").value.trim();
+      const btn = document.getElementById("updateSelfBtn");
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>更新中...</span></span>';
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/user/${currentProfile._id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ nickname, password })
+        });
+        const data = await res.json();
+        if (data.code === 200) {
+          toast("更新成功");
+          hideModal("updateModal");
+          refreshAuthUI();
+        } else {
+          toast(data.message || "更新失败");
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    });
+
+    const renderPagination = () => {
+      const info = document.getElementById("paginationInfo");
+      const buttons = document.getElementById("paginationButtons");
+      if (!info || !buttons) return;
+      info.textContent = `第 ${currentUsersPage} 页 / 共 ${currentUsersTotalPages} 页，合计 ${currentUsersTotal} 条`;
+      buttons.innerHTML = "";
+
+      const createBtn = (label, page, disabled, isActive) => {
+        const btn = document.createElement("button");
+        btn.textContent = label;
+        btn.disabled = disabled;
+        btn.setAttribute("data-page", String(page));
+        btn.className = [
+          "px-2.5",
+          "py-1",
+          "rounded",
+          "border",
+          disabled ? "text-slate-400 border-slate-200 cursor-not-allowed" : "border-slate-300 hover:bg-slate-100",
+          isActive ? "bg-slate-800 text-white border-slate-800" : "bg-white"
+        ].join(" ");
+        return btn;
+      };
+
+      buttons.appendChild(createBtn("上一页", currentUsersPage - 1, currentUsersPage <= 1, false));
+
+      const windowSize = 5;
+      const half = Math.floor(windowSize / 2);
+      let start = Math.max(1, currentUsersPage - half);
+      let end = Math.min(currentUsersTotalPages, start + windowSize - 1);
+      start = Math.max(1, end - windowSize + 1);
+      for (let p = start; p <= end; p += 1) {
+        buttons.appendChild(createBtn(String(p), p, false, p === currentUsersPage));
+      }
+
+      buttons.appendChild(
+        createBtn("下一页", currentUsersPage + 1, currentUsersPage >= currentUsersTotalPages, false)
+      );
+    };
+
+    const loadUsers = async (page = currentUsersPage) => {
+      const pageSizeInput = document.getElementById("pageSizeInput");
+      const pageSize = Number(pageSizeInput ? pageSizeInput.value : currentUsersPageSize) || 20;
+      currentUsersPageSize = pageSize;
+      const btn = document.getElementById("loadUsersBtn");
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>加载中...</span></span>';
+      btn.disabled = true;
+      try {
+        const sortKey = statsSort.key || "";
+        const sortDir = statsSort.dir || "";
+        const res = await fetch(
+          `/user/list?page=${page}&pageSize=${pageSize}&sortKey=${encodeURIComponent(sortKey)}&sortDir=${encodeURIComponent(sortDir)}`,
+          { headers: authHeaders() }
+        );
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "加载失败");
+          return;
+        }
+        currentUsersPage = data.page;
+        currentUsersTotalPages = data.totalPages;
+        currentUsersTotal = data.total;
+        userPermissionsById = {};
+        let statsMap = data.statsMap || {};
+        const tbody = document.getElementById("usersTbody");
+        tbody.innerHTML = "";
+        if (!statsMap || Object.keys(statsMap).length === 0) {
+          try {
+            const ids = data.data.map((u) => u._id);
+            const statsRes = await fetch("/user/stats/batch", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...authHeaders() },
+              body: JSON.stringify({ ids })
+            });
+            const statsData = await statsRes.json();
+            if (statsData.code === 200 && statsData.data) {
+              statsMap = statsData.data;
+            }
+          } catch (e) {
+            // ignore stats errors
+          }
+        }
+        const getStatValue = (u, key) => {
+          const stat = statsMap[u._id] || {};
+          const value = Number(stat[key] || 0);
+          return Number.isFinite(value) ? value : 0;
+        };
+        if (statsSort.key) {
+          const dir = statsSort.dir === "asc" ? 1 : -1;
+          if (!data.statsMap) {
+            data.data.sort((a, b) => {
+              const av = getStatValue(a, statsSort.key);
+              const bv = getStatValue(b, statsSort.key);
+              if (av === bv) return String(a._id).localeCompare(String(b._id));
+              return av > bv ? dir : -dir;
+            });
+          }
+        }
+        const updateSortButtons = () => {
+          const buttons = document.querySelectorAll("#usersThead [data-sort]");
+          buttons.forEach((btn) => {
+            const key = btn.getAttribute("data-sort");
+            const baseText = btn.getAttribute("data-base") || btn.textContent.replace(/[▲▼]\s*$/, "");
+            btn.setAttribute("data-base", baseText);
+            if (key === statsSort.key) {
+              btn.textContent = `${baseText}${statsSort.dir === "asc" ? "▲" : "▼"}`;
+            } else {
+              btn.textContent = baseText;
+            }
+          });
+        };
+        updateSortButtons();
+        data.data.forEach((u) => {
+          userPermissionsById[u._id] = Array.isArray(u.blockedPages) ? u.blockedPages : [];
+          const stat = statsMap[u._id] || {};
+          const watchSeconds = Number(stat.watchSeconds || 0);
+          const watchH = String(Math.floor(watchSeconds / 3600)).padStart(2, "0");
+          const watchM = String(Math.floor((watchSeconds % 3600) / 60)).padStart(2, "0");
+          const watchS = String(Math.floor(watchSeconds % 60)).padStart(2, "0");
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="py-2">${u._id}</td>
+            <td>${u.username}</td>
+            <td>${u.nickname || ""}</td>
+            <td>${u.role}</td>
+            <td>${u.isDisabled ? "禁用" : "正常"}</td>
+            <td>
+              <button
+                class="text-blue-600 text-xs"
+                data-action="note-toggle"
+                data-id="${u._id}"
+                data-note="${(u.note || "").replace(/"/g, "&quot;")}"
+              >查看/编辑</button>
+            </td>
+            <td class="text-xs text-slate-600">
+              <div>收藏：${stat.favoriteCount || 0}</div>
+              <div>历史：${stat.historyCount || 0}</div>
+              <div>搜索：${stat.searchCount || 0}</div>
+              <div>时长：${watchH}:${watchM}:${watchS}</div>
+            </td>
+            <td>
+              ${u._id === (currentProfile ? currentProfile._id : "")
+                ? `<span class="text-slate-400">本人</span>`
+                : `${u.role === "admin"
+                    ? ""
+                    : `<button class="text-emerald-600 mr-2" data-action="perm" data-id="${u._id}">权限</button>
+                      <button class="text-blue-600 mr-2" data-action="toggle" data-disabled="${u.isDisabled}" data-id="${u._id}">
+                        ${u.isDisabled ? "启用" : "禁用"}
+                      </button>`
+                  }
+                  <button class="text-red-600" data-action="delete" data-id="${u._id}">删除</button>`
+              }
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        document.getElementById("usersMeta").textContent =
+          `第 ${data.page} 页 / 共 ${data.totalPages} 页，合计 ${data.total} 条`;
+        renderPagination();
+        const pageSizeBox = document.getElementById("pageSizeBox");
+        if (pageSizeBox) pageSizeBox.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    };
+
+    document.getElementById("loadUsersBtn").addEventListener("click", async () => {
+      await loadUsers(currentUsersPage);
+    });
+
+    document.getElementById("pageSizeInput").addEventListener("change", async () => {
+      currentUsersPage = 1;
+      await loadUsers(1);
+    });
+
+    document.getElementById("paginationButtons").addEventListener("click", async (e) => {
+      const btn = e.target;
+      if (btn.tagName !== "BUTTON") return;
+      const page = Number(btn.getAttribute("data-page"));
+      if (!page || page === currentUsersPage) return;
+      await loadUsers(page);
+    });
+
+    document.getElementById("usersThead").addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-sort]");
+      if (!btn) return;
+      const key = btn.getAttribute("data-sort");
+      if (!key) return;
+      if (statsSort.key === key) {
+        statsSort.dir = statsSort.dir === "asc" ? "desc" : "asc";
+      } else {
+        statsSort.key = key;
+        statsSort.dir = "desc";
+      }
+      await loadUsers(currentUsersPage);
+    });
+
+    document.getElementById("usersTbody").addEventListener("click", async (e) => {
+      const btn = e.target;
+      if (btn.tagName !== "BUTTON") return;
+      const id = btn.getAttribute("data-id");
+      const action = btn.getAttribute("data-action");
+      if (!id || !action) return;
+
+      if (action === "perm") {
+        pendingPermissionUserId = id;
+        const userPages = userPermissionsById[id] || [];
+        const panel = document.getElementById("permissionPanel");
+        const info = document.getElementById("permissionUserInfo");
+        const list = document.getElementById("permissionList");
+        if (info) {
+          const row = btn.closest("tr");
+          const cells = row ? row.querySelectorAll("td") : [];
+          const username = cells[1] ? cells[1].textContent : "";
+          const nickname = cells[2] ? cells[2].textContent : "";
+          info.textContent = `用户：${username}${nickname ? `（${nickname}）` : ""}`;
+        }
+        if (!availablePages) {
+          const res = await fetch("/user/pages", { headers: authHeaders() });
+          const data = await res.json();
+          if (data.code === 200 && Array.isArray(data.data)) {
+            availablePages = data.data;
+          } else {
+            toast(data.message || "获取页面列表失败");
+            return;
+          }
+        }
+        pageAliasMap = {};
+        availablePages.forEach((page) => {
+          let alias = page;
+          if (page === "/index.html") alias = "首页";
+          else if (page.endsWith("/index.html")) {
+            const seg = page.split("/").filter(Boolean);
+            alias = seg.length >= 2 ? `${seg[0]} / ${seg[1]}` : seg[0];
+          } else {
+            const seg = page.split("/").filter(Boolean);
+            alias = seg[seg.length - 1];
+          }
+          pageAliasMap[page] = alias;
+        });
+        if (list) {
+          list.innerHTML = "";
+          availablePages.forEach((page) => {
+            const label = document.createElement("label");
+            label.className = "flex items-center gap-2 px-2 py-1 rounded hover:bg-slate-50";
+            label.innerHTML = `
+              <input type="checkbox" class="perm-checkbox" value="${page}">
+              <span>${pageAliasMap[page] || page}</span>
+              <span class="text-xs text-slate-400 ml-auto">${page}</span>
+            `;
+            const checkbox = label.querySelector("input");
+            if (checkbox && userPages.includes(page)) checkbox.checked = true;
+            list.appendChild(label);
+          });
+        }
+        if (panel) {
+          panel.classList.remove("hidden");
+          panel.classList.add("flex");
+        }
+        return;
+      }
+
+      if (action === "toggle") {
+        const isDisabled = btn.getAttribute("data-disabled") === "true";
+        const nextDisabled = !isDisabled;
+        if (nextDisabled) {
+          pendingDisableUserId = id;
+          const row = btn.closest("tr");
+          const cells = row ? row.querySelectorAll("td") : [];
+          const username = cells[1] ? cells[1].textContent : "";
+          const nickname = cells[2] ? cells[2].textContent : "";
+          document.getElementById("disableUserName").textContent = username;
+          document.getElementById("disableUserNickname").textContent = nickname;
+          document.getElementById("disableReasonInput").value = "";
+          showModal("disableModal");
+          return;
+        }
+        if (!confirm("确认启用该用户？")) return;
+        const res = await fetch(`/user/${id}/disable`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ disabled: false, reason: "" })
+        });
+        const data = await res.json();
+        if (data.code === 200) {
+          toast("已启用");
+          document.getElementById("loadUsersBtn").click();
+        } else {
+          toast(data.message || "操作失败");
+        }
+        return;
+      }
+
+      if (action === "delete") {
+        if (!confirm("确认删除用户？")) return;
+        const res = await fetch(`/user/${id}`, { method: "DELETE", headers: authHeaders() });
+        const data = await res.json();
+        if (data.code === 200) {
+          toast("已删除");
+          document.getElementById("loadUsersBtn").click();
+        } else {
+          toast(data.message || "删除失败");
+        }
+      }
+    });
+
+    document.getElementById("confirmDisableBtn").addEventListener("click", async () => {
+      if (!pendingDisableUserId) return;
+      const reason = document.getElementById("disableReasonInput").value.trim();
+      const btn = document.getElementById("confirmDisableBtn");
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>禁用中...</span></span>';
+      btn.disabled = true;
+      const res = await fetch(`/user/${pendingDisableUserId}/disable`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ disabled: true, reason })
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        toast("已禁用");
+        hideModal("disableModal");
+        document.getElementById("loadUsersBtn").click();
+      } else {
+        toast(data.message || "操作失败");
+      }
+      pendingDisableUserId = null;
+      btn.disabled = false;
+      btn.textContent = originalText;
+    });
+
+    document.getElementById("usersTbody").addEventListener("click", async (e) => {
+      const target = e.target;
+      if (target.tagName !== "BUTTON") return;
+      const action = target.getAttribute("data-action");
+
+      if (action === "note-toggle") {
+        const id = target.getAttribute("data-id");
+        const note = target.getAttribute("data-note") || "";
+        if (!id) return;
+        pendingNoteUserId = id;
+        const panel = document.getElementById("notePanel");
+        const input = document.getElementById("notePanelInput");
+        if (input) {
+          input.value = note;
+          input.focus();
+        }
+        if (panel) {
+          panel.classList.remove("hidden");
+          panel.classList.add("flex");
+        }
+        return;
+      }
+    });
+
+    const hideNotePanel = () => {
+      const panel = document.getElementById("notePanel");
+      if (panel) {
+        panel.classList.add("hidden");
+        panel.classList.remove("flex");
+      }
+      pendingNoteUserId = null;
+    };
+
+    document.getElementById("closeNotePanel").addEventListener("click", hideNotePanel);
+    document.getElementById("cancelNotePanel").addEventListener("click", hideNotePanel);
+
+    document.getElementById("saveNotePanel").addEventListener("click", async () => {
+      if (!pendingNoteUserId) return;
+      const btn = document.getElementById("saveNotePanel");
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center gap-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>保存中...</span></span>';
+      btn.disabled = true;
+      const input = document.getElementById("notePanelInput");
+      const note = input ? input.value.trim() : "";
+      const res = await fetch(`/user/${pendingNoteUserId}/note`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ note })
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        toast("备注已更新");
+        const toggleBtn = document.querySelector(`[data-action="note-toggle"][data-id="${pendingNoteUserId}"]`);
+        if (toggleBtn) toggleBtn.setAttribute("data-note", note.replace(/"/g, "&quot;"));
+        hideNotePanel();
+      } else {
+        toast(data.message || "更新失败");
+      }
+      btn.disabled = false;
+      btn.textContent = originalText;
+    });
+
+    const hidePermissionPanel = () => {
+      const panel = document.getElementById("permissionPanel");
+      if (panel) {
+        panel.classList.add("hidden");
+        panel.classList.remove("flex");
+      }
+      pendingPermissionUserId = null;
+    };
+
+    document.getElementById("closePermissionPanel").addEventListener("click", hidePermissionPanel);
+    document.getElementById("cancelPermissionPanel").addEventListener("click", hidePermissionPanel);
+
+    document.getElementById("savePermissionPanel").addEventListener("click", async () => {
+      if (!pendingPermissionUserId) return;
+      const btn = document.getElementById("savePermissionPanel");
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center gap-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>保存中...</span></span>';
+      btn.disabled = true;
+      const list = document.getElementById("permissionList");
+      const selected = list
+        ? Array.from(list.querySelectorAll(".perm-checkbox:checked")).map((el) => el.value)
+        : [];
+      const res = await fetch(`/user/${pendingPermissionUserId}/pages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ pages: selected })
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        toast("权限已更新");
+        userPermissionsById[pendingPermissionUserId] = selected;
+        hidePermissionPanel();
+      } else {
+        toast(data.message || "更新失败");
+      }
+      btn.disabled = false;
+      btn.textContent = originalText;
+    });
+
+    document.getElementById("permSelectAll").addEventListener("click", () => {
+      const list = document.getElementById("permissionList");
+      if (!list) return;
+      list.querySelectorAll(".perm-checkbox").forEach((el) => {
+        el.checked = true;
+      });
+    });
+
+    document.getElementById("permClearAll").addEventListener("click", () => {
+      const list = document.getElementById("permissionList");
+      if (!list) return;
+      list.querySelectorAll(".perm-checkbox").forEach((el) => {
+        el.checked = false;
+      });
+    });
+
+    (async () => {
+      await refreshAuthUI();
+    })();
+  </script>
+  <script src="/assets/page-permission.js"></script>
+  </body>
+</html>

@@ -106,62 +106,11 @@
             opacity: 0;
         }
 
-        .access-granted #accessGate {
-            display: none !important;
-        }
-
-        .access-granted #appContent {
-            display: block !important;
-        }
-
     </style>
 
-    <script>
-        try {
-            const grantedUntil = Number(localStorage.getItem('accessGrantedUntil') || '0');
-            const token = String(localStorage.getItem('officialApiToken') || '');
-            if (grantedUntil && Date.now() < grantedUntil && token) {
-                document.documentElement.classList.add('access-granted');
-            }
-        } catch (e) {
-            // ignore storage errors
-        }
-    </script>
 </head>
 <body class="bg-gray-100 transition-colors duration-300">
-    <!-- 访问密码验证 -->
-    <div 
-        id="accessGate" 
-        class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60"
-    >
-        <div class="bg-white rounded-xl shadow-2xl w-[90%] max-w-sm p-6 space-y-4">
-            <div class="flex items-center space-x-2">
-                <i class="fa fa-lock text-primary text-xl"></i>
-                <h2 class="text-lg font-semibold text-gray-800">请输入访问密码</h2>
-            </div>
-            <p class="text-sm text-gray-500">验证通过后才会显示页面内容</p>
-            <div class="space-y-2">
-                <input 
-                    id="accessPasswordInput" 
-                    type="password" 
-                    placeholder="访问密码" 
-                    class="input-primary w-full"
-                    autocomplete="current-password"
-                >
-                <div id="accessError" class="text-xs text-red-500 hidden">密码错误，请重试</div>
-            </div>
-            <button 
-                id="accessSubmitButton"
-                onclick="verifyAccessPassword()"
-                class="btn-primary w-full"
-            >
-                验证进入
-            </button>
-            <div class="text-xs text-gray-400">提示：密码在代码里配置，可自行修改</div>
-        </div>
-    </div>
-
-    <div id="appContent" class="hidden">
+    <div id="appContent">
     <!-- 导航头 -->
     <header id="header" class="fixed top-0 left-0 right-0 z-50 glass-effect shadow-lg">
         <div class="container mx-auto px-4 py-3">
@@ -345,11 +294,14 @@
             <!-- 喜欢内容将在这里动态生成 -->
         </div>
         
-        <div class="p-4 border-t border-gray-200">
-            <button onclick="clearFavorites()" class="w-full btn-secondary">
-                <i class="fa fa-trash mr-1"></i> 清空喜欢
-            </button>
-        </div>
+            <div class="p-4 border-t border-gray-200 space-y-2">
+                <button id="uploadFavoritesButton" onclick="uploadLocalFavorites()" class="w-full btn-primary hidden">
+                    <i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢
+                </button>
+                <button onclick="openClearFavoritesConfirm()" class="w-full btn-secondary">
+                    <i class="fa fa-trash mr-1"></i> 清空喜欢
+                </button>
+            </div>
     </div>
 
     <!-- 用户信息面板 -->
@@ -366,8 +318,13 @@
         <div id="userInfoContent" class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
                 <div class="flex items-center justify-between text-sm">
-                    <span class="text-gray-500">昵称</span>
-                    <span id="userNicknameDisplay" class="font-medium text-gray-800">未设置</span>
+                    <span class="text-gray-500">用户</span>
+                    <span id="userNicknameDisplay" class="font-medium text-gray-800">
+                        <span class="inline-flex items-center space-x-2 text-gray-500">
+                            <span class="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+                            <span>加载中...</span>
+                        </span>
+                    </span>
                 </div>
                 <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                     <input 
@@ -392,6 +349,19 @@
                         随机
                     </button>
                 </div>
+                <div class="space-y-2">
+                    <div class="text-xs text-gray-500">备注</div>
+                    <textarea
+                        id="userNoteInput"
+                        rows="2"
+                        placeholder="填写备注..."
+                        class="input-primary w-full text-sm"
+                        maxlength="200"
+                    ></textarea>
+                </div>
+                <button onclick="logoutUser()" class="w-full btn-secondary text-xs" data-action="logout" disabled>
+                    <i class="fa fa-sign-out mr-1"></i> <span>退出登录</span>
+                </button>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2 text-sm">
                 <div class="flex items-center justify-between">
@@ -416,7 +386,7 @@
                     <span class="text-gray-500">最近访问</span>
                     <div id="userLastVisit" class="text-right text-xs text-gray-700 space-y-1">-</div>
                 </div>
-                <div class="text-xs text-gray-500">用户信息仅保存在本地浏览器中</div>
+                <div class="text-xs text-gray-500">用户信息以账号为准</div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
                 <div class="text-sm font-medium">导入导出</div>
@@ -507,6 +477,31 @@
                     <i class="fa fa-copy mr-1"></i> 点击复制地址
                 </button>
             </div>
+        </div>
+    </div>
+
+    <!-- 清空喜欢密码验证 -->
+    <div id="clearFavoritesModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/60 p-4">
+        <div class="bg-white rounded-xl w-full max-w-sm p-5 shadow-2xl">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-800">验证密码</h3>
+                <button onclick="closeClearFavoritesModal()" class="p-2 hover:bg-gray-100 rounded-full">
+                    <i class="fa fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="space-y-2">
+                <input
+                    id="clearFavoritesPassword"
+                    type="password"
+                    placeholder="请输入账号密码"
+                    class="input-primary w-full"
+                    autocomplete="current-password"
+                >
+                <div id="clearFavoritesError" class="text-xs text-red-500 hidden">密码错误，请重试</div>
+            </div>
+            <button onclick="confirmClearFavorites()" class="btn-primary w-full mt-4">
+                <i class="fa fa-check-square-o mr-1"></i> 确认清空
+            </button>
         </div>
     </div>
 
@@ -698,7 +693,7 @@
                     <label class="block text-sm font-medium">官方推荐（🌈数量 <span id="officialApiCount">0</span>）</label>
                     <button 
                         type="button"
-                        onclick="toggleOfficialApiSection(); fetchOfficialApis(true)"
+                        onclick="toggleOfficialApiSection(); fetchOfficialApis(false)"
                         id="officialApiToggleButton"
                         class="text-xs text-gray-600 hover:text-gray-800"
                     >
@@ -794,6 +789,7 @@
         const historyContent = document.getElementById('historyContent');
         const favoritePanel = document.getElementById('favoritePanel');
         const favoriteContent = document.getElementById('favoriteContent');
+        const uploadFavoritesButton = document.getElementById('uploadFavoritesButton');
         const userPanel = document.getElementById('userPanel');
         const userInfoContent = document.getElementById('userInfoContent');
         const aboutPanel = document.getElementById('aboutPanel');
@@ -825,14 +821,12 @@
         const transferHistoryList = document.getElementById('transferHistoryList');
         const loadingIndicator = document.getElementById('loadingIndicator');
         const loadingText = document.getElementById('loadingText');
-        const accessGate = document.getElementById('accessGate');
-        const appContent = document.getElementById('appContent');
-        const accessPasswordInput = document.getElementById('accessPasswordInput');
-        const accessError = document.getElementById('accessError');
-        const accessSubmitButton = document.getElementById('accessSubmitButton');
         const shareModal = document.getElementById('shareModal');
         const shareExpireSelect = document.getElementById('shareExpireSelect');
         let currentShareUrl = '';
+        const clearFavoritesModal = document.getElementById('clearFavoritesModal');
+        const clearFavoritesPassword = document.getElementById('clearFavoritesPassword');
+        const clearFavoritesError = document.getElementById('clearFavoritesError');
 
         function getResumeStore() {
             try {
@@ -1010,17 +1004,64 @@
                     .forEach((key) => delete store[key]);
             }
             setWatchTimeStore(store);
+            scheduleUserStatsUpdate(3000);
         }
 
         function getTodayWatchTime() {
             const store = getWatchTimeStore();
             return store[getTodayKey()] || 0;
         }
+
+        let statsUpdateTimer = null;
+        const scheduleUserStatsUpdate = (delay = 1000) => {
+            if (statsUpdateTimer) clearTimeout(statsUpdateTimer);
+            statsUpdateTimer = setTimeout(() => {
+                updateUserStats();
+            }, delay);
+        };
+
+        async function updateUserStats() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) return;
+            const localFavorites = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            const remoteFavorites = Array.isArray(favoritesCache) ? favoritesCache : [];
+            const localMap = new Map((localFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
+            const remoteMap = new Map((remoteFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
+            const unionUrls = Array.from(new Set([...localMap.keys(), ...remoteMap.keys()]));
+            const favorites = unionUrls
+                .map(url => {
+                    const remoteItem = remoteMap.get(url);
+                    const localItem = localMap.get(url);
+                    const base = remoteItem || localItem || { url };
+                    const inLocal = !!localItem;
+                    const inRemote = !!remoteItem;
+                    return {
+                        ...base,
+                        _status: inLocal && inRemote ? 'both' : (inLocal ? 'local' : 'remote')
+                    };
+                })
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
+            const searchHistory = getSearchHistory();
+            const watchSeconds = getTodayWatchTime();
+            try {
+                await fetch('/user/stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                        favoriteCount: favorites.length,
+                        historyCount: history.length,
+                        searchCount: searchHistory.length,
+                        watchSeconds
+                    })
+                });
+            } catch (e) {
+                // ignore
+            }
+        }
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
-            initAccessGate();
-
             // 加载保存的Host
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
@@ -1183,89 +1224,38 @@
             }, { passive: true });
         });
 
-        const ACCESS_GRANT_KEY = 'accessGrantedUntil';
-        const ACCESS_GRANT_DURATION = 30 * 24 * 60 * 60 * 1000;
+        const USER_TOKEN_KEY = 'userToken';
+        const USER_TOKEN_EXPIRES_KEY = 'userTokenExpires';
+        const USER_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
         const OFFICIAL_API_TOKEN_KEY = 'officialApiToken';
 
-        function revokeAccess(message) {
-            try {
-                localStorage.removeItem(ACCESS_GRANT_KEY);
-                localStorage.removeItem(OFFICIAL_API_TOKEN_KEY);
-            } catch (e) {
-                // ignore storage errors
+        function getUserToken() {
+            const token = String(localStorage.getItem(USER_TOKEN_KEY) || '').trim();
+            if (!token) return '';
+            const expiresAt = Number(localStorage.getItem(USER_TOKEN_EXPIRES_KEY) || '0');
+            if (!expiresAt) {
+                localStorage.setItem(USER_TOKEN_EXPIRES_KEY, String(Date.now() + USER_TOKEN_TTL_MS));
+                return token;
             }
-            if (accessGate && appContent) {
-                accessGate.classList.remove('hidden');
-                appContent.classList.add('hidden');
-                document.documentElement.classList.remove('access-granted');
+            if (Date.now() > expiresAt) {
+                clearUserToken();
+                return '';
             }
-            if (accessPasswordInput) {
-                accessPasswordInput.value = '';
-                accessPasswordInput.focus();
-            }
-            if (message) {
-                showToast(message);
-            }
+            return token;
         }
 
-        function initAccessGate() {
-            if (!accessGate || !appContent) return;
-            const grantedUntil = Number(localStorage.getItem(ACCESS_GRANT_KEY) || '0');
-            const token = String(localStorage.getItem(OFFICIAL_API_TOKEN_KEY) || '');
-            if (grantedUntil && Date.now() < grantedUntil && token) {
-                accessGate.classList.add('hidden');
-                appContent.classList.remove('hidden');
-                document.documentElement.classList.add('access-granted');
-                return;
-            }
-            localStorage.removeItem(ACCESS_GRANT_KEY);
-            localStorage.removeItem(OFFICIAL_API_TOKEN_KEY);
-            appContent.classList.add('hidden');
-            accessGate.classList.remove('hidden');
-            document.documentElement.classList.remove('access-granted');
-            if (accessPasswordInput) {
-                accessPasswordInput.focus();
-                accessPasswordInput.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter') {
-                        verifyAccessPassword();
-                    }
-                });
-            }
+        function setUserToken(token) {
+            localStorage.setItem(USER_TOKEN_KEY, String(token || ''));
+            localStorage.setItem(USER_TOKEN_EXPIRES_KEY, String(Date.now() + USER_TOKEN_TTL_MS));
         }
 
-        function verifyAccessPassword() {
-            if (!accessPasswordInput || !accessGate || !appContent) return;
-            const value = accessPasswordInput.value.trim();
-            if (!value) {
-                if (accessError) accessError.classList.remove('hidden');
-                return;
-            }
-            if (accessSubmitButton) accessSubmitButton.disabled = true;
-            fetch(`/apis/video/pass?password=${encodeURIComponent(value)}`)
-                .then((res) => res.json())
-                .then((data) => {
-                    if (data && data.code === 200 && data.data === true && data.token) {
-                        localStorage.setItem(ACCESS_GRANT_KEY, String(Date.now() + ACCESS_GRANT_DURATION));
-                        localStorage.setItem(OFFICIAL_API_TOKEN_KEY, String(data.token));
-                        accessGate.classList.add('hidden');
-                        appContent.classList.remove('hidden');
-                        document.documentElement.classList.add('access-granted');
-                        accessPasswordInput.value = '';
-                        if (accessError) accessError.classList.add('hidden');
-                        return;
-                    }
-                    if (data && data.code === 200 && data.data === true && !data.token) {
-                        revokeAccess('服务未返回访问令牌，请稍后重试');
-                        return;
-                    }
-                    if (accessError) accessError.classList.remove('hidden');
-                })
-                .catch(() => {
-                    if (accessError) accessError.classList.remove('hidden');
-                })
-                .finally(() => {
-                    if (accessSubmitButton) accessSubmitButton.disabled = false;
-                });
+        function clearUserToken() {
+            localStorage.removeItem(USER_TOKEN_KEY);
+            localStorage.removeItem(USER_TOKEN_EXPIRES_KEY);
+        }
+
+        function revokeAccess() {
+            window.location.href = '/login/index.html';
         }
 
         function getOfficialApiUrl() {
@@ -1724,6 +1714,7 @@
                 history.splice(20);
             }
             localStorage.setItem('searchHistory', JSON.stringify(history));
+            scheduleUserStatsUpdate();
         }
 
         function renderSearchHistory() {
@@ -2153,6 +2144,7 @@
             } catch (error) {
                 console.error('保存播放历史失败:', error);
             }
+            scheduleUserStatsUpdate();
         }
         
         // 显示历史记录
@@ -2221,8 +2213,160 @@
         }
 
         // 喜欢功能
+        let favoritesCache = null;
+
         function getFavorites() {
+            if (Array.isArray(favoritesCache)) return favoritesCache;
             return JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+        }
+
+        function ensureFavoritesCacheImmediate() {
+            if (!Array.isArray(favoritesCache)) {
+                favoritesCache = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            }
+        }
+
+        function setFavoritesCache(list) {
+            favoritesCache = Array.isArray(list) ? list : [];
+            try {
+                localStorage.setItem('videoFavorites', JSON.stringify(favoritesCache));
+            } catch (e) {
+                // ignore storage errors
+            }
+        }
+
+        async function loadFavorites() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                setFavoritesCache(getFavorites());
+                return;
+            }
+            try {
+                const res = await fetch('/user/favorites', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && Array.isArray(data.data)) {
+                    setFavoritesCache(data.data);
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        async function mergeLocalFavoritesToMongo() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) return;
+            const local = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            if (!Array.isArray(local) || local.length === 0) return;
+            try {
+                await Promise.all(local.map(item => {
+                    return fetch('/user/favorites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                            title: item.title,
+                            url: item.url,
+                            pic: item.pic || '',
+                            source: item.source || '',
+                            timestamp: item.timestamp || Date.now()
+                        })
+                    });
+                }));
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        async function uploadLocalFavorites() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                showToast('请先登录');
+                return;
+            }
+            if (uploadFavoritesButton) {
+                uploadFavoritesButton.disabled = true;
+                uploadFavoritesButton.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>上传中...</span></span>';
+            }
+            const local = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            let remote = [];
+            try {
+                const res = await fetch('/user/favorites', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && Array.isArray(data.data)) {
+                    remote = data.data;
+                }
+            } catch (e) {
+                // ignore
+            }
+            const localSet = new Set((local || []).map(item => item.url).filter(Boolean));
+            const remoteSet = new Set((remote || []).map(item => item.url).filter(Boolean));
+
+            if ((!local || local.length === 0) && remoteSet.size > 0) {
+                setFavoritesCache(remote);
+                showToast('已从线上同步到本地');
+                if (uploadFavoritesButton) {
+                    uploadFavoritesButton.disabled = false;
+                    uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
+                }
+                return;
+            }
+
+            const toUpload = (local || []).filter(item => item.url && !remoteSet.has(item.url));
+            const toDownload = (remote || []).filter(item => item.url && !localSet.has(item.url));
+            const isSame =
+                localSet.size === remoteSet.size &&
+                [...localSet].every(url => remoteSet.has(url));
+            if (isSame) {
+                showToast('本地和线上一致，无需上传');
+                if (uploadFavoritesButton) {
+                    uploadFavoritesButton.disabled = false;
+                    uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
+                }
+                return;
+            }
+            if (toUpload.length > 0) {
+                await Promise.all(toUpload.map(item => {
+                    return fetch('/user/favorites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({
+                            title: item.title,
+                            url: item.url,
+                            pic: item.pic || '',
+                            source: item.source || '',
+                            timestamp: item.timestamp || Date.now()
+                        })
+                    });
+                }));
+            }
+            const mergedRemote = remote.concat(toUpload.filter(item => !remoteSet.has(item.url)));
+            const mergedLocal = local.concat(toDownload.filter(item => !localSet.has(item.url)));
+            const mergedMap = new Map();
+            mergedLocal.concat(mergedRemote).forEach(item => {
+                if (!item || !item.url) return;
+                if (!mergedMap.has(item.url)) {
+                    mergedMap.set(item.url, item);
+                } else {
+                    const existing = mergedMap.get(item.url);
+                    if ((item.timestamp || 0) > (existing.timestamp || 0)) {
+                        mergedMap.set(item.url, item);
+                    }
+                }
+            });
+            const mergedList = Array.from(mergedMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            setFavoritesCache(mergedList);
+            if (!favoritePanel.classList.contains('translate-x-full')) {
+                const favorites = buildFavoriteStatusList();
+                renderFavoriteContent(favorites);
+            }
+            showToast(`同步完成：上传 ${toUpload.length} 条，下载 ${toDownload.length} 条`);
+            if (uploadFavoritesButton) {
+                uploadFavoritesButton.disabled = false;
+                uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
+            }
         }
 
         function isFavorited(videoUrl) {
@@ -2231,32 +2375,65 @@
             return favorites.some(item => item.url === realVideoUrl);
         }
 
-        function toggleFavorite(title, videoUrl, pic, buttonEl, sourceLabel = '') {
+        async function toggleFavorite(title, videoUrl, pic, buttonEl, sourceLabel = '') {
             const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
+            const token = getUserToken ? getUserToken() : '';
+            ensureFavoritesCacheImmediate();
             const favorites = getFavorites();
             const existingIndex = favorites.findIndex(item => item.url === realVideoUrl);
             
             if (existingIndex >= 0) {
                 favorites.splice(existingIndex, 1);
+                setFavoritesCache(favorites);
                 showToast('已取消喜欢');
                 updateFavoriteButton(buttonEl, false);
+                scheduleUserStatsUpdate();
+                if (token) {
+                    fetch('/user/favorites', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ url: realVideoUrl })
+                    }).catch(() => {});
+                }
             } else {
                 const source = sourceLabel || getHostLabel();
-                favorites.unshift({
+                const item = {
                     title,
                     url: realVideoUrl,
                     pic: pic || '',
                     source: source || '',
                     timestamp: Date.now()
-                });
+                };
+                favorites.unshift(item);
                 if (favorites.length > 100) {
                     favorites.splice(100);
                 }
+                setFavoritesCache(favorites);
                 showToast('已加入喜欢');
                 updateFavoriteButton(buttonEl, true);
+                scheduleUserStatsUpdate();
+                if (token) {
+                    fetch('/user/favorites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify(item)
+                    }).then(async () => {
+                        try {
+                            if (!Array.isArray(favoritesCache)) {
+                                await loadFavorites();
+                            } else if (!favoritesCache.some(f => f && f.url === realVideoUrl)) {
+                                favoritesCache.unshift(item);
+                                if (favoritesCache.length > 100) favoritesCache.splice(100);
+                            }
+                            if (!favoritePanel.classList.contains('translate-x-full')) {
+                                renderFavoriteContent(buildFavoriteStatusList());
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                    }).catch(() => {});
+                }
             }
-            
-            localStorage.setItem('videoFavorites', JSON.stringify(favorites));
         }
 
         function updateFavoriteButton(buttonEl, isLiked) {
@@ -2269,9 +2446,29 @@
             }
         }
 
-        function toggleFavorites() {
-            const favorites = getFavorites();
-            
+        function buildFavoriteStatusList() {
+            const localFavorites = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            const remoteFavorites = Array.isArray(favoritesCache) ? favoritesCache : [];
+            const localMap = new Map((localFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
+            const remoteMap = new Map((remoteFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
+            const unionUrls = Array.from(new Set([...localMap.keys(), ...remoteMap.keys()]));
+            return unionUrls
+                .map(url => {
+                    const remoteItem = remoteMap.get(url);
+                    const localItem = localMap.get(url);
+                    const base = remoteItem || localItem || { url };
+                    const inLocal = !!localItem;
+                    const inRemote = !!remoteItem;
+                    return {
+                        ...base,
+                        _status: inLocal && inRemote ? 'both' : (inLocal ? 'local' : 'remote')
+                    };
+                })
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        }
+
+        function renderFavoriteContent(list) {
+            const favorites = Array.isArray(list) ? list : [];
             if (favorites.length === 0) {
                 favoriteContent.innerHTML = `
                     <div class="text-center py-8 text-gray-500">
@@ -2279,68 +2476,154 @@
                         <p>暂无喜欢内容</p>
                     </div>
                 `;
-            } else {
-                favoriteContent.innerHTML = favorites.map(item => `
-                    <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
-                        <div class="flex space-x-3">
-                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
-                                ${
-                                    item.pic
-                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
-                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
-                                }
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <h4 class="font-medium text-sm mb-2 line-clamp-1">
-                                    <span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${item.source || '未知来源'}</span>
-                                    ${item.title}
-                                </h4>
-                                <div class="text-xs text-gray-500">
-                                    <span>收藏时间: ${formatDate(item.timestamp)}</span>
-                                </div>
-                            </div>
+                return;
+            }
+            favoriteContent.innerHTML = favorites.map(item => `
+                <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
+                    <div class="flex space-x-3">
+                        <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
+                            ${
+                                item.pic
+                                    ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
+                                    : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
+                            }
                         </div>
-                        <div class="mt-3 flex space-x-2">
-                            <button 
-                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
-                                class="btn-primary text-xs py-1 px-2 flex-1"
-                            >
-                                <i class="fa fa-play mr-1"></i> 播放
-                            </button>
-                            <button 
-                                onclick="removeFavorite('${item.url}')"
-                                class="text-gray-500 hover:text-red-500 p-1"
-                            >
-                                <i class="fa fa-trash"></i>
-                            </button>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-medium text-sm mb-2 line-clamp-1">
+                                <span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${item.source || '未知来源'}</span>
+                                <span class="mr-1">${item._status === 'both' ? '🟢' : (item._status === 'local' ? '🔴' : '🟡')}</span>
+                                ${item.title}
+                            </h4>
+                            <div class="text-xs text-gray-500">
+                                <span>收藏时间: ${formatDate(item.timestamp)}</span>
+                            </div>
                         </div>
                     </div>
-                `).join('');
-            }
-            
-            const willOpen = favoritePanel.classList.contains('translate-x-full');
-            if (willOpen) closePanelsExcept(favoritePanel);
-            favoritePanel.classList.toggle('translate-x-full');
-            updateOverlayForPanels();
+                    <div class="mt-3 flex space-x-2">
+                        <button 
+                            onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
+                            class="btn-primary text-xs py-1 px-2 flex-1"
+                        >
+                            <i class="fa fa-play mr-1"></i> 播放
+                        </button>
+                        <button 
+                            onclick="removeFavorite('${item.url}')"
+                            class="text-gray-500 hover:text-red-500 p-1"
+                        >
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function removeFavorite(url) {
+        async function toggleFavorites() {
+            const willOpen = favoritePanel.classList.contains('translate-x-full');
+            if (!willOpen) {
+                favoritePanel.classList.add('translate-x-full');
+                updateOverlayForPanels();
+                return;
+            }
+            favoriteContent.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <span class="inline-flex items-center space-x-2">
+                        <span class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+                        <span>加载中...</span>
+                    </span>
+                </div>
+            `;
+            if (uploadFavoritesButton) {
+                const token = getUserToken ? getUserToken() : '';
+                uploadFavoritesButton.classList.toggle('hidden', !token);
+            }
+            closePanelsExcept(favoritePanel);
+            favoritePanel.classList.remove('translate-x-full');
+            updateOverlayForPanels();
+            if (!Array.isArray(favoritesCache)) {
+                await loadFavorites();
+            }
+            const favorites = buildFavoriteStatusList();
+            renderFavoriteContent(favorites);
+        }
+
+        async function removeFavorite(url) {
             try {
+                const token = getUserToken ? getUserToken() : '';
+                if (token) {
+                    await fetch('/user/favorites', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ url })
+                    });
+                }
                 const favorites = getFavorites().filter(item => item.url !== url);
-                localStorage.setItem('videoFavorites', JSON.stringify(favorites));
+                setFavoritesCache(favorites);
                 toggleFavorites();
                 toggleFavorites();
+                scheduleUserStatsUpdate();
             } catch (error) {
                 console.error('移除喜欢失败:', error);
             }
         }
 
-        function clearFavorites() {
-            if (confirm('确定要清空所有喜欢内容吗？')) {
-                localStorage.removeItem('videoFavorites');
+        function openClearFavoritesConfirm() {
+            if (!clearFavoritesModal) return;
+            clearFavoritesModal.classList.remove('hidden');
+            clearFavoritesModal.classList.add('flex');
+            if (clearFavoritesPassword) clearFavoritesPassword.value = '';
+            if (clearFavoritesError) clearFavoritesError.classList.add('hidden');
+            if (clearFavoritesPassword) clearFavoritesPassword.focus();
+        }
+
+        function closeClearFavoritesModal() {
+            if (!clearFavoritesModal) return;
+            clearFavoritesModal.classList.add('hidden');
+            clearFavoritesModal.classList.remove('flex');
+        }
+
+        async function confirmClearFavorites() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                showToast('请先登录');
+                return;
+            }
+            const password = clearFavoritesPassword ? clearFavoritesPassword.value.trim() : '';
+            if (!password) {
+                if (clearFavoritesError) {
+                    clearFavoritesError.textContent = '请输入密码';
+                    clearFavoritesError.classList.remove('hidden');
+                }
+                return;
+            }
+            try {
+                const verifyRes = await fetch('/user/verify-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ password })
+                });
+                const verifyData = await verifyRes.json();
+                if (!verifyData || verifyData.code !== 200 || verifyData.data !== true) {
+                    if (clearFavoritesError) {
+                        clearFavoritesError.textContent = '密码错误，请重试';
+                        clearFavoritesError.classList.remove('hidden');
+                    }
+                    return;
+                }
+                await fetch('/user/favorites/all', {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setFavoritesCache([]);
                 toggleFavorites();
                 toggleFavorites();
+                closeClearFavoritesModal();
                 showToast('喜欢内容已清空');
+                scheduleUserStatsUpdate();
+            } catch (e) {
+                if (clearFavoritesError) {
+                    clearFavoritesError.textContent = '验证失败，请稍后重试';
+                    clearFavoritesError.classList.remove('hidden');
+                }
             }
         }
         
@@ -2354,6 +2637,7 @@
                 // 重新渲染历史记录
                 toggleHistory();
                 toggleHistory();
+                scheduleUserStatsUpdate();
             } catch (error) {
                 console.error('移除历史记录失败:', error);
             }
@@ -2366,6 +2650,7 @@
                 toggleHistory();
                 toggleHistory();
                 showToast('历史记录已清空');
+                scheduleUserStatsUpdate();
             }
         }
         
@@ -2445,6 +2730,15 @@
         function toggleAggregateSearch() {
             if (!aggregateSwitch) return;
             const enabled = !!aggregateSwitch.checked;
+            if (enabled) {
+                const selected = getAggregateApiSelection();
+                if (selected.length < 2) {
+                    aggregateSwitch.checked = false;
+                    updateAggregateSwitchUI(false);
+                    showToast('请至少选择2个接口后再开启聚合搜索');
+                    return;
+                }
+            }
             localStorage.setItem('aggregateSearch', enabled ? '1' : '0');
             updateAggregateSwitchUI(enabled);
             if (enabled) {
@@ -2463,6 +2757,14 @@
         }
 
         function confirmAggregateSelection() {
+            const selected = getAggregateApiSelection();
+            if (selected.length < 2) {
+                showToast('请至少选择2个接口后再保存');
+                if (aggregateApiSection && aggregateApiSection.classList.contains('hidden')) {
+                    aggregateApiSection.classList.remove('hidden');
+                }
+                return;
+            }
             showToast('聚合接口已保存');
             if (!hostModal.classList.contains('translate-x-full')) {
                 toggleHostModal();
@@ -2587,9 +2889,9 @@
                 try {
                     const data = JSON.parse(reader.result || '{}');
                     if (data.favorites && Array.isArray(data.favorites)) {
-                        localStorage.setItem('videoFavorites', JSON.stringify(data.favorites));
+                        setFavoritesCache(data.favorites);
                     } else {
-                        localStorage.setItem('videoFavorites', JSON.stringify([]));
+                        setFavoritesCache([]);
                     }
                     if (data.playHistory && Array.isArray(data.playHistory)) {
                         localStorage.setItem('videoPlayHistory', JSON.stringify(data.playHistory));
@@ -2601,11 +2903,7 @@
                     } else {
                         localStorage.setItem('searchHistory', JSON.stringify([]));
                     }
-                    if (typeof data.userNickname === 'string' && data.userNickname.trim()) {
-                        localStorage.setItem('userNickname', data.userNickname.trim());
-                    } else {
-                        localStorage.removeItem('userNickname');
-                    }
+                    // 用户昵称已改为账号资料，不再本地保存
                     if (data.playbackResume && typeof data.playbackResume === 'object') {
                         localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(data.playbackResume));
                     } else {
@@ -2614,6 +2912,7 @@
                     renderUserInfo();
                     addTransferHistory('导入', file.name);
                     showToast('导入成功');
+                    scheduleUserStatsUpdate();
                 } catch (e) {
                     showToast('导入失败：文件格式不正确');
                 } finally {
@@ -2707,16 +3006,74 @@
             if (menu) menu.classList.add('hidden');
         }
 
-        function renderUserInfo() {
+        let currentUserProfile = null;
+
+        async function fetchUserProfile() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) return null;
+            try {
+                const res = await fetch('/user/profile', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && data.data) {
+                    currentUserProfile = data.data;
+                    return currentUserProfile;
+                }
+            } catch (e) {
+                // ignore
+            }
+            return null;
+        }
+
+        async function renderUserInfo() {
             if (!userInfoContent) return;
-            const nickname = localStorage.getItem('userNickname') || '';
             const nicknameDisplay = document.getElementById('userNicknameDisplay');
             const nicknameInput = document.getElementById('userNicknameInput');
+            const noteInput = document.getElementById('userNoteInput');
+            const logoutBtn = document.querySelector('[data-action="logout"]');
             if (nicknameDisplay) {
-                nicknameDisplay.textContent = nickname ? nickname : '未设置';
+                nicknameDisplay.innerHTML = `
+                    <span class="inline-flex items-center space-x-2 text-gray-500">
+                        <span class="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+                        <span>加载中...</span>
+                    </span>
+                `;
             }
             if (nicknameInput) {
-                nicknameInput.value = nickname;
+                nicknameInput.disabled = true;
+            }
+            if (noteInput) {
+                noteInput.disabled = true;
+            }
+            if (logoutBtn) {
+                logoutBtn.disabled = true;
+            }
+            let profile = currentUserProfile;
+            if (!profile) {
+                const token = getUserToken ? getUserToken() : '';
+                if (token) {
+                    profile = await fetchUserProfile();
+                }
+            }
+            if (nicknameDisplay) {
+                if (profile) {
+                    nicknameDisplay.textContent = profile.nickname || profile.username || '未登录';
+                } else {
+                    nicknameDisplay.textContent = '未登录';
+                }
+            }
+            if (nicknameInput) {
+                nicknameInput.value = profile ? (profile.nickname || profile.username || '') : '';
+                nicknameInput.disabled = false;
+            }
+            if (noteInput) {
+                const noteValue = profile ? (profile.profileNote || profile.note || '') : '';
+                noteInput.value = noteValue;
+                noteInput.disabled = false;
+            }
+            if (logoutBtn) {
+                logoutBtn.disabled = !profile;
             }
             const favorites = getFavorites();
             const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
@@ -2744,19 +3101,84 @@
             }
         }
 
-        function saveUserNickname() {
+        async function saveUserNickname() {
             const nicknameInput = document.getElementById('userNicknameInput');
+            const saveButton = document.getElementById('userNicknameSave');
             if (!nicknameInput) return;
             const value = nicknameInput.value.trim();
-            if (!value) {
-                localStorage.removeItem('userNickname');
-                renderUserInfo();
-                showToast('已清空昵称');
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                showToast('请先登录');
                 return;
             }
-            localStorage.setItem('userNickname', value);
-            renderUserInfo();
+            if (!currentUserProfile) {
+                await fetchUserProfile();
+            }
+            if (!currentUserProfile || !currentUserProfile._id) {
+                showToast('无法获取用户信息');
+                return;
+            }
+            const currentName = String(currentUserProfile.nickname || currentUserProfile.username || '').trim();
+            if (value === currentName) {
+                showToast('昵称未修改');
+                return;
+            }
+            const originalText = saveButton ? saveButton.textContent : '';
+            if (saveButton) {
+                saveButton.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>保存中...</span></span>';
+                saveButton.disabled = true;
+            }
+            await fetch(`/user/${currentUserProfile._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ nickname: value })
+            });
+            await renderUserInfo();
             showToast('昵称已保存');
+            if (saveButton) {
+                saveButton.disabled = false;
+                saveButton.textContent = originalText || '保存';
+            }
+        }
+
+        async function saveUserNote() {
+            const noteInput = document.getElementById('userNoteInput');
+            if (!noteInput) return;
+            const value = noteInput.value.trim();
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                showToast('请先登录');
+                return;
+            }
+            if (!currentUserProfile) {
+                await fetchUserProfile();
+            }
+            if (!currentUserProfile || !currentUserProfile._id) {
+                showToast('无法获取用户信息');
+                return;
+            }
+            const currentNote = String(currentUserProfile.profileNote || '').trim();
+            if (value === currentNote) {
+                return;
+            }
+            const res = await fetch(`/user/${currentUserProfile._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ profileNote: value })
+            });
+            try {
+                const data = await res.json();
+                if (data && data.code === 200 && data.data) {
+                    currentUserProfile = data.data;
+                } else if (currentUserProfile) {
+                    currentUserProfile.profileNote = value;
+                }
+            } catch (e) {
+                if (currentUserProfile) currentUserProfile.profileNote = value;
+            }
+            if (noteInput) noteInput.value = value;
+            await renderUserInfo();
+            showToast('备注已保存');
         }
 
         function generateRandomNickname() {
@@ -2768,15 +3190,61 @@
             return `${adjective}${noun}${number}`;
         }
 
-        function setRandomNickname() {
+        async function setRandomNickname() {
             const nicknameInput = document.getElementById('userNicknameInput');
             if (!nicknameInput) return;
             const value = generateRandomNickname();
             nicknameInput.value = value;
-            localStorage.setItem('userNickname', value);
-            renderUserInfo();
-            showToast('随机昵称已生成');
+            await saveUserNickname();
         }
+
+        let noteSaveTimer = null;
+        const handleUserNoteBlur = () => {
+            if (noteSaveTimer) clearTimeout(noteSaveTimer);
+            noteSaveTimer = setTimeout(() => {
+                saveUserNote();
+            }, 200);
+        };
+
+        const bindUserNoteAutoSave = () => {
+            const noteInput = document.getElementById('userNoteInput');
+            if (!noteInput || noteInput.dataset.bound === '1') return;
+            noteInput.addEventListener('blur', handleUserNoteBlur);
+            noteInput.dataset.bound = '1';
+        };
+
+        async function logoutUser() {
+            const logoutBtn = document.querySelector('[data-action="logout"]');
+            const originalHtml = logoutBtn ? logoutBtn.innerHTML : '';
+            if (logoutBtn) {
+                logoutBtn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span><span>退出中...</span></span>';
+                logoutBtn.disabled = true;
+            }
+            const token = getUserToken ? getUserToken() : '';
+            if (token) {
+                try {
+                    await fetch('/user/logout', {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                } catch (e) {
+                    // ignore
+                }
+            }
+            if (typeof revokeAccess === 'function') {
+                revokeAccess('已退出，请重新登录');
+            } else if (typeof clearUserToken === 'function') {
+                clearUserToken();
+            }
+            currentUserProfile = null;
+            renderUserInfo();
+            if (logoutBtn) {
+                logoutBtn.disabled = false;
+                logoutBtn.innerHTML = originalHtml;
+            }
+        }
+
+        bindUserNoteAutoSave();
 
         function toggleUserInfo() {
             if (!userPanel) return;
@@ -2804,18 +3272,35 @@
                 renderOfficialApis(officialApiCache);
                 return;
             }
+
+            if (!force) {
+                try {
+                    const cached = JSON.parse(localStorage.getItem('officialApiList') || 'null');
+                    if (cached && Array.isArray(cached)) {
+                        const payload = { code: 200, data: cached };
+                        officialApiCache = payload;
+                        renderOfficialApis(payload);
+                        return;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            }
             
             officialApiList.innerHTML = `
                 <div class="text-xs text-gray-500">正在获取官方推荐...</div>
             `;
             
-            fetch(getOfficialApiUrl())
+            const userToken = getUserToken ? getUserToken() : '';
+            fetch(getOfficialApiUrl(), {
+                headers: userToken ? { Authorization: `Bearer ${userToken}` } : {}
+            })
                 .then(res => {
                     if (res.status === 401) {
                         officialApiList.innerHTML = `
                             <div class="text-xs text-red-500">访问已过期，请重新验证</div>
                         `;
-                        revokeAccess('访问已过期，请重新验证');
+                        revokeAccess('访问已过期，请重新登录');
                         throw new Error('unauthorized');
                     }
                     return res.json();
@@ -2944,11 +3429,7 @@
         }
 
         function ensureDefaultAggregateSelection(apis) {
-            const current = getAggregateApiSelection();
-            if (current.length > 0) return current;
-            const defaults = (apis || []).slice(0, 3).map(item => item.url).filter(Boolean);
-            setAggregateApiSelection(defaults);
-            return defaults;
+            return getAggregateApiSelection();
         }
 
         function renderAggregateApiSelection(apis) {
@@ -2963,7 +3444,7 @@
                 }
                 return;
             }
-            const selected = ensureDefaultAggregateSelection(list);
+            const selected = getAggregateApiSelection();
             if (aggregateSelectedCount) {
                 aggregateSelectedCount.textContent = String(selected.length);
             }
@@ -3211,36 +3692,52 @@
         }
 
         // 播放器内喜欢/取消喜欢
-        function toggleCurrentVideoFavorite() {
+        async function toggleCurrentVideoFavorite() {
             if (!currentVideoUrl) {
                 showToast('暂无可操作的视频');
                 return;
             }
-            
+            const token = getUserToken ? getUserToken() : '';
+            ensureFavoritesCacheImmediate();
             const favorites = getFavorites();
             const existingIndex = favorites.findIndex(item => item.url === currentVideoUrl);
-            
+
             if (existingIndex >= 0) {
                 favorites.splice(existingIndex, 1);
+                setFavoritesCache(favorites);
                 showToast('已取消喜欢');
                 updatePlayerLikeButtons(false);
+                if (token) {
+                    fetch('/user/favorites', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify({ url: currentVideoUrl })
+                    }).catch(() => {});
+                }
             } else {
                 const source = currentVideoSource || getHostLabel();
-                favorites.unshift({
+                const item = {
                     title: currentVideoTitle || '视频播放',
                     url: currentVideoUrl,
                     pic: currentVideoPic || '',
                     source: source || '',
                     timestamp: Date.now()
-                });
+                };
+                favorites.unshift(item);
                 if (favorites.length > 100) {
                     favorites.splice(100);
                 }
+                setFavoritesCache(favorites);
                 showToast('已加入喜欢');
                 updatePlayerLikeButtons(true);
+                if (token) {
+                    fetch('/user/favorites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                        body: JSON.stringify(item)
+                    }).catch(() => {});
+                }
             }
-            
-            localStorage.setItem('videoFavorites', JSON.stringify(favorites));
         }
 
         function updatePlayerLikeButtons(isLiked) {
@@ -3394,7 +3891,7 @@
         // 显示Toast提示
         function showToast(message) {
             const toast = document.createElement('div');
-            toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg z-50';
+            toast.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-lg z-[90]';
             toast.textContent = message;
             
             document.body.appendChild(toast);
@@ -3449,5 +3946,7 @@
         
 
     </script>
-</body>
+    <script src="/assets/login-guard.js"></script>
+  <script src="/assets/page-permission.js"></script>
+  </body>
 </html>

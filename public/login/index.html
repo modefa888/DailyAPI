@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>登录 / 注册</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-100 text-slate-800 flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-6 space-y-5">
+      <header class="space-y-1">
+        <h1 class="text-2xl font-bold">账号登录</h1>
+        <p class="text-sm text-slate-500">登录或注册后即可访问已授权页面</p>
+      </header>
+
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <button id="tabLogin" class="px-3 py-2 rounded-lg bg-slate-800 text-white">登录</button>
+        <button id="tabRegister" class="px-3 py-2 rounded-lg bg-slate-100 text-slate-600">注册</button>
+      </div>
+
+      <section id="loginPanel" class="space-y-3">
+        <input id="loginUsername" class="w-full border rounded px-3 py-2" placeholder="用户名" />
+        <input id="loginPassword" type="password" class="w-full border rounded px-3 py-2" placeholder="密码" />
+        <button id="loginBtn" class="w-full bg-blue-600 text-white rounded py-2">登录</button>
+      </section>
+
+      <section id="registerPanel" class="space-y-3 hidden">
+        <input id="regUsername" class="w-full border rounded px-3 py-2" placeholder="用户名" />
+        <input id="regNickname" class="w-full border rounded px-3 py-2" placeholder="昵称(可选)" />
+        <input id="regPassword" type="password" class="w-full border rounded px-3 py-2" placeholder="密码" />
+        <button id="regBtn" class="w-full bg-emerald-600 text-white rounded py-2">注册</button>
+      </section>
+
+      <div class="text-xs text-slate-500 text-center">
+        登录成功后会自动跳回首页
+      </div>
+    </div>
+
+    <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded hidden z-[70]"></div>
+
+    <script>
+      const TOKEN_KEY = "userToken";
+      const toast = (msg) => {
+        const el = document.getElementById("toast");
+        el.textContent = msg;
+        el.classList.remove("hidden");
+        setTimeout(() => el.classList.add("hidden"), 1800);
+      };
+      const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
+      const params = new URLSearchParams(window.location.search);
+      const redirectTarget = params.get("redirect") || "/index.html";
+
+      const tabLogin = document.getElementById("tabLogin");
+      const tabRegister = document.getElementById("tabRegister");
+      const loginPanel = document.getElementById("loginPanel");
+      const registerPanel = document.getElementById("registerPanel");
+
+      const switchTab = (mode) => {
+        if (mode === "login") {
+          tabLogin.className = "px-3 py-2 rounded-lg bg-slate-800 text-white";
+          tabRegister.className = "px-3 py-2 rounded-lg bg-slate-100 text-slate-600";
+          loginPanel.classList.remove("hidden");
+          registerPanel.classList.add("hidden");
+        } else {
+          tabRegister.className = "px-3 py-2 rounded-lg bg-slate-800 text-white";
+          tabLogin.className = "px-3 py-2 rounded-lg bg-slate-100 text-slate-600";
+          registerPanel.classList.remove("hidden");
+          loginPanel.classList.add("hidden");
+        }
+      };
+
+      tabLogin.addEventListener("click", () => switchTab("login"));
+      tabRegister.addEventListener("click", () => switchTab("register"));
+
+      document.getElementById("loginBtn").addEventListener("click", async () => {
+        const username = document.getElementById("loginUsername").value.trim();
+        const password = document.getElementById("loginPassword").value.trim();
+        if (!username || !password) {
+          toast("请输入用户名和密码");
+          return;
+        }
+        const btn = document.getElementById("loginBtn");
+        const originalText = btn.textContent;
+        btn.innerHTML = '<span class="inline-flex items-center gap-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>登录中...</span></span>';
+        btn.disabled = true;
+        try {
+          const res = await fetch("/user/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await res.json();
+          if (data.code === 200 && data.data && data.data.token) {
+            setToken(data.data.token);
+            toast("登录成功");
+            setTimeout(() => (window.location.href = redirectTarget), 600);
+          } else {
+            toast(data.message || "登录失败");
+          }
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      });
+
+      document.getElementById("regBtn").addEventListener("click", async () => {
+        const username = document.getElementById("regUsername").value.trim();
+        const nickname = document.getElementById("regNickname").value.trim();
+        const password = document.getElementById("regPassword").value.trim();
+        if (!username || !password) {
+          toast("请输入用户名和密码");
+          return;
+        }
+        const btn = document.getElementById("regBtn");
+        const originalText = btn.textContent;
+        btn.innerHTML = '<span class="inline-flex items-center gap-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>注册中...</span></span>';
+        btn.disabled = true;
+        try {
+          const res = await fetch("/user/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, nickname })
+          });
+          const data = await res.json();
+          if (data.code === 200) {
+            toast("注册成功，正在登录");
+            const loginRes = await fetch("/user/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username, password })
+            });
+            const loginData = await loginRes.json();
+            if (loginData.code === 200 && loginData.data && loginData.data.token) {
+              setToken(loginData.data.token);
+              setTimeout(() => (window.location.href = redirectTarget), 600);
+            } else {
+              toast(loginData.message || "自动登录失败，请手动登录");
+              switchTab("login");
+            }
+          } else {
+            toast(data.message || "注册失败");
+          }
+        } finally {
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      });
+    </script>
+      <script src="/assets/login-guard.js"></script>
+  <script src="/assets/page-permission.js"></script>
+  </body>
+</html>

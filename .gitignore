@@ -17,3 +17,4 @@ utils/lsp/txt
 # 忽略特定文件
 secret.txt
 
+.env

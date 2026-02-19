@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>无权限访问</title>
+    <style>
+      :root {
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --primary: #2563eb;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        background: var(--card);
+        border-radius: 16px;
+        box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        padding: 28px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 22px;
+        margin-bottom: 8px;
+      }
+      p {
+        color: var(--muted);
+        margin-bottom: 20px;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+      }
+      .btn {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 10px 16px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: #fff;
+      }
+      .btn-ghost {
+        border-color: #cbd5f5;
+        color: #334155;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>当前账号无权限访问此页面</h1>
+      <p>请联系管理员为你开通权限，或切换账号后重试。</p>
+      <div class="actions">
+        <a id="noAccessLoginBtn" class="btn btn-primary" href="/login/index.html">去登录</a>
+        <a class="btn btn-ghost" href="/index.html">返回首页</a>
+      </div>
+    </div>
+    <script>
+      const TOKEN_KEY = "userToken";
+      const loginBtn = document.getElementById("noAccessLoginBtn");
+      const params = new URLSearchParams(window.location.search);
+      const from = params.get("from");
+      if (loginBtn && from && String(from).startsWith("/")) {
+        loginBtn.href = `/login/index.html?redirect=${encodeURIComponent(from)}`;
+      }
+      const token = localStorage.getItem(TOKEN_KEY) || "";
+      if (token) {
+        fetch("/user/profile", { headers: { Authorization: "Bearer " + token } })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.code === 200 && data.data && data.data.role === "admin") {
+              window.location.href = "/index.html";
+            }
+          })
+          .catch(() => {});
+      }
+    </script>
+      <script src="/assets/login-guard.js"></script>
+  <script src="/assets/page-permission.js"></script>
+  </body>
+</html>
