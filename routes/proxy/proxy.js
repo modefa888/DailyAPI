@@ -72,10 +72,13 @@ proxyRouter.get("/proxy", async (ctx) => {
             ctx.body = data;
         }
     } catch (err) {
+        const isTimeout = err && (err.code === 'ECONNABORTED' || err.message?.includes('timeout'));
+        const message = isTimeout ? '请求超时，请稍后重试' : '目标资源暂时无法访问';
+        const code = isTimeout ? 504 : 606;
         // 精简错误日志
-        console.warn(`[proxy][FETCH_FAIL] ${zUrl}`);
+        console.warn(`[proxy][FETCH_FAIL] ${zUrl}${isTimeout ? ' (timeout)' : ''}`);
 
-        response(ctx, 606, "", "目标资源暂时无法访问");
+        response(ctx, code, "", message);
     }
 });
 

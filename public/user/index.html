@@ -17,7 +17,7 @@
     </header>
 
 
-    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section id="favoritesSection" class="bg-white rounded-xl shadow p-4 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">我的信息</h2>
       </div>
@@ -32,7 +32,7 @@
       </div>
     </section>
 
-    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section id="sharesSection" class="bg-white rounded-xl shadow p-4 space-y-4">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">用户列表（管理员）</h2>
         <div class="flex items-center space-x-2 text-sm">
@@ -77,6 +77,99 @@
         <div id="paginationButtons" class="flex flex-wrap items-center gap-1"></div>
       </div>
     </section>
+
+    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold">在线用户（管理员）</h2>
+        <div class="flex items-center gap-2 text-sm text-slate-600">
+          <span>统计窗口</span>
+          <input id="onlineWindowInput" type="number" min="1" max="1440" class="w-20 border rounded px-2 py-1" value="5">
+          <span>分钟</span>
+          <button id="loadOnlineBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white">刷新</button>
+        </div>
+      </div>
+      <div id="onlineMeta" class="text-sm text-slate-500"></div>
+      <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500">
+            <tr>
+              <th class="py-2">用户名</th>
+              <th>昵称</th>
+              <th>角色</th>
+              <th>最近在线</th>
+              <th>页面</th>
+              <th>IP</th>
+              <th class="min-w-[220px]">UA</th>
+            </tr>
+          </thead>
+          <tbody id="onlineTbody" class="divide-y"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold">官方推荐接口（管理员）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="officialEnableAllBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white text-sm">全部启用</button>
+          <button id="officialDisableAllBtn" class="hidden px-3 py-1.5 rounded bg-slate-600 text-white text-sm">全部停用</button>
+          <button id="officialSaveSortBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">保存排序</button>
+          <button id="loadOfficialApisBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+        <input id="officialNameInput" class="border rounded px-3 py-2" placeholder="名称">
+        <input id="officialUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="接口 URL">
+        <input id="officialTypeInput" class="border rounded px-3 py-2" placeholder="类型(默认 vod)">
+        <button id="addOfficialBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
+      </div>
+      <div id="officialMeta" class="text-sm text-slate-500"></div>
+      <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500">
+            <tr>
+              <th class="py-2">排序</th>
+              <th class="py-2">名称</th>
+              <th>URL</th>
+              <th>类型</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="officialTbody" class="divide-y"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div id="favoritesModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl p-4 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-semibold">我的喜欢</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="favoritesUserSelect" class="hidden border rounded px-2 py-1 text-sm"></select>
+            <button id="loadFavoritesBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">刷新</button>
+            <button id="closeFavoritesBtn" class="px-3 py-1.5 rounded bg-slate-200 text-slate-700 text-sm">关闭</button>
+          </div>
+        </div>
+        <div id="favoritesMeta" class="text-sm text-slate-500"></div>
+        <div id="favoritesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[540px] overflow-y-auto"></div>
+      </div>
+    </div>
+
+    <div id="sharesModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl p-4 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="font-semibold">我的分享</h2>
+          <div class="flex flex-wrap items-center gap-2">
+            <select id="sharesUserSelect" class="hidden border rounded px-2 py-1 text-sm"></select>
+            <button id="loadSharesBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">刷新</button>
+            <button id="closeSharesBtn" class="px-3 py-1.5 rounded bg-slate-200 text-slate-700 text-sm">关闭</button>
+          </div>
+        </div>
+        <div id="sharesMeta" class="text-sm text-slate-500"></div>
+        <div id="sharesGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[540px] overflow-y-auto"></div>
+      </div>
+    </div>
 
   </div>
 
@@ -202,6 +295,9 @@
     let pageAliasMap = {};
     let userPermissionsById = {};
     let statsSort = { key: "", dir: "" };
+    let officialApisCache = [];
+    let usersCache = [];
+    const FALLBACK_IMAGE = "/video/loading.gif";
 
     const authHeaders = () => {
       const token = getToken();
@@ -219,12 +315,30 @@
       const logoutBtn = document.getElementById("logoutBtn");
       const updateBtn = document.getElementById("openUpdateModal");
       const loadUsersBtn = document.getElementById("loadUsersBtn");
+      const loadOnlineBtn = document.getElementById("loadOnlineBtn");
+      const loadOfficialApisBtn = document.getElementById("loadOfficialApisBtn");
+      const officialEnableAllBtn = document.getElementById("officialEnableAllBtn");
+      const officialDisableAllBtn = document.getElementById("officialDisableAllBtn");
+      const officialSaveSortBtn = document.getElementById("officialSaveSortBtn");
       const token = getToken();
       if (!token) {
         status.textContent = isCheckingAuth ? "校验中..." : "未登录";
         logoutBtn.classList.add("hidden");
         if (updateBtn) updateBtn.classList.add("hidden");
-        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
+      if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+      const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
+      const loadSharesBtn = document.getElementById("loadSharesBtn");
+      const favoritesUserSelect = document.getElementById("favoritesUserSelect");
+      const sharesUserSelect = document.getElementById("sharesUserSelect");
+      if (loadFavoritesBtn) loadFavoritesBtn.classList.add("hidden");
+      if (loadSharesBtn) loadSharesBtn.classList.add("hidden");
+      if (favoritesUserSelect) favoritesUserSelect.classList.add("hidden");
+      if (sharesUserSelect) sharesUserSelect.classList.add("hidden");
+        if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
+        if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
+        if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
         document.getElementById("profileBox").innerHTML = isCheckingAuth
           ? '<span class="inline-flex items-center space-x-2 text-slate-500"><span class="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span><span>加载中...</span></span>'
           : "未登录";
@@ -242,7 +356,20 @@
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
         if (updateBtn) updateBtn.classList.add("hidden");
-        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
+      if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+      const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
+      const loadSharesBtn = document.getElementById("loadSharesBtn");
+      const favoritesUserSelect = document.getElementById("favoritesUserSelect");
+      const sharesUserSelect = document.getElementById("sharesUserSelect");
+      if (loadFavoritesBtn) loadFavoritesBtn.classList.add("hidden");
+      if (loadSharesBtn) loadSharesBtn.classList.add("hidden");
+      if (favoritesUserSelect) favoritesUserSelect.classList.add("hidden");
+      if (sharesUserSelect) sharesUserSelect.classList.add("hidden");
+        if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
+        if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
+        if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
         document.getElementById("profileBox").textContent = "未登录";
         toast("登录状态校验失败");
         redirectToLogin();
@@ -254,7 +381,20 @@
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
         if (updateBtn) updateBtn.classList.add("hidden");
-        if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
+      if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+      const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
+      const loadSharesBtn = document.getElementById("loadSharesBtn");
+      const favoritesUserSelect = document.getElementById("favoritesUserSelect");
+      const sharesUserSelect = document.getElementById("sharesUserSelect");
+      if (loadFavoritesBtn) loadFavoritesBtn.classList.add("hidden");
+      if (loadSharesBtn) loadSharesBtn.classList.add("hidden");
+      if (favoritesUserSelect) favoritesUserSelect.classList.add("hidden");
+      if (sharesUserSelect) sharesUserSelect.classList.add("hidden");
+        if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
+        if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
+        if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
         document.getElementById("profileBox").textContent = "未登录";
         redirectToLogin();
         isCheckingAuth = false;
@@ -265,6 +405,19 @@
       logoutBtn.classList.remove("hidden");
       if (updateBtn) updateBtn.classList.remove("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.remove("hidden");
+      if (loadOnlineBtn) loadOnlineBtn.classList.remove("hidden");
+      if (loadOfficialApisBtn) loadOfficialApisBtn.classList.remove("hidden");
+      const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
+      const loadSharesBtn = document.getElementById("loadSharesBtn");
+      const favoritesUserSelect = document.getElementById("favoritesUserSelect");
+      const sharesUserSelect = document.getElementById("sharesUserSelect");
+      if (loadFavoritesBtn) loadFavoritesBtn.classList.remove("hidden");
+      if (loadSharesBtn) loadSharesBtn.classList.remove("hidden");
+      if (favoritesUserSelect) favoritesUserSelect.classList.remove("hidden");
+      if (sharesUserSelect) sharesUserSelect.classList.remove("hidden");
+      if (officialEnableAllBtn) officialEnableAllBtn.classList.remove("hidden");
+      if (officialDisableAllBtn) officialDisableAllBtn.classList.remove("hidden");
+      if (officialSaveSortBtn) officialSaveSortBtn.classList.remove("hidden");
       document.getElementById("profileBox").textContent =
         `用户名：${data.data.username}，昵称：${data.data.nickname}，角色：${data.data.role}`;
       currentProfile = data.data;
@@ -284,6 +437,8 @@
       if (data.data.role === "admin" && !hasAutoLoadedUsers) {
         hasAutoLoadedUsers = true;
         document.getElementById("loadUsersBtn").click();
+        document.getElementById("loadOnlineBtn").click();
+        document.getElementById("loadOfficialApisBtn").click();
       }
     };
 
@@ -421,6 +576,472 @@
       );
     };
 
+    const updateUserSelectors = (users) => {
+      const favoritesSelect = document.getElementById("favoritesUserSelect");
+      const sharesSelect = document.getElementById("sharesUserSelect");
+      if (!favoritesSelect || !sharesSelect) return;
+      const list = Array.isArray(users) ? users : [];
+      const options = list.map((u) => ({
+        id: u._id,
+        label: `${u.username}${u.nickname ? ` (${u.nickname})` : ""}`,
+      }));
+      const buildOptions = () =>
+        options.map((opt) => `<option value="${opt.id}">${opt.label}</option>`).join("");
+      favoritesSelect.innerHTML = buildOptions();
+      sharesSelect.innerHTML = buildOptions();
+      const targetId = currentProfile ? String(currentProfile._id || "") : (options[0] ? options[0].id : "");
+      if (targetId) {
+        favoritesSelect.value = targetId;
+        sharesSelect.value = targetId;
+      }
+    };
+
+    const formatTime = (value) => {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "-";
+      return date.toLocaleString("zh-CN");
+    };
+
+    const loadOnline = async () => {
+      const btn = document.getElementById("loadOnlineBtn");
+      const input = document.getElementById("onlineWindowInput");
+      const meta = document.getElementById("onlineMeta");
+      const tbody = document.getElementById("onlineTbody");
+      const minutes = Math.min(1440, Math.max(1, Number(input ? input.value : 5) || 5));
+      if (input) input.value = String(minutes);
+      const originalText = btn.textContent;
+      btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>加载中...</span></span>';
+      btn.disabled = true;
+      try {
+        const res = await fetch(`/user/online?within=${minutes * 60 * 1000}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取在线用户失败");
+          return;
+        }
+        if (meta) {
+          const windowMinutes = Math.round((data.withinMs || minutes * 60 * 1000) / 60000);
+          meta.textContent = `在线 ${data.total || 0} 人（统计窗口 ${windowMinutes} 分钟）`;
+        }
+        if (tbody) {
+          tbody.innerHTML = "";
+          (data.data || []).forEach((item) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td class="py-2">${item.username || ""}</td>
+              <td>${item.nickname || ""}</td>
+              <td>${item.role || ""}</td>
+              <td>${formatTime(item.lastSeenAt)}</td>
+              <td class="text-xs text-slate-600">${item.lastPage || "-"}</td>
+              <td class="text-xs text-slate-600">${item.ip || "-"}</td>
+              <td class="text-xs text-slate-500">${item.userAgent || "-"}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          if (!data.data || data.data.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="7">暂无在线用户</td>';
+            tbody.appendChild(tr);
+          }
+        }
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    };
+
+    const setBtnLoading = (btn, loading, label) => {
+      if (!btn) return;
+      if (loading) {
+        btn.dataset.label = btn.textContent || "";
+        if (label === "") {
+          btn.innerHTML = '<span class="inline-flex items-center"><span class="w-4 h-4 border-2 border-slate-800 border-t-transparent rounded-full animate-spin"></span></span>';
+        } else {
+          btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>' + (label || "处理中...") + '</span></span>';
+        }
+        btn.disabled = true;
+      } else {
+        btn.disabled = false;
+        const text = btn.dataset.label || label || "";
+        btn.textContent = text || btn.textContent;
+      }
+    };
+
+    const loadOfficialApis = async () => {
+      const btn = document.getElementById("loadOfficialApisBtn");
+      const tbody = document.getElementById("officialTbody");
+      const meta = document.getElementById("officialMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const res = await fetch("/user/official-apis", { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取失败");
+          return;
+        }
+        officialApisCache = Array.isArray(data.data) ? data.data : [];
+        if (meta) meta.textContent = `共 ${officialApisCache.length} 条`;
+        if (tbody) {
+          tbody.innerHTML = "";
+          officialApisCache.forEach((item) => {
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-id", item.id);
+            tr.setAttribute("draggable", "true");
+            tr.innerHTML = `
+              <td class="py-2">
+                <div class="inline-flex items-center gap-2 text-slate-400 cursor-move" data-action="drag-handle" title="拖拽排序">
+                  <span class="text-xs">≡</span>
+                  <span class="text-xs">${Number(item.sort || 0)}</span>
+                </div>
+              </td>
+              <td class="py-2">
+                <input class="border rounded px-2 py-1 w-40" value="${item.name || ""}" data-field="name" data-id="${item.id}">
+              </td>
+              <td>
+                <input class="border rounded px-2 py-1 w-full min-w-[220px]" value="${item.url || ""}" data-field="url" data-id="${item.id}">
+              </td>
+              <td>
+                <input class="border rounded px-2 py-1 w-24" value="${item.type || "vod"}" data-field="type" data-id="${item.id}">
+              </td>
+              <td>
+                <button class="px-2 py-1 rounded text-xs ${item.enabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"}" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? "1" : "0"}">
+                  ${item.enabled ? "已启用" : "已停用"}
+                </button>
+              </td>
+              <td class="space-x-2">
+                <button class="text-xs text-blue-600" data-action="save" data-id="${item.id}">保存</button>
+                <button class="text-xs text-rose-600" data-action="delete" data-id="${item.id}">删除</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+          if (officialApisCache.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="6">暂无数据</td>';
+            tbody.appendChild(tr);
+          }
+          tbody.dataset.sortSignature = getOfficialSortSignature();
+        }
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
+    const addOfficialApi = async () => {
+      const nameInput = document.getElementById("officialNameInput");
+      const urlInput = document.getElementById("officialUrlInput");
+      const typeInput = document.getElementById("officialTypeInput");
+      const name = (nameInput.value || "").trim();
+      const url = (urlInput.value || "").trim();
+      const type = (typeInput.value || "vod").trim();
+      if (!name || !url) {
+        toast("名称或URL不能为空");
+        return;
+      }
+      const btn = document.getElementById("addOfficialBtn");
+      setBtnLoading(btn, true, "提交中...");
+      try {
+        const res = await fetch("/user/official-apis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ name, url, type, enabled: true })
+        });
+        const data = await res.json();
+        if (data.code === 200) {
+          nameInput.value = "";
+          urlInput.value = "";
+          typeInput.value = "";
+          toast("新增成功");
+          await loadOfficialApis();
+        } else {
+          toast(data.message || "新增失败");
+        }
+      } finally {
+        setBtnLoading(btn, false, "新增");
+      }
+    };
+
+    const updateOfficialApi = async (id, payload) => {
+      const res = await fetch(`/user/official-apis/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "更新失败");
+        return false;
+      }
+      return true;
+    };
+
+    const deleteOfficialApi = async (id) => {
+      if (!confirm("确认删除该接口？")) return;
+      const res = await fetch(`/user/official-apis/${id}`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        toast("已删除");
+        await loadOfficialApis();
+      } else {
+        toast(data.message || "删除失败");
+      }
+    };
+
+    const getOfficialSortSignature = () => {
+      const tbody = document.getElementById("officialTbody");
+      if (!tbody) return "";
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      return rows.map((row) => row.getAttribute("data-id") || "").join(",");
+    };
+
+    const syncOfficialSortNumbers = () => {
+      const tbody = document.getElementById("officialTbody");
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      rows.forEach((row, index) => {
+        const id = row.getAttribute("data-id");
+        const sortValue = index + 1;
+        const sortLabel = row.querySelector('[data-action="drag-handle"] span:last-child');
+        if (sortLabel) sortLabel.textContent = String(sortValue);
+        const hidden = row.querySelector(`input[data-id="${id}"][data-field="sort"]`);
+        if (hidden) {
+          hidden.value = String(sortValue);
+        } else {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.setAttribute("data-field", "sort");
+          input.setAttribute("data-id", id);
+          input.value = String(sortValue);
+          row.appendChild(input);
+        }
+      });
+    };
+
+    const saveOfficialSort = async () => {
+      const tbody = document.getElementById("officialTbody");
+      if (!tbody) return;
+      const btn = document.getElementById("officialSaveSortBtn");
+      const currentSignature = getOfficialSortSignature();
+      const savedSignature = tbody.dataset.sortSignature || "";
+      if (currentSignature && currentSignature === savedSignature) {
+        setBtnLoading(btn, false, "保存排序");
+        return;
+      }
+      setBtnLoading(btn, true, "保存中...");
+      syncOfficialSortNumbers();
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      const items = rows.map((row, index) => ({
+        id: row.getAttribute("data-id"),
+        sort: index + 1,
+      }));
+      const res = await fetch("/user/official-apis/sort", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "排序保存失败");
+      } else {
+        toast("排序已保存");
+      }
+      await loadOfficialApis();
+      setBtnLoading(btn, false, "保存排序");
+    };
+
+    const batchToggleOfficial = async (enabled) => {
+      const tbody = document.getElementById("officialTbody");
+      if (!tbody) return;
+      const btn = document.getElementById(enabled ? "officialEnableAllBtn" : "officialDisableAllBtn");
+      setBtnLoading(btn, true, enabled ? "启用中..." : "停用中...");
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      const targets = rows.filter((row) => {
+        const toggleBtn = row.querySelector('[data-action="toggle"]');
+        if (!toggleBtn) return false;
+        const isEnabled = toggleBtn.getAttribute("data-enabled") === "1";
+        return enabled ? !isEnabled : isEnabled;
+      });
+      const ids = targets.map((row) => row.getAttribute("data-id")).filter(Boolean);
+      if (ids.length === 0) {
+        toast(enabled ? "无需启用，全部已启用" : "无需停用，全部已停用");
+        setBtnLoading(btn, false, enabled ? "全部启用" : "全部停用");
+        return;
+      }
+      const res = await fetch("/user/official-apis/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ ids, enabled })
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "批量更新失败");
+      } else {
+        toast(enabled ? "已启用所有已停用接口" : "已停用所有已启用接口");
+      }
+      await loadOfficialApis();
+      setBtnLoading(btn, false, enabled ? "全部启用" : "全部停用");
+    };
+
+    const renderVideoCards = (items, container, options = {}) => {
+      if (!container) return;
+      const list = Array.isArray(items) ? items : [];
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center text-slate-500 py-8">暂无内容</div>
+        `;
+        return;
+      }
+      const allowDelete = options.allowDelete;
+      const deleteAction = options.deleteAction || "";
+      container.innerHTML = list.map((item) => {
+        const title = item.title || "未命名";
+        const pic = item.pic || FALLBACK_IMAGE;
+        const source = item.source || "未知来源";
+        const url = item.url || "";
+        const shareUrl = item.shareUrl || "";
+        const cardId = item.shareId || item.id || url;
+        const deleteBtn = allowDelete
+          ? `<button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs" data-action="${deleteAction}" data-url="${url}" data-share-id="${item.shareId || item.id || ""}">删除</button>`
+          : "";
+        const openBtn = url
+          ? `<button class="px-3 py-1.5 rounded bg-blue-600 text-white text-xs" onclick="window.open('${url}', '_blank')">打开</button>`
+          : "";
+        const shareBtn = shareUrl
+          ? `<button class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs" onclick="navigator.clipboard.writeText('${shareUrl}').then(()=>toast('已复制')).catch(()=>prompt('复制链接', '${shareUrl}'))">复制分享</button>`
+          : "";
+        return `
+          <div class="bg-white rounded-lg overflow-hidden shadow-md h-[260px] flex flex-col" data-card-id="${cardId}">
+            <div class="relative aspect-video overflow-hidden">
+              <img src="${pic}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" class="w-full h-full object-cover">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
+              <div class="absolute bottom-2 left-2 text-white text-sm font-medium line-clamp-2">${title}</div>
+            </div>
+            <div class="p-3 space-y-2 flex-1 flex flex-col justify-between">
+              <div class="text-xs text-slate-500 truncate">${source}</div>
+              <div class="flex items-center gap-2">
+                ${openBtn}
+                ${shareBtn}
+                ${deleteBtn}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    };
+
+    const buildShareUrl = (item) => {
+      const url = String(item.url || "");
+      if (!url) return "";
+      const title = String(item.title || "");
+      const pic = String(item.pic || "");
+      const source = String(item.source || "");
+      const expiresAt = Number(item.expiresAt || 0);
+      const shareId = String(item.id || item.shareId || "");
+      const payload = btoa([
+        encodeURIComponent(url),
+        encodeURIComponent(title),
+        encodeURIComponent(pic),
+        encodeURIComponent(source),
+        encodeURIComponent(String(expiresAt || 0)),
+        encodeURIComponent(String(shareId || "")),
+      ].join("|"));
+      const base = window.location.origin;
+      return `${base}/video/play.html?key=${payload}`;
+    };
+
+    const getSelectedUserId = () => {
+      const select = document.getElementById("favoritesUserSelect");
+      return select && select.value ? select.value : (currentProfile ? String(currentProfile._id || "") : "");
+    };
+
+    const syncUserSelects = (value) => {
+      const favoritesSelect = document.getElementById("favoritesUserSelect");
+      const sharesSelect = document.getElementById("sharesUserSelect");
+      if (favoritesSelect && favoritesSelect.value !== value) favoritesSelect.value = value;
+      if (sharesSelect && sharesSelect.value !== value) sharesSelect.value = value;
+    };
+
+    const openModal = (id) => {
+      const modal = document.getElementById(id);
+      if (!modal) return;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    };
+
+    const closeModal = (id) => {
+      const modal = document.getElementById(id);
+      if (!modal) return;
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    };
+
+    const updateGridMeta = (containerId, metaId) => {
+      const container = document.getElementById(containerId);
+      const meta = document.getElementById(metaId);
+      if (!container || !meta) return;
+      const cards = container.querySelectorAll("[data-card-id]");
+      if (cards.length === 0) {
+        meta.textContent = "共 0 条";
+        container.innerHTML = '<div class="col-span-full text-center text-slate-500 py-8">暂无内容</div>';
+        return;
+      }
+      meta.textContent = `共 ${cards.length} 条`;
+    };
+
+    const loadFavorites = async () => {
+      const btn = document.getElementById("loadFavoritesBtn");
+      const grid = document.getElementById("favoritesGrid");
+      const meta = document.getElementById("favoritesMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const userId = getSelectedUserId();
+        const endpoint = userId ? `/user/${userId}/favorites` : "/user/favorites";
+        const res = await fetch(endpoint, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取喜欢失败");
+          renderVideoCards([], grid);
+          return;
+        }
+        const list = Array.isArray(data.data) ? data.data : [];
+        if (meta) meta.textContent = `共 ${list.length} 条`;
+        renderVideoCards(list, grid, { allowDelete: true, deleteAction: "favorite-delete" });
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
+    const loadShares = async () => {
+      const btn = document.getElementById("loadSharesBtn");
+      const grid = document.getElementById("sharesGrid");
+      const meta = document.getElementById("sharesMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const userId = getSelectedUserId();
+        const endpoint = userId ? `/user/${userId}/shares` : "/user/shares";
+        const res = await fetch(endpoint, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取分享失败");
+          renderVideoCards([], grid);
+          return;
+        }
+        const list = (Array.isArray(data.data) ? data.data : []).map((item) => ({
+          ...item,
+          id: item.shareId || item.id,
+          shareUrl: buildShareUrl(item),
+        }));
+        if (meta) meta.textContent = `共 ${list.length} 条`;
+        renderVideoCards(list, grid, { allowDelete: true, deleteAction: "share-delete" });
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
     const loadUsers = async (page = currentUsersPage) => {
       const pageSizeInput = document.getElementById("pageSizeInput");
       const pageSize = Number(pageSizeInput ? pageSizeInput.value : currentUsersPageSize) || 20;
@@ -494,9 +1115,11 @@
           });
         };
         updateSortButtons();
+        usersCache = data.data || [];
+        updateUserSelectors(usersCache);
         data.data.forEach((u) => {
-          userPermissionsById[u._id] = Array.isArray(u.blockedPages) ? u.blockedPages : [];
-          const stat = statsMap[u._id] || {};
+            userPermissionsById[u._id] = Array.isArray(u.blockedPages) ? u.blockedPages : [];
+            const stat = statsMap[u._id] || {};
           const watchSeconds = Number(stat.watchSeconds || 0);
           const watchH = String(Math.floor(watchSeconds / 3600)).padStart(2, "0");
           const watchM = String(Math.floor((watchSeconds % 3600) / 60)).padStart(2, "0");
@@ -522,17 +1145,19 @@
               <div>搜索：${stat.searchCount || 0}</div>
               <div>时长：${watchH}:${watchM}:${watchS}</div>
             </td>
-            <td>
+            <td class="space-x-2">
+              <button class="text-indigo-600" data-action="view-favorites" data-id="${u._id}">喜欢</button>
+              <button class="text-indigo-600" data-action="view-shares" data-id="${u._id}">分享</button>
               ${u._id === (currentProfile ? currentProfile._id : "")
-                ? `<span class="text-slate-400">本人</span>`
+                ? `<span class="text-slate-400 ml-2">本人</span>`
                 : `${u.role === "admin"
                     ? ""
-                    : `<button class="text-emerald-600 mr-2" data-action="perm" data-id="${u._id}">权限</button>
-                      <button class="text-blue-600 mr-2" data-action="toggle" data-disabled="${u.isDisabled}" data-id="${u._id}">
+                    : `<button class="text-emerald-600 ml-2" data-action="perm" data-id="${u._id}">权限</button>
+                      <button class="text-blue-600 ml-2" data-action="toggle" data-disabled="${u.isDisabled}" data-id="${u._id}">
                         ${u.isDisabled ? "启用" : "禁用"}
                       </button>`
                   }
-                  <button class="text-red-600" data-action="delete" data-id="${u._id}">删除</button>`
+                  <button class="text-red-600 ml-2" data-action="delete" data-id="${u._id}">删除</button>`
               }
             </td>
           `;
@@ -552,6 +1177,217 @@
     document.getElementById("loadUsersBtn").addEventListener("click", async () => {
       await loadUsers(currentUsersPage);
     });
+    document.getElementById("loadOnlineBtn").addEventListener("click", async () => {
+      await loadOnline();
+    });
+    document.getElementById("loadOfficialApisBtn").addEventListener("click", async () => {
+      await loadOfficialApis();
+    });
+    document.getElementById("addOfficialBtn").addEventListener("click", async () => {
+      await addOfficialApi();
+    });
+    document.getElementById("officialEnableAllBtn").addEventListener("click", async () => {
+      if (!confirm("确认启用所有官方接口？")) return;
+      await batchToggleOfficial(true);
+    });
+    document.getElementById("officialDisableAllBtn").addEventListener("click", async () => {
+      if (!confirm("确认停用所有官方接口？")) return;
+      await batchToggleOfficial(false);
+    });
+    document.getElementById("officialSaveSortBtn").addEventListener("click", async () => {
+      await saveOfficialSort();
+    });
+    document.getElementById("loadFavoritesBtn").addEventListener("click", async () => {
+      await loadFavorites();
+      openModal("favoritesModal");
+    });
+    document.getElementById("loadSharesBtn").addEventListener("click", async () => {
+      await loadShares();
+      openModal("sharesModal");
+    });
+    document.getElementById("closeFavoritesBtn").addEventListener("click", () => {
+      closeModal("favoritesModal");
+    });
+    document.getElementById("closeSharesBtn").addEventListener("click", () => {
+      closeModal("sharesModal");
+    });
+    const favoritesUserSelect = document.getElementById("favoritesUserSelect");
+    const sharesUserSelect = document.getElementById("sharesUserSelect");
+    if (favoritesUserSelect) {
+      favoritesUserSelect.addEventListener("change", async (e) => {
+        const value = e.target.value;
+        syncUserSelects(value);
+        await loadFavorites();
+        await loadShares();
+      });
+    }
+    if (sharesUserSelect) {
+      sharesUserSelect.addEventListener("change", async (e) => {
+        const value = e.target.value;
+        syncUserSelects(value);
+        await loadFavorites();
+        await loadShares();
+      });
+    }
+
+    const favoritesGrid = document.getElementById("favoritesGrid");
+    if (favoritesGrid) {
+      favoritesGrid.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.getAttribute("data-action") !== "favorite-delete") return;
+        const url = target.getAttribute("data-url") || "";
+        if (!url) return;
+        if (!confirm("确认删除该喜欢？")) return;
+        const userId = getSelectedUserId();
+        const endpoint = userId ? `/user/${userId}/favorites` : "/user/favorites";
+        setBtnLoading(target, true, "");
+        const res = await fetch(endpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "删除失败");
+        } else {
+          toast("已删除");
+          const grid = document.getElementById("favoritesGrid");
+          const prevTop = grid ? grid.scrollTop : 0;
+          const card = target.closest("[data-card-id]");
+          if (card) card.remove();
+          updateGridMeta("favoritesGrid", "favoritesMeta");
+          if (grid) grid.scrollTop = prevTop;
+        }
+        setBtnLoading(target, false, "删除");
+      });
+    }
+
+    const sharesGrid = document.getElementById("sharesGrid");
+    if (sharesGrid) {
+      sharesGrid.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.getAttribute("data-action") !== "share-delete") return;
+        const shareId = target.getAttribute("data-share-id") || "";
+        if (!shareId) return;
+        if (!confirm("确认删除该分享？")) return;
+        const userId = getSelectedUserId();
+        const endpoint = userId ? `/user/${userId}/shares` : "/user/shares";
+        setBtnLoading(target, true, "");
+        const res = await fetch(endpoint, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ shareId })
+        });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "删除失败");
+        } else {
+          toast("已删除");
+          const grid = document.getElementById("sharesGrid");
+          const prevTop = grid ? grid.scrollTop : 0;
+          const card = target.closest("[data-card-id]");
+          if (card) card.remove();
+          updateGridMeta("sharesGrid", "sharesMeta");
+          if (grid) grid.scrollTop = prevTop;
+        }
+        setBtnLoading(target, false, "删除");
+      });
+    }
+
+    const officialTbody = document.getElementById("officialTbody");
+    if (officialTbody) {
+      let dragSourceRow = null;
+      let sortAutoSaveTimer = null;
+      officialTbody.addEventListener("dragstart", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        dragSourceRow = row;
+        e.dataTransfer.effectAllowed = "move";
+        row.classList.add("opacity-50");
+      });
+      officialTbody.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const overRow = e.target && e.target.closest("tr[data-id]");
+        if (!overRow || overRow === dragSourceRow) return;
+        const rect = overRow.getBoundingClientRect();
+        const next = (e.clientY - rect.top) > rect.height / 2;
+        if (next) {
+          overRow.after(dragSourceRow);
+        } else {
+          overRow.before(dragSourceRow);
+        }
+      });
+      officialTbody.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
+        dragSourceRow = null;
+        syncOfficialSortNumbers();
+        const currentSignature = getOfficialSortSignature();
+        if (currentSignature === (officialTbody.dataset.sortSignature || "")) {
+          return;
+        }
+        if (sortAutoSaveTimer) clearTimeout(sortAutoSaveTimer);
+        sortAutoSaveTimer = setTimeout(() => {
+          saveOfficialSort();
+        }, 400);
+      });
+      officialTbody.addEventListener("dragend", () => {
+        if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
+        dragSourceRow = null;
+      });
+      officialTbody.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        const id = target.getAttribute("data-id");
+        if (!action || !id) return;
+        if (action === "toggle") {
+          setBtnLoading(target, true, "处理中...");
+          const enabled = target.getAttribute("data-enabled") !== "1";
+          const res = await fetch("/user/official-apis/batch", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ ids: [id], enabled })
+          });
+          const data = await res.json();
+          if (data.code !== 200) {
+            toast(data.message || "更新失败");
+          }
+          await loadOfficialApis();
+          setBtnLoading(target, false, enabled ? "已启用" : "已停用");
+          return;
+        }
+        if (action === "delete") {
+          setBtnLoading(target, true, "删除中...");
+          await deleteOfficialApi(id);
+          setBtnLoading(target, false, "删除");
+          return;
+        }
+        if (action === "save") {
+          setBtnLoading(target, true, "保存中...");
+          const rowInputs = officialTbody.querySelectorAll(`[data-id="${id}"][data-field]`);
+          const payload = {};
+          rowInputs.forEach((input) => {
+            const field = input.getAttribute("data-field");
+            if (!field) return;
+            if (field === "sort") {
+              payload.sort = Number(input.value || 0);
+            } else {
+              payload[field] = input.value;
+            }
+          });
+          const ok = await updateOfficialApi(id, payload);
+          if (ok) {
+            toast("已保存");
+            await loadOfficialApis();
+          }
+          setBtnLoading(target, false, "保存");
+        }
+      });
+    }
 
     document.getElementById("pageSizeInput").addEventListener("change", async () => {
       currentUsersPage = 1;
@@ -586,6 +1422,24 @@
       const id = btn.getAttribute("data-id");
       const action = btn.getAttribute("data-action");
       if (!id || !action) return;
+
+      if (action === "view-favorites") {
+        setBtnLoading(btn, true, "");
+        syncUserSelects(id);
+        await loadFavorites();
+        openModal("favoritesModal");
+        setBtnLoading(btn, false, "喜欢");
+        return;
+      }
+
+      if (action === "view-shares") {
+        setBtnLoading(btn, true, "");
+        syncUserSelects(id);
+        await loadShares();
+        openModal("sharesModal");
+        setBtnLoading(btn, false, "分享");
+        return;
+      }
 
       if (action === "perm") {
         pendingPermissionUserId = id;

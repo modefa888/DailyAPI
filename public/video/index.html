@@ -87,6 +87,33 @@
     </style>
 
     <style>
+        html.modal-open,
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        body.modal-open {
+            overscroll-behavior: none;
+        }
+
+        body.modal-open #appContent {
+            pointer-events: none;
+        }
+
+        body.modal-open #videoPlayerModal {
+            pointer-events: auto;
+        }
+
+        body.modal-open #shareModal,
+        body.modal-open #shareModal * {
+            pointer-events: auto;
+        }
+
+        body.modal-open #mathChallengeModal,
+        body.modal-open #mathChallengeModal * {
+            pointer-events: auto;
+        }
+
         body.privacy-on .video-thumb img {
             filter: blur(12px);
             transform: scale(1.05);
@@ -307,9 +334,6 @@
                 <button id="uploadFavoritesButton" onclick="uploadLocalFavorites()" class="w-full btn-primary hidden">
                     <i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢
                 </button>
-                <button onclick="openClearFavoritesConfirm()" class="w-full btn-secondary">
-                    <i class="fa fa-trash mr-1"></i> 清空喜欢
-                </button>
             </div>
     </div>
 
@@ -461,26 +485,25 @@
         <div class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4 text-sm">
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
                 <div class="text-base font-medium text-gray-800">功能概览</div>
-                <div class="text-gray-600">这是一个视频搜索与播放工具，支持多接口聚合、收藏与历史记录、观看进度续播、隐私模式与分享。</div>
+                <div class="text-gray-600">这是一个视频搜索与播放工具，支持多接口与聚合搜索、播放续播、喜欢与历史、分享管理、隐私模式，以及缩略图预览放大与快速播放。</div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
                 <div class="text-base font-medium text-gray-800">使用方法</div>
                 <div class="space-y-1 text-gray-600">
-                    <div>1. 在搜索框输入关键词开始搜索。</div>
-                    <div>2. 点“设置”选择或填写接口地址。</div>
-                    <div>3. “官方推荐”需要通过访问密码验证。</div>
-                    <div>4. 可开启“聚合搜索”一次查询多个接口。</div>
-                    <div>5. 进入视频后支持断点续播与播放历史记录。</div>
-                    <div>6. “喜欢”和“历史”可在更多菜单中查看。</div>
+                    <div>1. 在搜索框输入关键词开始搜索，或开启聚合搜索同时查询多个接口。</div>
+                    <div>2. 在“设置”中选择或填写接口地址，必要时完成访问验证。</div>
+                    <div>3. 点击卡片可播放，支持断点续播与观看记录。</div>
+                    <div>4. 在更多菜单中查看“喜欢”“历史”“分享”列表。</div>
+                    <div>5. 分享链接可设置有效期，并在分享列表中管理。</div>
                 </div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
                 <div class="text-base font-medium text-gray-800">小贴士</div>
-                <div class="text-gray-600">隐私模式会对缩略图打码；分享链接可设置有效期。</div>
+                <div class="text-gray-600">隐私模式会对缩略图打码；缩略图支持放大预览、左右切换与手势缩放；预览中可一键播放。</div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2">
                 <div class="text-base font-medium text-gray-800">数据说明</div>
-                <div class="text-gray-600">收藏、历史、搜索记录等信息只保存在本地浏览器。</div>
+                <div class="text-gray-600">收藏、历史、搜索记录等信息优先保存在本地浏览器，登录后可同步到账号。</div>
             </div>
         </div>
     </div>
@@ -1283,7 +1306,6 @@
         const USER_TOKEN_KEY = 'userToken';
         const USER_TOKEN_EXPIRES_KEY = 'userTokenExpires';
         const USER_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-        const OFFICIAL_API_TOKEN_KEY = 'officialApiToken';
         const USER_AVATAR_KEY = 'userAvatarUrl';
         const USER_AVATAR_API = 'https://v2.xxapi.cn/api/head';
 
@@ -1368,9 +1390,7 @@
         }
 
         function getOfficialApiUrl() {
-            const token = localStorage.getItem(OFFICIAL_API_TOKEN_KEY) || '';
-            if (!token) return '/apis/official';
-            return `/apis/official?token=${encodeURIComponent(token)}`;
+            return '/apis/official';
         }
         
         // 加载初始数据
@@ -1619,7 +1639,7 @@
                 card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset video-card';
                 card.setAttribute('data-video-url', video.vod_play_url || '');
                 card.innerHTML = `
-                    <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
+                    <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" data-preview-group="video" data-preview-url="${video.vod_pic || FALLBACK_IMAGE}" data-preview-title="${video.vod_name || ''}" data-preview-video-url="${video.vod_play_url || ''}" data-preview-source="${sourceLabel || ''}" onclick="openPreviewFromGroup(this)">
                         <img 
                             src="${FALLBACK_IMAGE}" 
                             data-src="${video.vod_pic}" 
@@ -1925,6 +1945,9 @@
         let mathChallengeResolver = null;
 
         function showMathChallengeModal() {
+            if (videoPlayerModal && !videoPlayerModal.classList.contains('hidden')) {
+                return Promise.resolve(false);
+            }
             const ops = ['+', '-', '*'];
             const op = ops[Math.floor(Math.random() * ops.length)];
             let a = Math.floor(Math.random() * 9) + 1;
@@ -1992,6 +2015,7 @@
         // 加载更多
         async function loadMoreData() {
             if (isLoading || (!host && !isAggregateSearchEnabled()) || !hasMore) return;
+            if (videoPlayerModal && !videoPlayerModal.classList.contains('hidden')) return;
 
             const now = Date.now();
             if (now - lastLoadMoreAt < 5000) {
@@ -2016,39 +2040,261 @@
             }
         }
         
+        function openPreviewFromGroup(el) {
+            if (!el || !el.dataset) return;
+            const group = el.dataset.previewGroup || '';
+            const nodes = group
+                ? Array.from(document.querySelectorAll(`[data-preview-group="${group}"]`))
+                : [];
+            const list = nodes.length > 0
+                ? nodes.map(node => ({
+                    url: String(node.dataset.previewUrl || ''),
+                    title: String(node.dataset.previewTitle || ''),
+                    videoUrl: String(node.dataset.previewVideoUrl || ''),
+                    source: String(node.dataset.previewSource || '')
+                })).filter(item => item.url)
+                : [{
+                    url: String(el.dataset.previewUrl || ''),
+                    title: String(el.dataset.previewTitle || ''),
+                    videoUrl: String(el.dataset.previewVideoUrl || ''),
+                    source: String(el.dataset.previewSource || '')
+                }];
+            const index = nodes.length > 0 ? Math.max(0, nodes.indexOf(el)) : 0;
+            const current = list[index] || list[0];
+            if (!current || !current.url) return;
+            openFullScreenPreview(current.url, current.title, list, index);
+        }
+
         // 显示全屏预览
-        function openFullScreenPreview(imageUrl, title) {
+        function openFullScreenPreview(imageUrl, title, list = [], startIndex = 0) {
+            const items = Array.isArray(list) && list.length > 0
+                ? list
+                : [{ url: imageUrl, title }];
+            let currentIndex = Math.min(Math.max(Number(startIndex) || 0, 0), items.length - 1);
+            let scale = 1;
+            let translateX = 0;
+            let translateY = 0;
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let pinchStartDist = 0;
+            let pinchStartScale = 1;
+            let swipeStartX = 0;
+            let swipeStartY = 0;
+            let lastTapAt = 0;
+
             const overlay = document.createElement('div');
             overlay.className = 'fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4';
             overlay.innerHTML = `
-                <div class="relative max-w-4xl max-h-[90vh]">
+                <div class="relative max-w-5xl max-h-[90vh] w-full flex items-center justify-center">
                     <button 
-                        onclick="this.closest('.fixed').remove()"
                         class="absolute -top-12 right-0 text-white hover:text-gray-300"
+                        data-action="close"
                     >
                         <i class="fa fa-times text-xl"></i>
                     </button>
-                    <img 
-                        src="${imageUrl}" 
-                        alt="${title}" 
-                        onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
-                        loading="lazy"
-                        class="max-w-full max-h-[90vh] object-contain rounded-lg"
+                    <button
+                        class="absolute -top-12 left-0 text-white hover:text-white/80 bg-blue-600/80 hover:bg-blue-600 rounded-full w-10 h-10 flex items-center justify-center hidden"
+                        data-action="play"
+                        title="播放"
                     >
-                    <p class="text-white text-center mt-4">${title}</p>
+                        <i class="fa fa-play text-base"></i>
+                    </button>
+                    <button 
+                        class="absolute left-0 md:-left-12 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center ${items.length > 1 ? '' : 'hidden'}"
+                        data-action="prev"
+                    >
+                        <i class="fa fa-angle-left text-2xl"></i>
+                    </button>
+                    <button 
+                        class="absolute right-0 md:-right-12 top-1/2 -translate-y-1/2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full w-10 h-10 flex items-center justify-center ${items.length > 1 ? '' : 'hidden'}"
+                        data-action="next"
+                    >
+                        <i class="fa fa-angle-right text-2xl"></i>
+                    </button>
+                    <div class="relative max-w-full max-h-[90vh] flex flex-col items-center">
+                        <img 
+                            src="" 
+                            alt="" 
+                            onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';"
+                            loading="lazy"
+                            class="max-w-full max-h-[90vh] object-contain rounded-lg select-none touch-none"
+                        >
+                        <div class="preview-meta text-white/80 text-xs mt-2"></div>
+                        <p class="preview-caption text-white text-center mt-2"></p>
+                    </div>
                 </div>
             `;
-            
+
             document.body.appendChild(overlay);
-            document.body.style.overflow = 'hidden';
-            
-            // 点击空白区域关闭
+            setModalScrollLock(true);
+
+            const img = overlay.querySelector('img');
+            const caption = overlay.querySelector('.preview-caption');
+            const meta = overlay.querySelector('.preview-meta');
+            const prevBtn = overlay.querySelector('[data-action="prev"]');
+            const nextBtn = overlay.querySelector('[data-action="next"]');
+            const closeBtn = overlay.querySelector('[data-action="close"]');
+            const playBtn = overlay.querySelector('[data-action="play"]');
+
+            const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+            const applyTransform = () => {
+                img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+            };
+            const resetTransform = () => {
+                scale = 1;
+                translateX = 0;
+                translateY = 0;
+                applyTransform();
+            };
+            const renderImage = () => {
+                const item = items[currentIndex] || items[0];
+                img.src = item.url;
+                img.alt = item.title || '';
+                caption.textContent = item.title || '';
+                if (meta) {
+                    meta.textContent = `${currentIndex + 1}/${items.length}`;
+                }
+                if (playBtn) {
+                    playBtn.classList.toggle('hidden', !item.videoUrl);
+                }
+                resetTransform();
+            };
+            const gotoIndex = (nextIndex) => {
+                if (items.length <= 1) return;
+                currentIndex = (nextIndex + items.length) % items.length;
+                renderImage();
+            };
+
+            const handleClose = () => {
+                overlay.remove();
+                setModalScrollLock(false);
+                document.removeEventListener('keydown', onKeyDown);
+            };
+
+            const onKeyDown = (e) => {
+                if (e.key === 'Escape') handleClose();
+                if (e.key === 'ArrowLeft') gotoIndex(currentIndex - 1);
+                if (e.key === 'ArrowRight') gotoIndex(currentIndex + 1);
+            };
+            document.addEventListener('keydown', onKeyDown);
+
+            if (closeBtn) closeBtn.addEventListener('click', handleClose);
+            if (prevBtn) prevBtn.addEventListener('click', () => gotoIndex(currentIndex - 1));
+            if (nextBtn) nextBtn.addEventListener('click', () => gotoIndex(currentIndex + 1));
+            if (playBtn) {
+                playBtn.addEventListener('click', () => {
+                    const item = items[currentIndex] || items[0];
+                    if (!item || !item.videoUrl) return;
+                    handleClose();
+                    openVideoPlayer(item.videoUrl, item.title || '', item.url || '', item.source || '');
+                });
+            }
+
             overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) {
-                    overlay.remove();
-                    document.body.style.overflow = '';
+                if (e.target === overlay) handleClose();
+            });
+
+            img.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.2 : 0.2;
+                const nextScale = clamp(scale + delta, 1, 4);
+                scale = nextScale;
+                if (scale === 1) {
+                    translateX = 0;
+                    translateY = 0;
+                }
+                applyTransform();
+            }, { passive: false });
+
+            img.addEventListener('mousedown', (e) => {
+                if (scale <= 1) return;
+                isDragging = true;
+                dragStartX = e.clientX - translateX;
+                dragStartY = e.clientY - translateY;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                translateX = e.clientX - dragStartX;
+                translateY = e.clientY - dragStartY;
+                applyTransform();
+            });
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            img.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 2) {
+                    pinchStartDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    pinchStartScale = scale;
+                    return;
+                }
+                if (e.touches.length === 1) {
+                    swipeStartX = e.touches[0].clientX;
+                    swipeStartY = e.touches[0].clientY;
+                    if (scale > 1) {
+                        isDragging = true;
+                        dragStartX = e.touches[0].clientX - translateX;
+                        dragStartY = e.touches[0].clientY - translateY;
+                    }
+                }
+            }, { passive: false });
+
+            img.addEventListener('touchmove', (e) => {
+                if (e.touches.length === 2) {
+                    e.preventDefault();
+                    const dist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    const nextScale = clamp(pinchStartScale * (dist / (pinchStartDist || dist)), 1, 4);
+                    scale = nextScale;
+                    if (scale === 1) {
+                        translateX = 0;
+                        translateY = 0;
+                    }
+                    applyTransform();
+                    return;
+                }
+                if (e.touches.length === 1 && isDragging) {
+                    e.preventDefault();
+                    translateX = e.touches[0].clientX - dragStartX;
+                    translateY = e.touches[0].clientY - dragStartY;
+                    applyTransform();
+                }
+            }, { passive: false });
+
+            img.addEventListener('touchend', (e) => {
+                if (e.touches.length === 0) {
+                    isDragging = false;
+                    const now = Date.now();
+                    if (now - lastTapAt < 280) {
+                        if (scale > 1) {
+                            resetTransform();
+                        } else {
+                            scale = 2;
+                            applyTransform();
+                        }
+                        lastTapAt = 0;
+                        return;
+                    }
+                    lastTapAt = now;
+                    if (scale <= 1.05 && items.length > 1) {
+                        const endX = (e.changedTouches[0] || {}).clientX || swipeStartX;
+                        const endY = (e.changedTouches[0] || {}).clientY || swipeStartY;
+                        const deltaX = endX - swipeStartX;
+                        const deltaY = endY - swipeStartY;
+                        if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+                            gotoIndex(deltaX > 0 ? currentIndex - 1 : currentIndex + 1);
+                        }
+                    }
                 }
             });
+
+            renderImage();
         }
         
         // 打开视频播放器
@@ -2060,7 +2306,7 @@
                     return;
                 }
             }
-            
+
             showLoading('正在加载视频...');
             
             try {
@@ -2081,8 +2327,8 @@
                 saveToHistory(videoTitle, realVideoUrl, imageUrl, currentVideoSource);
                 
                 // 显示播放器
+                setModalScrollLock(true);
                 videoPlayerModal.classList.remove('hidden');
-                document.body.style.overflow = 'hidden';
                 
                 // 初始化DPlayer
                 if (dplayer) {
@@ -2203,7 +2449,7 @@
             }
             
             videoPlayerModal.classList.add('hidden');
-            document.body.style.overflow = '';
+            setModalScrollLock(false);
             currentVideoUrl = '';
             currentVideoTitle = '';
             currentVideoPic = '';
@@ -2221,6 +2467,42 @@
                 mobileCloseButton.className = 'md:hidden fixed top-4 right-4 bg-red-600 text-white rounded-full w-12 h-12 flex items-center justify-center z-50 shadow-lg';
                 mobileCloseButton.style.cssText = '';
             }
+        }
+
+        function setModalScrollLock(locked) {
+            const body = document.body;
+            const html = document.documentElement;
+            const isLocked = body.classList.contains('modal-open');
+            if (locked === isLocked) return;
+            const app = document.getElementById('appContent');
+            if (locked) {
+                const scrollY = window.scrollY || window.pageYOffset || 0;
+                body.dataset.scrollLockY = String(scrollY);
+                if (app) {
+                    app.style.position = 'fixed';
+                    app.style.top = `-${scrollY}px`;
+                    app.style.left = '0';
+                    app.style.right = '0';
+                    app.style.width = '100%';
+                }
+                body.style.overflow = 'hidden';
+            } else {
+                const scrollY = Number(body.dataset.scrollLockY || 0);
+                if (app) {
+                    app.style.position = '';
+                    app.style.top = '';
+                    app.style.left = '';
+                    app.style.right = '';
+                    app.style.width = '';
+                }
+                body.style.overflow = '';
+                delete body.dataset.scrollLockY;
+                if (Number.isFinite(scrollY)) {
+                    window.scrollTo(0, scrollY);
+                }
+            }
+            body.classList.toggle('modal-open', locked);
+            html.classList.toggle('modal-open', locked);
         }
         
         // 保存到播放历史
@@ -2283,7 +2565,7 @@
                     return `
                     <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
                         <div class="flex space-x-3">
-                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
+                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 cursor-pointer" data-preview-group="history" data-preview-url="${item.pic || FALLBACK_IMAGE}" data-preview-title="${item.title || ''}" data-preview-video-url="${item.url || ''}" data-preview-source="${item.source || ''}" onclick="openPreviewFromGroup(this)">
                                 ${
                                     item.pic
                                         ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
@@ -2596,7 +2878,7 @@
             favoriteContent.innerHTML = favorites.map(item => `
                 <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
                     <div class="flex space-x-3">
-                        <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
+                        <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 cursor-pointer" data-preview-group="favorite" data-preview-url="${item.pic || FALLBACK_IMAGE}" data-preview-title="${item.title || ''}" data-preview-video-url="${item.url || ''}" data-preview-source="${item.source || ''}" onclick="openPreviewFromGroup(this)">
                             ${
                                 item.pic
                                     ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
@@ -2622,7 +2904,7 @@
                             <i class="fa fa-play mr-1"></i> 播放
                         </button>
                         <button 
-                            onclick="removeFavorite('${item.url}')"
+                            onclick="removeFavoriteWithSpin(this, '${item.url}')"
                             class="text-gray-500 hover:text-red-500 p-1"
                         >
                             <i class="fa fa-trash"></i>
@@ -2679,6 +2961,19 @@
             } catch (error) {
                 console.error('移除喜欢失败:', error);
             }
+        }
+
+        async function removeFavoriteWithSpin(button, url) {
+            if (button) {
+                button.disabled = true;
+                button.classList.add('opacity-60', 'cursor-not-allowed');
+                const icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('fa-trash');
+                    icon.classList.add('fa-refresh', 'fa-spin');
+                }
+            }
+            await removeFavorite(url);
         }
 
         function openClearFavoritesConfirm() {
@@ -3397,20 +3692,6 @@
                 renderOfficialApis(officialApiCache);
                 return;
             }
-
-            if (!force) {
-                try {
-                    const cached = JSON.parse(localStorage.getItem('officialApiList') || 'null');
-                    if (cached && Array.isArray(cached)) {
-                        const payload = { code: 200, data: cached };
-                        officialApiCache = payload;
-                        renderOfficialApis(payload);
-                        return;
-                    }
-                } catch (e) {
-                    // ignore
-                }
-            }
             
             officialApiList.innerHTML = `
                 <div class="text-xs text-gray-500">正在获取官方推荐...</div>
@@ -3435,11 +3716,6 @@
                         throw new Error('官方接口返回异常');
                     }
                     officialApiCache = data;
-                    try {
-                        localStorage.setItem('officialApiList', JSON.stringify(data.data));
-                    } catch (e) {
-                        // ignore storage errors
-                    }
                     renderOfficialApis(data);
                 })
                 .catch(err => {
@@ -3503,26 +3779,10 @@
             if (officialApiCache && Array.isArray(officialApiCache.data)) {
                 return officialApiCache.data.filter(item => item && item.url);
             }
-            try {
-                const cached = localStorage.getItem('officialApiList');
-                if (cached) {
-                    const list = JSON.parse(cached);
-                    if (Array.isArray(list)) {
-                        return list.filter(item => item && item.url);
-                    }
-                }
-            } catch (e) {
-                // ignore cache errors
-            }
             const res = await fetch(getOfficialApiUrl());
             const data = await res.json();
             if (data && data.code === 200 && Array.isArray(data.data)) {
                 officialApiCache = data;
-                try {
-                    localStorage.setItem('officialApiList', JSON.stringify(data.data));
-                } catch (e) {
-                    // ignore storage errors
-                }
                 renderAggregateApiSelection(data.data);
                 return data.data.filter(item => item && item.url);
             }
@@ -3782,6 +4042,8 @@
                         title: item.title,
                         pic: item.pic || '',
                         source: item.source || '',
+                        viewCount: Number(item.viewCount || 0),
+                        lastViewAt: Number(item.lastViewAt || 0),
                         expireSeconds: Number(item.expireSeconds || 0),
                         expiresAt: Number(item.expiresAt || 0),
                         createdAt: Number(item.createdAt || Date.now()),
@@ -3825,6 +4087,10 @@
             const expiresAt = Number.isFinite(item.expiresAt)
                 ? item.expiresAt
                 : (expireSeconds > 0 ? createdAt + expireSeconds * 1000 : 0);
+            const viewCountRaw = Number(item.viewCount);
+            const viewCount = Number.isFinite(viewCountRaw) ? viewCountRaw : undefined;
+            const lastViewAtRaw = Number(item.lastViewAt);
+            const lastViewAt = Number.isFinite(lastViewAtRaw) && lastViewAtRaw > 0 ? lastViewAtRaw : undefined;
             const shareUrl = item.shareUrl || buildShareUrl(url, title, pic, source, expireSeconds, id);
             return {
                 id,
@@ -3834,6 +4100,8 @@
                 source,
                 createdAt,
                 updatedAt: Number(item.updatedAt || createdAt),
+                viewCount,
+                lastViewAt,
                 expireSeconds,
                 expiresAt,
                 shareUrl
@@ -4213,6 +4481,12 @@
         function renderShareContent(list) {
             if (!shareContent) return;
             const shares = Array.isArray(list) ? list.map(normalizeShareItem).filter(Boolean) : [];
+            shares.sort((a, b) => {
+                const aLast = Number(a.lastViewAt || 0);
+                const bLast = Number(b.lastViewAt || 0);
+                if (bLast !== aLast) return bLast - aLast;
+                return Number(b.createdAt || 0) - Number(a.createdAt || 0);
+            });
             if (shares.length === 0) {
                 shareContent.innerHTML = `
                     <div class="text-center py-8 text-gray-500">
@@ -4228,11 +4502,11 @@
                 return `
                     <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
                         <div class="flex space-x-3">
-                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
+                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 cursor-pointer" data-preview-group="share" data-preview-url="${item.pic || FALLBACK_IMAGE}" data-preview-title="${item.title || ''}" data-preview-video-url="${item.url || ''}" data-preview-source="${item.source || ''}" onclick="openPreviewFromGroup(this)">
                                 ${
                                     item.pic
                                         ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
-                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
+                                    : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
                                 }
                             </div>
                             <div class="flex-1 min-w-0">
@@ -4242,6 +4516,8 @@
                                 </h4>
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <span>分享时间: ${formatDate(item.createdAt)}</span>
+                                    <span>查看次数: ${Number.isFinite(item.viewCount) ? item.viewCount : 0}</span>
+                                    <span>最近查看: ${item.lastViewAt ? formatDate(item.lastViewAt) : '-'}</span>
                                     <span class="${statusClass}">${statusText}</span>
                                 </div>
                             </div>
@@ -4249,14 +4525,14 @@
                         <div class="mt-3 space-y-2">
                             <label class="block text-xs text-gray-500">有效时间</label>
                             <div class="flex items-center space-x-2">
-                                <select class="input-primary w-full text-xs" onchange="updateShareExpire('${item.id}', this.value)">
+                                <select class="input-primary flex-[4] text-xs" onchange="updateShareExpire('${item.id}', this.value)">
                                     <option value="1800" ${Number(item.expireSeconds) === 1800 ? 'selected' : ''}>30分钟</option>
                                     <option value="7200" ${Number(item.expireSeconds) === 7200 ? 'selected' : ''}>2小时</option>
                                     <option value="86400" ${Number(item.expireSeconds) === 86400 ? 'selected' : ''}>1天</option>
                                     <option value="604800" ${Number(item.expireSeconds) === 604800 ? 'selected' : ''}>7天</option>
                                     <option value="0" ${Number(item.expireSeconds) === 0 ? 'selected' : ''}>永久</option>
                                 </select>
-                                <button onclick="copyShareLink('${item.id}')" class="btn-secondary text-xs px-3">
+                                <button onclick="copyShareLink('${item.id}')" class="btn-secondary text-xs px-3 flex-[1]">
                                     <i class="fa fa-copy mr-1"></i> 复制
                                 </button>
                             </div>

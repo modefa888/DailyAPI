@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const apisRouter = new Router();
 const client = require("../../utils/mongo");
 const { encryptUrl } = require("../../utils/urlCipher");
+const { DEFAULT_OFFICIAL_APIS } = require("../../utils/officialApis");
 
 // 接口信息
 const routerInfo = { name: "官方推荐API", title: "官方推荐", subtitle: "视频资源接口" };
@@ -10,6 +11,19 @@ const videoAccessPassword = process.env.VIDEO_ACCESS_PASSWORD || "123456";
 const accessTokenTtlMs = Number(process.env.VIDEO_ACCESS_TOKEN_TTL_MS || 86400000);
 const accessTokens = new Map();
 const DB_NAME = process.env.MONGODB_DB || undefined;
+let officialIndexesReady = false;
+
+const getDb = async () => {
+    await client.connect();
+    return DB_NAME ? client.db(DB_NAME) : client.db();
+};
+
+const ensureOfficialIndexes = async (db) => {
+    if (officialIndexesReady) return;
+    await db.collection("official_apis").createIndex({ url: 1 }, { unique: true });
+    await db.collection("official_apis").createIndex({ enabled: 1, sort: 1, updatedAt: -1 });
+    officialIndexesReady = true;
+};
 
 function issueAccessToken() {
     const token = crypto.randomBytes(24).toString("hex");
@@ -54,79 +68,6 @@ async function isUserTokenValid(token) {
     }
 }
 
-// 官方推荐 API 列表
-const officialApis = [
-    {
-        name: "奶香香资源",
-        url: "https://naixxzy.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "麻豆资源",
-        url: "https://91md.me/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "深林资源",
-        url: "https://slapibf.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "155资源",
-        url: "https://155api.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "奥斯卡资源",
-        url: "https://aosikazy.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "老色逼资源",
-        url: "https://apilsbzy1.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "百万资源",
-        url: "https://api.bwzyz.com/api.php/provide/vod/at/json/",
-        type: "vod",
-    },
-    {
-        name: "杏吧资源",
-        url: "https://json.xingba222.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "幸资资源",
-        url: "https://xzybb2.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "黄色仓库",
-        url: "https://hsckzy888.com/api.php/provide/vod/from/hsckm3u8/at/json/",
-        type: "vod",
-    },
-    {
-        name: "香蕉资源",
-        url: "https://www.xiangjiaozyw.com/api.php/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "小鸡资源",
-        url: "https://api.xjzyapi.xyz/provide/vod/",
-        type: "vod",
-    },
-    {
-        name: "乐播资源",
-        url: "https://lbapi9.com/api.php/provide/vod/at/json/",
-        type: "vod",
-    },
-    {
-        name: "色猫资源",
-        url: "https://caiji.semaozy.net/inc/apijson_vod.php",
-        type: "vod",
-    },
-];
 
 
 /* ================== apis ================== */
@@ -144,10 +85,32 @@ apisRouter.get("/apis/official", async (ctx) => {
         };
         return;
     }
-    const data = officialApis.map((api) => ({
-        ...api,
-        url: encryptUrl(api.url),
-    }));
+    const db = await getDb();
+    await ensureOfficialIndexes(db);
+    let list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    if (!list || list.length === 0) {
+        const now = new Date();
+        const payload = DEFAULT_OFFICIAL_APIS.map((api, index) => ({
+            name: api.name,
+            url: api.url,
+            type: api.type || "vod",
+            enabled: true,
+            sort: index + 1,
+            createdAt: now,
+            updatedAt: now,
+        }));
+        if (payload.length > 0) {
+            await db.collection("official_apis").insertMany(payload, { ordered: false });
+        }
+        list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    }
+    const data = list
+        .filter((api) => api && api.enabled)
+        .map((api) => ({
+            name: api.name,
+            url: encryptUrl(api.url),
+            type: api.type || "vod",
+        }));
     ctx.body = {
         code: 200,
         message: "获取成功",

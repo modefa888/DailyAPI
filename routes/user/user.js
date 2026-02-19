@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const { ObjectId } = require("mongodb");
 const client = require("../../utils/mongo");
+const { DEFAULT_OFFICIAL_APIS } = require("../../utils/officialApis");
 
 const userRouter = new Router();
 
@@ -13,6 +14,7 @@ userRouter.info = routerInfo;
 
 const TOKEN_TTL_MS = Number(process.env.USER_TOKEN_TTL_MS || 7 * 24 * 60 * 60 * 1000);
 const DB_NAME = process.env.MONGODB_DB || undefined;
+const SESSION_TOUCH_INTERVAL_MS = Number(process.env.USER_SESSION_TOUCH_MS || 60 * 1000);
 
 let indexesReady = false;
 const ensureIndexes = async (db) => {
@@ -20,6 +22,9 @@ const ensureIndexes = async (db) => {
     await db.collection("users").createIndex({ username: 1 }, { unique: true });
     await db.collection("user_sessions").createIndex({ token: 1 }, { unique: true });
     await db.collection("user_sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection("user_sessions").createIndex({ lastSeenAt: -1 });
+    await db.collection("official_apis").createIndex({ url: 1 }, { unique: true });
+    await db.collection("official_apis").createIndex({ enabled: 1, sort: 1, updatedAt: -1 });
     await db.collection("user_favorites").createIndex({ userId: 1, url: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ userId: 1, shareId: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -116,6 +121,27 @@ const authMiddleware = async (ctx, next) => {
     }
     ctx.state.user = user;
     ctx.state.session = session;
+    const now = new Date();
+    const lastSeenAt = session.lastSeenAt ? new Date(session.lastSeenAt) : null;
+    if (!lastSeenAt || now - lastSeenAt > SESSION_TOUCH_INTERVAL_MS) {
+        db.collection("user_sessions")
+            .updateOne(
+                { _id: session._id },
+                {
+                    $set: {
+                        lastSeenAt: now,
+                        lastPage: ctx.request.path || "",
+                        ip: ctx.request.ip,
+                        userAgent: ctx.headers["user-agent"] || "",
+                    },
+                },
+            )
+            .catch(() => {});
+        db.collection("users")
+            .updateOne({ _id: user._id }, { $set: { lastSeenAt: now } })
+            .catch(() => {});
+        session.lastSeenAt = now;
+    }
     await next();
 };
 
@@ -201,6 +227,10 @@ userRouter.post("/user/login", async (ctx) => {
         token,
         createdAt: now,
         expiresAt,
+        lastSeenAt: now,
+        lastPage: ctx.request.path || "",
+        ip: ctx.request.ip,
+        userAgent: ctx.headers["user-agent"] || "",
     });
     ctx.body = {
         code: 200,
@@ -218,6 +248,26 @@ userRouter.post("/user/logout", authMiddleware, async (ctx) => {
     const db = await getDb();
     await db.collection("user_sessions").deleteOne({ _id: ctx.state.session._id });
     ctx.body = { code: 200, message: "已退出" };
+});
+
+// 心跳（登录用户）
+userRouter.post("/user/heartbeat", authMiddleware, async (ctx) => {
+    const db = await getDb();
+    const page = String((ctx.request.body || {}).page || "").trim();
+    const now = new Date();
+    await db.collection("user_sessions").updateOne(
+        { _id: ctx.state.session._id },
+        {
+            $set: {
+                lastSeenAt: now,
+                lastPage: page || ctx.request.path || "",
+                ip: ctx.request.ip,
+                userAgent: ctx.headers["user-agent"] || "",
+            },
+        },
+    );
+    await db.collection("users").updateOne({ _id: ctx.state.user._id }, { $set: { lastSeenAt: now } });
+    ctx.body = { code: 200, message: "ok", data: { lastSeenAt: now.getTime() } };
 });
 
 // 验证当前用户密码
@@ -334,6 +384,202 @@ userRouter.get("/user/pages", authMiddleware, requireAdmin, async (ctx) => {
     ctx.body = { code: 200, message: "获取成功", data: listHtmlPages() };
 });
 
+// 在线用户（管理员）
+userRouter.get("/user/online", authMiddleware, requireAdmin, async (ctx) => {
+    const rawWithin = Number(ctx.query.within || 300000);
+    const withinMs = Math.min(24 * 60 * 60 * 1000, Math.max(60 * 1000, rawWithin));
+    const since = new Date(Date.now() - withinMs);
+    const db = await getDb();
+    const sessions = await db
+        .collection("user_sessions")
+        .aggregate([
+            { $match: { lastSeenAt: { $gte: since } } },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "userId",
+                    foreignField: "_id",
+                    as: "user",
+                },
+            },
+            { $unwind: "$user" },
+            { $sort: { lastSeenAt: -1 } },
+            { $limit: 500 },
+        ])
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        withinMs,
+        total: sessions.length,
+        data: sessions.map((s) => ({
+            sessionId: String(s._id),
+            userId: String(s.userId),
+            username: s.user ? s.user.username : "",
+            nickname: s.user ? s.user.nickname : "",
+            role: s.user ? s.user.role : "",
+            isDisabled: !!(s.user && s.user.isDisabled),
+            lastSeenAt: s.lastSeenAt ? s.lastSeenAt.getTime() : 0,
+            lastPage: s.lastPage || "",
+            ip: s.ip || "",
+            userAgent: s.userAgent || "",
+            createdAt: s.createdAt ? s.createdAt.getTime() : 0,
+        })),
+    };
+});
+
+// 官方推荐接口列表（管理员）
+userRouter.get("/user/official-apis", authMiddleware, requireAdmin, async (ctx) => {
+    const db = await getDb();
+    let list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    if (!list || list.length === 0) {
+        const now = new Date();
+        const payload = DEFAULT_OFFICIAL_APIS.map((api, index) => ({
+            name: api.name,
+            url: api.url,
+            type: api.type || "vod",
+            enabled: true,
+            sort: index + 1,
+            createdAt: now,
+            updatedAt: now,
+        }));
+        if (payload.length > 0) {
+            await db.collection("official_apis").insertMany(payload, { ordered: false });
+        }
+        list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    }
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: list.map((item) => ({
+            id: String(item._id),
+            name: item.name,
+            url: item.url,
+            type: item.type || "vod",
+            enabled: !!item.enabled,
+            sort: Number(item.sort || 0),
+            createdAt: item.createdAt ? item.createdAt.getTime() : 0,
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : 0,
+        })),
+    };
+});
+
+// 新增官方推荐接口（管理员）
+userRouter.post("/user/official-apis", authMiddleware, requireAdmin, async (ctx) => {
+    const { name, url, type, enabled, sort } = ctx.request.body || {};
+    const safeName = String(name || "").trim();
+    const safeUrl = String(url || "").trim();
+    if (!safeName || !safeUrl) {
+        ctx.body = { code: 400, message: "名称或URL不能为空" };
+        return;
+    }
+    const now = new Date();
+    const db = await getDb();
+    try {
+        const result = await db.collection("official_apis").insertOne({
+            name: safeName,
+            url: safeUrl,
+            type: String(type || "vod").trim() || "vod",
+            enabled: enabled !== false,
+            sort: Number(sort || 0),
+            createdAt: now,
+            updatedAt: now,
+        });
+        ctx.body = { code: 200, message: "新增成功", data: { id: String(result.insertedId) } };
+    } catch (err) {
+        if (err && err.code === 11000) {
+            ctx.body = { code: 409, message: "URL已存在" };
+            return;
+        }
+        ctx.body = { code: 500, message: "新增失败" };
+    }
+});
+
+// 批量排序更新（管理员）
+userRouter.put("/user/official-apis/sort", authMiddleware, requireAdmin, async (ctx) => {
+    const items = Array.isArray(ctx.request.body?.items) ? ctx.request.body.items : [];
+    const updates = items
+        .map((item) => ({
+            id: String(item.id || "").trim(),
+            sort: Number(item.sort || 0),
+        }))
+        .filter((item) => ObjectId.isValid(item.id));
+    if (updates.length === 0) {
+        ctx.body = { code: 400, message: "无有效排序数据" };
+        return;
+    }
+    const db = await getDb();
+    const ops = updates.map((item) => ({
+        updateOne: {
+            filter: { _id: new ObjectId(item.id) },
+            update: { $set: { sort: item.sort, updatedAt: new Date() } },
+        },
+    }));
+    await db.collection("official_apis").bulkWrite(ops, { ordered: false });
+    ctx.body = { code: 200, message: "排序已更新", total: updates.length };
+});
+
+// 批量启用/停用（管理员）
+userRouter.put("/user/official-apis/batch", authMiddleware, requireAdmin, async (ctx) => {
+    const ids = Array.isArray(ctx.request.body?.ids) ? ctx.request.body.ids : [];
+    const enabled = ctx.request.body?.enabled;
+    if (enabled === undefined) {
+        ctx.body = { code: 400, message: "缺少 enabled 参数" };
+        return;
+    }
+    const validIds = ids.filter((id) => ObjectId.isValid(String(id || "")));
+    if (validIds.length === 0) {
+        ctx.body = { code: 400, message: "无有效ID" };
+        return;
+    }
+    const db = await getDb();
+    const objectIds = validIds.map((id) => new ObjectId(id));
+    const result = await db.collection("official_apis").updateMany(
+        { _id: { $in: objectIds } },
+        { $set: { enabled: !!enabled, updatedAt: new Date() } },
+    );
+    ctx.body = { code: 200, message: "更新成功", total: result.modifiedCount };
+});
+
+// 更新官方推荐接口（管理员）
+userRouter.put("/user/official-apis/:id", authMiddleware, requireAdmin, async (ctx) => {
+    const id = String(ctx.params.id || "").trim();
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "ID不合法" };
+        return;
+    }
+    const { name, url, type, enabled, sort } = ctx.request.body || {};
+    const update = { updatedAt: new Date() };
+    if (name !== undefined) update.name = String(name || "").trim();
+    if (url !== undefined) update.url = String(url || "").trim();
+    if (type !== undefined) update.type = String(type || "vod").trim() || "vod";
+    if (enabled !== undefined) update.enabled = !!enabled;
+    if (sort !== undefined) update.sort = Number(sort || 0);
+    const db = await getDb();
+    try {
+        await db.collection("official_apis").updateOne({ _id: new ObjectId(id) }, { $set: update });
+        ctx.body = { code: 200, message: "更新成功" };
+    } catch (err) {
+        if (err && err.code === 11000) {
+            ctx.body = { code: 409, message: "URL已存在" };
+            return;
+        }
+        ctx.body = { code: 500, message: "更新失败" };
+    }
+});
+
+// 删除官方推荐接口（管理员）
+userRouter.delete("/user/official-apis/:id", authMiddleware, requireAdmin, async (ctx) => {
+    const id = String(ctx.params.id || "").trim();
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "ID不合法" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("official_apis").deleteOne({ _id: new ObjectId(id) });
+    ctx.body = { code: 200, message: "已删除" };
+});
+
 // 获取喜欢列表（登录用户）
 userRouter.get("/user/favorites", authMiddleware, async (ctx) => {
     const db = await getDb();
@@ -353,6 +599,49 @@ userRouter.get("/user/favorites", authMiddleware, async (ctx) => {
             timestamp: item.createdAt ? item.createdAt.getTime() : Date.now(),
         })),
     };
+});
+
+// 获取喜欢列表（管理员指定用户）
+userRouter.get("/user/:id/favorites", authMiddleware, requireAdmin, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "用户ID不合法" };
+        return;
+    }
+    const db = await getDb();
+    const favorites = await db
+        .collection("user_favorites")
+        .find({ userId: new ObjectId(id) })
+        .sort({ createdAt: -1 })
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: favorites.map((item) => ({
+            title: item.title,
+            url: item.url,
+            pic: item.pic,
+            source: item.source,
+            timestamp: item.createdAt ? item.createdAt.getTime() : Date.now(),
+        })),
+    };
+});
+
+// 删除喜欢（管理员指定用户）
+userRouter.delete("/user/:id/favorites", authMiddleware, requireAdmin, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "用户ID不合法" };
+        return;
+    }
+    const url = String(ctx.request.body?.url || "").trim();
+    if (!url) {
+        ctx.body = { code: 400, message: "缺少 url 参数" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("user_favorites").deleteOne({ userId: new ObjectId(id), url });
+    ctx.body = { code: 200, message: "已删除" };
 });
 
 // 添加喜欢（登录用户）
@@ -438,12 +727,63 @@ userRouter.get("/user/shares", authMiddleware, async (ctx) => {
             title: item.title,
             pic: item.pic,
             source: item.source,
+            viewCount: Number(item.viewCount || 0),
+            lastViewAt: item.lastViewAt ? item.lastViewAt.getTime() : null,
             expireSeconds: item.expireSeconds || 0,
             expiresAt: item.expiresAt ? item.expiresAt.getTime() : 0,
             createdAt: item.createdAt ? item.createdAt.getTime() : Date.now(),
             updatedAt: item.updatedAt ? item.updatedAt.getTime() : null,
         })),
     };
+});
+
+// 获取分享列表（管理员指定用户）
+userRouter.get("/user/:id/shares", authMiddleware, requireAdmin, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "用户ID不合法" };
+        return;
+    }
+    const db = await getDb();
+    const shares = await db
+        .collection("user_shares")
+        .find({ userId: new ObjectId(id) })
+        .sort({ createdAt: -1 })
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: shares.map((item) => ({
+            shareId: item.shareId,
+            url: item.url,
+            title: item.title,
+            pic: item.pic,
+            source: item.source,
+            viewCount: Number(item.viewCount || 0),
+            lastViewAt: item.lastViewAt ? item.lastViewAt.getTime() : null,
+            expireSeconds: item.expireSeconds || 0,
+            expiresAt: item.expiresAt ? item.expiresAt.getTime() : 0,
+            createdAt: item.createdAt ? item.createdAt.getTime() : Date.now(),
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : null,
+        })),
+    };
+});
+
+// 删除分享（管理员指定用户）
+userRouter.delete("/user/:id/shares", authMiddleware, requireAdmin, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "用户ID不合法" };
+        return;
+    }
+    const shareId = String(ctx.request.body?.shareId || "").trim();
+    if (!shareId) {
+        ctx.body = { code: 400, message: "缺少 shareId 参数" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("user_shares").deleteOne({ userId: new ObjectId(id), shareId });
+    ctx.body = { code: 200, message: "已删除" };
 });
 
 // 保存分享（登录用户）
@@ -473,6 +813,8 @@ userRouter.post("/user/shares", authMiddleware, async (ctx) => {
             },
             $setOnInsert: {
                 createdAt: now,
+                viewCount: 0,
+                lastViewAt: null,
             },
         },
         { upsert: true }

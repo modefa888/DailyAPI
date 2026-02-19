@@ -30,19 +30,28 @@ shareRouter.get("/share/:shareId", async (ctx) => {
         ctx.body = { code: 410, message: "分享已过期" };
         return;
     }
+    const now = new Date();
+    const updated = await db.collection("user_shares").findOneAndUpdate(
+        { shareId },
+        { $inc: { viewCount: 1 }, $set: { lastViewAt: now } },
+        { returnDocument: "after" }
+    );
+    const finalShare = updated.value || share;
     ctx.body = {
         code: 200,
         message: "获取成功",
         ...routerInfo,
         data: {
-            shareId: share.shareId,
-            url: share.url,
-            title: share.title,
-            pic: share.pic,
-            source: share.source,
-            expiresAt: expiresAtMs,
-            createdAt: share.createdAt ? share.createdAt.getTime() : Date.now(),
-            updatedAt: share.updatedAt ? share.updatedAt.getTime() : null,
+            shareId: finalShare.shareId,
+            url: finalShare.url,
+            title: finalShare.title,
+            pic: finalShare.pic,
+            source: finalShare.source,
+            viewCount: Number(finalShare.viewCount || 0),
+            lastViewAt: finalShare.lastViewAt ? finalShare.lastViewAt.getTime() : null,
+            expiresAt: finalShare.expiresAt ? finalShare.expiresAt.getTime() : 0,
+            createdAt: finalShare.createdAt ? finalShare.createdAt.getTime() : Date.now(),
+            updatedAt: finalShare.updatedAt ? finalShare.updatedAt.getTime() : null,
         },
     };
 });
