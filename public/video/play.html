@@ -111,20 +111,58 @@
         <div id="errorBox" class="hidden mt-4 bg-red-500/20 border border-red-400/40 text-red-200 p-3 rounded-lg text-sm"></div>
     </div>
 
-    <div id="expiredOverlay" class="fixed inset-0 hidden items-center justify-center bg-black/90 z-50">
-        <div class="text-center px-6">
-            <div class="text-4xl md:text-6xl font-bold text-white tracking-widest">已过期</div>
-            <div class="mt-3 text-sm md:text-base text-white/70">分享链接已失效</div>
+    <div id="expiredOverlay" class="fixed inset-0 hidden items-center justify-center bg-black z-50">
+        <div class="text-center px-6 relative z-10">
+            <div class="text-4xl md:text-6xl font-bold tracking-widest bg-gradient-to-r from-rose-400 via-amber-300 to-cyan-400 text-transparent bg-clip-text">已过期</div>
+            <div class="mt-3 text-sm md:text-base bg-gradient-to-r from-emerald-300 via-sky-300 to-violet-400 text-transparent bg-clip-text">分享链接已失效</div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="fixed inset-0 hidden items-center justify-center bg-black z-40">
+        <div class="flex flex-col items-center space-y-3 text-white">
+            <div class="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            <div class="text-sm text-white/80">加载中...</div>
         </div>
     </div>
 
     <script>
+        function showLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            overlay.classList.add('flex');
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (!overlay) return;
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }
+
         function safeDecodeBase64(value) {
             try {
                 return atob(value);
             } catch (e) {
                 return '';
             }
+        }
+
+        function base64Url(value) {
+            try {
+                return btoa(unescape(encodeURIComponent(String(value || ''))))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/g, '');
+            } catch (e) {
+                return '';
+            }
+        }
+
+        function getShareId(url, title) {
+            const raw = `${url || ''}|${title || ''}`;
+            const encoded = base64Url(raw);
+            return encoded ? `s_${encoded}` : '';
         }
 
         function parseShareKey() {
@@ -140,10 +178,17 @@
                     return item || '';
                 }
             });
-            const [url, title, pic, source, expiresAtRaw] = parts;
+            const [url, title, pic, source, expiresAtRaw, shareIdRaw] = parts;
             if (!url) return null;
             const expiresAt = Number(expiresAtRaw || 0);
-            return { url, title: title || '分享视频', pic: pic || '', source: source || '', expiresAt };
+            return {
+                url,
+                title: title || '分享视频',
+                pic: pic || '',
+                source: source || '',
+                expiresAt,
+                shareId: String(shareIdRaw || '').trim()
+            };
         }
 
         function showError(message) {
@@ -199,6 +244,19 @@
                 }
             }, 1000);
             return timer;
+        }
+
+        async function fetchShareDetail(shareId) {
+            if (!shareId) return null;
+            try {
+                const res = await fetch(`/share/${encodeURIComponent(shareId)}`);
+                if (!res.ok) return null;
+                const data = await res.json();
+                if (!data || data.code !== 200 || !data.data) return null;
+                return data.data;
+            } catch (e) {
+                return null;
+            }
         }
 
         function copyToClipboard(text) {
@@ -286,18 +344,45 @@
             });
         }
 
-        const payload = parseShareKey();
-        if (!payload) {
-            showError('分享链接无效或已过期');
-            showExpiredOverlay();
-        } else if (payload.expiresAt && Date.now() > payload.expiresAt) {
-            showError('分享链接已过期');
-            showExpiredOverlay();
-            startCountdown(payload.expiresAt);
-        } else {
-            initPlayer(payload);
-            startCountdown(payload.expiresAt);
-        }
+        (async () => {
+            showLoading();
+            const payload = parseShareKey();
+            if (!payload) {
+                showError('分享链接无效或已过期');
+                showExpiredOverlay();
+                hideLoading();
+                return;
+            }
+            let resolved = { ...payload };
+            const shareId = payload.shareId || getShareId(payload.url, payload.title);
+            if (shareId) {
+                const remote = await fetchShareDetail(shareId);
+                if (!remote) {
+                    showError('分享已取消或不存在');
+                    showExpiredOverlay();
+                    hideLoading();
+                    return;
+                }
+                resolved = {
+                    ...resolved,
+                    url: remote.url || resolved.url,
+                    title: remote.title || resolved.title,
+                    pic: remote.pic || resolved.pic,
+                    source: remote.source || resolved.source,
+                    expiresAt: Number(remote.expiresAt || 0)
+                };
+            }
+            if (resolved.expiresAt && Date.now() > resolved.expiresAt) {
+                showError('分享链接已过期');
+                showExpiredOverlay();
+                startCountdown(resolved.expiresAt);
+                hideLoading();
+                return;
+            }
+            initPlayer(resolved);
+            startCountdown(resolved.expiresAt);
+            hideLoading();
+        })();
 
         bindShareButton();
         bindThemeToggle();

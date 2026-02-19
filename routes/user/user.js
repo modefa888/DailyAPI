@@ -21,6 +21,8 @@ const ensureIndexes = async (db) => {
     await db.collection("user_sessions").createIndex({ token: 1 }, { unique: true });
     await db.collection("user_sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     await db.collection("user_favorites").createIndex({ userId: 1, url: 1 }, { unique: true });
+    await db.collection("user_shares").createIndex({ userId: 1, shareId: 1 }, { unique: true });
+    await db.collection("user_shares").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
     indexesReady = true;
 };
 
@@ -48,8 +50,8 @@ const verifyPassword = (password, user) => {
 
 const sanitizeUser = (user) => {
     if (!user) return null;
-    const { password, hash, salt, iterations, keylen, digest, ...rest } = user;
-    return rest;
+        const { password, hash, salt, iterations, keylen, digest, ...rest } = user;
+        return rest;
 };
 
 const issueToken = () => crypto.randomBytes(32).toString("hex");
@@ -240,6 +242,19 @@ userRouter.get("/user/profile", authMiddleware, async (ctx) => {
     };
 });
 
+// 更新头像（登录用户）
+userRouter.post("/user/avatar", authMiddleware, async (ctx) => {
+    const { avatar } = ctx.request.body || {};
+    const safeAvatar = String(avatar || "").trim();
+    const db = await getDb();
+    await db.collection("users").updateOne(
+        { _id: ctx.state.user._id },
+        { $set: { avatar: safeAvatar, updatedAt: new Date() } }
+    );
+    const updated = await db.collection("users").findOne({ _id: ctx.state.user._id });
+    ctx.body = { code: 200, message: "头像已更新", data: sanitizeUser(updated) };
+});
+
 // 用户列表（管理员）- 分页
 userRouter.get("/user/list", authMiddleware, requireAdmin, async (ctx) => {
     const page = Math.max(1, Number(ctx.query.page || 1));
@@ -388,6 +403,121 @@ userRouter.delete("/user/favorites/all", authMiddleware, async (ctx) => {
     ctx.body = { code: 200, message: "喜欢已清空" };
 });
 
+const parseExpireSeconds = (value) => {
+    const seconds = Number(value || 0);
+    if (!Number.isFinite(seconds) || seconds < 0) return 0;
+    return Math.floor(seconds);
+};
+
+const buildExpiresAt = (seconds, fallbackMs) => {
+    const safeSeconds = parseExpireSeconds(seconds);
+    if (safeSeconds > 0) {
+        return new Date(Date.now() + safeSeconds * 1000);
+    }
+    const fallback = Number(fallbackMs || 0);
+    if (Number.isFinite(fallback) && fallback > 0) {
+        return new Date(fallback);
+    }
+    return null;
+};
+
+// 获取分享列表（登录用户）
+userRouter.get("/user/shares", authMiddleware, async (ctx) => {
+    const db = await getDb();
+    const shares = await db
+        .collection("user_shares")
+        .find({ userId: ctx.state.user._id })
+        .sort({ createdAt: -1 })
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: shares.map((item) => ({
+            shareId: item.shareId,
+            url: item.url,
+            title: item.title,
+            pic: item.pic,
+            source: item.source,
+            expireSeconds: item.expireSeconds || 0,
+            expiresAt: item.expiresAt ? item.expiresAt.getTime() : 0,
+            createdAt: item.createdAt ? item.createdAt.getTime() : Date.now(),
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : null,
+        })),
+    };
+});
+
+// 保存分享（登录用户）
+userRouter.post("/user/shares", authMiddleware, async (ctx) => {
+    const { shareId, url, title, pic, source, expireSeconds, expiresAt } = ctx.request.body || {};
+    const safeShareId = String(shareId || "").trim();
+    const safeUrl = String(url || "").trim();
+    if (!safeShareId || !safeUrl) {
+        ctx.body = { code: 400, message: "分享ID或视频地址不能为空" };
+        return;
+    }
+    const db = await getDb();
+    const now = new Date();
+    const seconds = parseExpireSeconds(expireSeconds);
+    const expiry = buildExpiresAt(seconds, expiresAt);
+    await db.collection("user_shares").updateOne(
+        { userId: ctx.state.user._id, shareId: safeShareId },
+        {
+            $set: {
+                url: safeUrl,
+                title: String(title || "").trim(),
+                pic: String(pic || "").trim(),
+                source: String(source || "").trim(),
+                expireSeconds: seconds,
+                expiresAt: expiry,
+                updatedAt: now,
+            },
+            $setOnInsert: {
+                createdAt: now,
+            },
+        },
+        { upsert: true }
+    );
+    ctx.body = { code: 200, message: "分享已保存" };
+});
+
+// 更新分享有效期（登录用户）
+userRouter.put("/user/shares/:shareId", authMiddleware, async (ctx) => {
+    const { shareId } = ctx.params;
+    const safeShareId = String(shareId || "").trim();
+    if (!safeShareId) {
+        ctx.body = { code: 400, message: "分享ID不能为空" };
+        return;
+    }
+    const { expireSeconds, expiresAt } = ctx.request.body || {};
+    const seconds = parseExpireSeconds(expireSeconds);
+    const expiry = buildExpiresAt(seconds, expiresAt);
+    const db = await getDb();
+    await db.collection("user_shares").updateOne(
+        { userId: ctx.state.user._id, shareId: safeShareId },
+        {
+            $set: {
+                expireSeconds: seconds,
+                expiresAt: expiry,
+                updatedAt: new Date(),
+            },
+        }
+    );
+    ctx.body = { code: 200, message: "分享有效期已更新" };
+});
+
+// 取消分享（登录用户）
+userRouter.delete("/user/shares/:shareId", authMiddleware, async (ctx) => {
+    const { shareId } = ctx.params;
+    const safeShareId = String(shareId || "").trim();
+    if (!safeShareId) {
+        ctx.body = { code: 400, message: "分享ID不能为空" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("user_shares").deleteOne({ userId: ctx.state.user._id, shareId: safeShareId });
+    ctx.body = { code: 200, message: "分享已取消" };
+});
+
 // 更新用户统计（登录用户）
 userRouter.post("/user/stats", authMiddleware, async (ctx) => {
     const payload = ctx.request.body || {};
@@ -525,10 +655,11 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
         ctx.body = { code: 403, message: "无权限" };
         return;
     }
-    const { nickname, password, role, profileNote } = ctx.request.body || {};
+    const { nickname, password, role, profileNote, avatar } = ctx.request.body || {};
     const update = { updatedAt: new Date() };
     if (nickname !== undefined) update.nickname = String(nickname || "").trim();
     if (profileNote !== undefined) update.profileNote = String(profileNote || "").trim();
+    if (avatar !== undefined) update.avatar = String(avatar || "").trim();
     if (password) {
         const hashed = hashPassword(String(password));
         Object.assign(update, hashed);

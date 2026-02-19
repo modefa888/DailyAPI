@@ -146,6 +146,15 @@
                 <!-- 右侧：更多下拉 -->
                 <div class="flex items-center space-x-3 relative">
                     <button
+                        id="userAvatarButton"
+                        onclick="toggleUserInfo()"
+                        class="w-9 h-9 rounded-full bg-white shadow-md border border-gray-200 flex items-center justify-center overflow-hidden hover:shadow-lg transition"
+                        title="用户信息"
+                    >
+                        <img id="userAvatarImg" src="" alt="avatar" class="w-full h-full object-cover hidden">
+                        <span id="userAvatarText" class="text-primary font-semibold text-sm">U</span>
+                    </button>
+                    <button
                         id="mobileSearchToggle"
                         onclick="toggleMobileSearch()"
                         class="md:hidden btn-primary text-sm"
@@ -173,18 +182,18 @@
                             <span class="text-right flex-1">喜欢</span>
                         </button>
                         <button 
+                            onclick="handleMoreAction('share')"
+                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
+                        >
+                            <i class="fa fa-share-alt text-blue-500"></i>
+                            <span class="text-right flex-1">分享</span>
+                        </button>
+                        <button 
                             onclick="handleMoreAction('history')"
                             class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
                         >
                             <i class="fa fa-history text-gray-600"></i>
                             <span class="text-right flex-1">历史</span>
-                        </button>
-                        <button 
-                            onclick="handleMoreAction('user')"
-                            class="w-full px-3 py-2 text-sm hover:bg-blue-50 flex items-center justify-between rounded-lg"
-                        >
-                            <i class="fa fa-user text-gray-600"></i>
-                            <span class="text-right flex-1">用户信息</span>
                         </button>
                         <button 
                             onclick="handleMoreAction('setting')"
@@ -304,6 +313,25 @@
             </div>
     </div>
 
+    <!-- 分享列表面板 -->
+    <div 
+        id="sharePanel" 
+        class="fixed top-0 right-0 bottom-0 w-4/5 md:w-96 glass-effect shadow-xl transform translate-x-full transition-transform duration-300 z-40 overflow-hidden flex flex-col"
+    >
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold">分享列表</h3>
+            <button onclick="toggleSharePanel()" class="p-2 hover:bg-gray-200 rounded-full">
+                <i class="fa fa-times"></i>
+            </button>
+        </div>
+        <div id="shareContent" class="flex-1 overflow-y-auto scrollbar-hide p-4">
+            <!-- 分享内容将在这里动态生成 -->
+        </div>
+        <div class="p-4 border-t border-gray-200 text-xs text-gray-500">
+            分享链接会保存在本地浏览器，可在此修改有效期或取消分享。
+        </div>
+    </div>
+
     <!-- 用户信息面板 -->
     <div 
         id="userPanel" 
@@ -317,6 +345,17 @@
         </div>
         <div id="userInfoContent" class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
+                        <img id="userAvatarPreview" src="" alt="avatar" class="w-full h-full object-cover hidden">
+                    </div>
+                    <div class="flex-1">
+                        <div class="text-xs text-gray-500 mb-2">头像</div>
+                        <button onclick="randomizeAvatar()" class="btn-secondary text-xs px-3 py-1">
+                            <i class="fa fa-random mr-1"></i> 随机头像
+                        </button>
+                    </div>
+                </div>
                 <div class="flex items-center justify-between text-sm">
                     <span class="text-gray-500">用户</span>
                     <span id="userNicknameDisplay" class="font-medium text-gray-800">
@@ -790,6 +829,8 @@
         const favoritePanel = document.getElementById('favoritePanel');
         const favoriteContent = document.getElementById('favoriteContent');
         const uploadFavoritesButton = document.getElementById('uploadFavoritesButton');
+        const sharePanel = document.getElementById('sharePanel');
+        const shareContent = document.getElementById('shareContent');
         const userPanel = document.getElementById('userPanel');
         const userInfoContent = document.getElementById('userInfoContent');
         const aboutPanel = document.getElementById('aboutPanel');
@@ -824,6 +865,12 @@
         const shareModal = document.getElementById('shareModal');
         const shareExpireSelect = document.getElementById('shareExpireSelect');
         let currentShareUrl = '';
+        let currentSharePayload = null;
+        let currentShareId = '';
+        let shareListLoaded = false;
+        const userAvatarImg = document.getElementById('userAvatarImg');
+        const userAvatarText = document.getElementById('userAvatarText');
+        const userAvatarPreview = document.getElementById('userAvatarPreview');
         const clearFavoritesModal = document.getElementById('clearFavoritesModal');
         const clearFavoritesPassword = document.getElementById('clearFavoritesPassword');
         const clearFavoritesError = document.getElementById('clearFavoritesError');
@@ -1066,6 +1113,7 @@
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
             updateHostNameDisplay(host);
+            applyAvatarFromStorage();
             const aggregateEnabled = isAggregateSearchEnabled();
             if (aggregateSwitch) {
                 aggregateSwitch.checked = aggregateEnabled;
@@ -1082,6 +1130,9 @@
             // 鼠标移出面板自动关闭
             historyPanel.addEventListener('mouseleave', closeAllPanels);
             favoritePanel.addEventListener('mouseleave', closeAllPanels);
+            if (sharePanel) {
+                sharePanel.addEventListener('mouseleave', closeAllPanels);
+            }
             if (userPanel) {
                 userPanel.addEventListener('mouseleave', closeAllPanels);
             }
@@ -1179,6 +1230,11 @@
                     }
                 });
             }
+            if (shareExpireSelect) {
+                shareExpireSelect.addEventListener('change', () => {
+                    refreshShareUrlFromSelection();
+                });
+            }
 
             const siteTitle = document.getElementById('siteTitle');
             if (siteTitle) {
@@ -1228,6 +1284,8 @@
         const USER_TOKEN_EXPIRES_KEY = 'userTokenExpires';
         const USER_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
         const OFFICIAL_API_TOKEN_KEY = 'officialApiToken';
+        const USER_AVATAR_KEY = 'userAvatarUrl';
+        const USER_AVATAR_API = 'https://v2.xxapi.cn/api/head';
 
         function getUserToken() {
             const token = String(localStorage.getItem(USER_TOKEN_KEY) || '').trim();
@@ -1258,6 +1316,57 @@
             window.location.href = '/login/index.html';
         }
 
+        function applyAvatar(url) {
+            const safe = String(url || '').trim();
+            if (safe) {
+                if (userAvatarImg) {
+                    userAvatarImg.src = safe;
+                    userAvatarImg.classList.remove('hidden');
+                }
+                if (userAvatarPreview) {
+                    userAvatarPreview.src = safe;
+                    userAvatarPreview.classList.remove('hidden');
+                }
+                if (userAvatarText) {
+                    userAvatarText.classList.add('hidden');
+                }
+            } else {
+                if (userAvatarImg) userAvatarImg.classList.add('hidden');
+                if (userAvatarPreview) userAvatarPreview.classList.add('hidden');
+                if (userAvatarText) userAvatarText.classList.remove('hidden');
+            }
+        }
+
+        function applyAvatarFromStorage() {
+            const url = localStorage.getItem(USER_AVATAR_KEY) || '';
+            applyAvatar(url);
+        }
+
+        async function randomizeAvatar() {
+            try {
+                const res = await fetch(USER_AVATAR_API);
+                const data = await res.json();
+                if (data && data.code === 200 && data.data) {
+                    const url = String(data.data).trim();
+                    localStorage.setItem(USER_AVATAR_KEY, url);
+                    applyAvatar(url);
+                    const token = getUserToken ? getUserToken() : '';
+                    if (token) {
+                        fetch('/user/avatar', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                            body: JSON.stringify({ avatar: url })
+                        }).catch(() => {});
+                    }
+                    showToast('头像已更新');
+                } else {
+                    showToast('获取头像失败');
+                }
+            } catch (e) {
+                showToast('获取头像失败');
+            }
+        }
+
         function getOfficialApiUrl() {
             const token = localStorage.getItem(OFFICIAL_API_TOKEN_KEY) || '';
             if (!token) return '/apis/official';
@@ -1272,6 +1381,7 @@
                 return;
             }
             
+            hideEmptyState();
             showLoading('正在加载推荐视频...');
             hasMore = true;
             fetchData('', 1).finally(() => {
@@ -1341,6 +1451,7 @@
                     updateLoadedCount(0);
                 }
                 
+                hideEmptyState();
                 renderVideos(deduped);
                 updateLoadedCount(renderedVideos.length);
                 
@@ -1446,6 +1557,7 @@
                     updateLoadedCount(0);
                 }
                 
+                hideEmptyState();
                 if (deduped.length === 0) {
                     if (page === 1) {
                         showEmptyState();
@@ -1504,7 +1616,8 @@
                     });
                 }
                 const card = document.createElement('div');
-                card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset';
+                card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset video-card';
+                card.setAttribute('data-video-url', video.vod_play_url || '');
                 card.innerHTML = `
                     <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" onclick="openFullScreenPreview('${video.vod_pic}', '${video.vod_name}')">
                         <img 
@@ -1538,6 +1651,7 @@
                             <div class="flex items-center space-x-2">
                                 <button 
                                     onclick="toggleFavorite('${video.vod_name}', '${video.vod_play_url}', '${video.vod_pic}', this, '${sourceLabel}')"
+                                    data-action="favorite"
                                     class="text-sm ${favorited ? 'text-red-500' : 'text-gray-500'} hover:text-red-500"
                                     title="喜欢"
                                 >
@@ -1667,6 +1781,7 @@
             searchTerm = input;
             currentPage = 1;
             hasMore = true;
+            hideEmptyState();
             saveSearchHistory(input);
             hideSearchHistory();
             
@@ -2963,6 +3078,8 @@
             if (!value) return;
             if (value === 'favorite') {
                 toggleFavorites();
+            } else if (value === 'share') {
+                toggleSharePanel();
             } else if (value === 'history') {
                 toggleHistory();
             } else if (value === 'user') {
@@ -2988,6 +3105,8 @@
         function handleMoreAction(action) {
             if (action === 'favorite') {
                 toggleFavorites();
+            } else if (action === 'share') {
+                toggleSharePanel();
             } else if (action === 'history') {
                 toggleHistory();
             } else if (action === 'user') {
@@ -3063,6 +3182,10 @@
                     nicknameDisplay.textContent = '未登录';
                 }
             }
+            if (profile && profile.avatar) {
+                localStorage.setItem(USER_AVATAR_KEY, String(profile.avatar));
+            }
+            applyAvatarFromStorage();
             if (nicknameInput) {
                 nicknameInput.value = profile ? (profile.nickname || profile.username || '') : '';
                 nicknameInput.disabled = false;
@@ -3236,6 +3359,8 @@
             } else if (typeof clearUserToken === 'function') {
                 clearUserToken();
             }
+            localStorage.removeItem(USER_AVATAR_KEY);
+            applyAvatarFromStorage();
             currentUserProfile = null;
             renderUserInfo();
             if (logoutBtn) {
@@ -3620,6 +3745,136 @@
 
         
         // 分享视频
+        const SHARE_LIST_KEY = 'videoShareList';
+        const SHARE_LIST_MAX = 100;
+
+        function getShareList() {
+            try {
+                const raw = localStorage.getItem(SHARE_LIST_KEY);
+                const list = raw ? JSON.parse(raw) : [];
+                return Array.isArray(list) ? list : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function setShareList(list) {
+            const safe = Array.isArray(list) ? list : [];
+            try {
+                localStorage.setItem(SHARE_LIST_KEY, JSON.stringify(safe));
+            } catch (e) {
+                // ignore storage errors
+            }
+        }
+
+        async function loadRemoteShares() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) return null;
+            try {
+                const res = await fetch('/user/shares', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && Array.isArray(data.data)) {
+                    const mapped = data.data.map(item => ({
+                        id: item.shareId,
+                        url: item.url,
+                        title: item.title,
+                        pic: item.pic || '',
+                        source: item.source || '',
+                        expireSeconds: Number(item.expireSeconds || 0),
+                        expiresAt: Number(item.expiresAt || 0),
+                        createdAt: Number(item.createdAt || Date.now()),
+                        updatedAt: Number(item.updatedAt || Date.now())
+                    }));
+                    setShareList(mapped);
+                    shareListLoaded = true;
+                    return mapped;
+                }
+            } catch (e) {
+                // ignore
+            }
+            return null;
+        }
+
+        function base64Url(value) {
+            try {
+                return btoa(unescape(encodeURIComponent(String(value || ''))))
+                    .replace(/\+/g, '-')
+                    .replace(/\//g, '_')
+                    .replace(/=+$/g, '');
+            } catch (e) {
+                return String(Date.now());
+            }
+        }
+
+        function getShareId(url, title) {
+            return `s_${base64Url(`${url || ''}|${title || ''}`)}`;
+        }
+
+        function normalizeShareItem(item) {
+            if (!item) return null;
+            const url = String(item.url || '').trim();
+            if (!url) return null;
+            const title = String(item.title || '未命名').trim();
+            const pic = String(item.pic || '').trim();
+            const source = String(item.source || '').trim();
+            const id = item.id || getShareId(url, title);
+            const createdAt = Number(item.createdAt || item.timestamp || Date.now());
+            const expireSeconds = Number.isFinite(item.expireSeconds) ? item.expireSeconds : 0;
+            const expiresAt = Number.isFinite(item.expiresAt)
+                ? item.expiresAt
+                : (expireSeconds > 0 ? createdAt + expireSeconds * 1000 : 0);
+            const shareUrl = item.shareUrl || buildShareUrl(url, title, pic, source, expireSeconds, id);
+            return {
+                id,
+                url,
+                title,
+                pic,
+                source,
+                createdAt,
+                updatedAt: Number(item.updatedAt || createdAt),
+                expireSeconds,
+                expiresAt,
+                shareUrl
+            };
+        }
+
+        function saveShareItem(payload) {
+            const item = normalizeShareItem(payload);
+            if (!item) return;
+            const list = getShareList().map(normalizeShareItem).filter(Boolean);
+            const index = list.findIndex(entry => entry.id === item.id);
+            if (index >= 0) {
+                list[index] = { ...list[index], ...item, updatedAt: Date.now() };
+            } else {
+                list.unshift({ ...item, updatedAt: Date.now() });
+            }
+            if (list.length > SHARE_LIST_MAX) {
+                list.splice(SHARE_LIST_MAX);
+            }
+            setShareList(list);
+            if (sharePanel && !sharePanel.classList.contains('translate-x-full')) {
+                renderShareContent(list);
+            }
+            const token = getUserToken ? getUserToken() : '';
+            if (token) {
+                fetch('/user/shares', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({
+                        shareId: item.id,
+                        url: item.url,
+                        title: item.title,
+                        pic: item.pic || '',
+                        source: item.source || '',
+                        expireSeconds: item.expireSeconds || 0,
+                        expiresAt: item.expiresAt || 0
+                    })
+                }).catch(() => {});
+            }
+        }
+
         function encodeSharePayload(fields) {
             const payload = (fields || [])
                 .map(value => encodeURIComponent(value || ''))
@@ -3633,10 +3888,10 @@
             return Number.isFinite(value) ? value : 0;
         }
 
-        function buildShareUrl(videoUrl, videoTitle, videoPic, sourceLabel, expireSeconds) {
+        function buildShareUrl(videoUrl, videoTitle, videoPic, sourceLabel, expireSeconds, shareId = '') {
             const now = Date.now();
             const expiresAt = expireSeconds > 0 ? now + expireSeconds * 1000 : 0;
-            const payload = encodeSharePayload([videoUrl, videoTitle, videoPic, sourceLabel, String(expiresAt)]);
+            const payload = encodeSharePayload([videoUrl, videoTitle, videoPic, sourceLabel, String(expiresAt), String(shareId || '')]);
             const pathname = window.location.pathname || '/';
             const isFilePath = pathname.split('/').pop().includes('.');
             const basePath = pathname.endsWith('/')
@@ -3678,8 +3933,42 @@
         function shareVideo(videoUrl, videoTitle, videoPic = '', sourceLabel = '') {
             const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
             const expireSeconds = getShareExpireSeconds();
-            const shareUrl = buildShareUrl(realVideoUrl, videoTitle, videoPic, sourceLabel, expireSeconds);
+            currentSharePayload = {
+                url: realVideoUrl,
+                title: videoTitle,
+                pic: videoPic || '',
+                source: sourceLabel || ''
+            };
+            currentShareId = getShareId(realVideoUrl, videoTitle);
+            const shareUrl = buildShareUrl(realVideoUrl, videoTitle, videoPic, sourceLabel, expireSeconds, currentShareId);
+            saveShareItem({
+                id: currentShareId,
+                url: realVideoUrl,
+                title: videoTitle,
+                pic: videoPic || '',
+                source: sourceLabel || '',
+                expireSeconds,
+                expiresAt: expireSeconds > 0 ? Date.now() + expireSeconds * 1000 : 0,
+                shareUrl,
+                createdAt: Date.now()
+            });
             openShareModal(shareUrl);
+        }
+
+        function refreshShareUrlFromSelection() {
+            if (!currentSharePayload) return;
+            const expireSeconds = getShareExpireSeconds();
+            currentShareUrl = buildShareUrl(
+                currentSharePayload.url,
+                currentSharePayload.title,
+                currentSharePayload.pic || '',
+                currentSharePayload.source || '',
+                expireSeconds,
+                currentShareId
+            );
+            if (currentShareId) {
+                updateShareExpire(currentShareId, expireSeconds);
+            }
         }
 
         // 播放器内分享当前视频
@@ -3707,6 +3996,7 @@
                 setFavoritesCache(favorites);
                 showToast('已取消喜欢');
                 updatePlayerLikeButtons(false);
+                updateCardFavoriteByUrl(currentVideoUrl, false);
                 if (token) {
                     fetch('/user/favorites', {
                         method: 'DELETE',
@@ -3730,6 +4020,7 @@
                 setFavoritesCache(favorites);
                 showToast('已加入喜欢');
                 updatePlayerLikeButtons(true);
+                updateCardFavoriteByUrl(currentVideoUrl, true);
                 if (token) {
                     fetch('/user/favorites', {
                         method: 'POST',
@@ -3738,6 +4029,21 @@
                     }).catch(() => {});
                 }
             }
+        }
+
+        function updateCardFavoriteByUrl(rawUrl, isLiked) {
+            if (!rawUrl) return;
+            const realUrl = rawUrl.split('$')[1] || rawUrl;
+            const cards = document.querySelectorAll('.video-card');
+            cards.forEach(card => {
+                if (!card) return;
+                const cardUrl = card.getAttribute('data-video-url');
+                if (!cardUrl) return;
+                const normalized = cardUrl.split('$')[1] || cardUrl;
+                if (normalized !== realUrl) return;
+                const btn = card.querySelector('[data-action="favorite"]');
+                if (btn) updateFavoriteButton(btn, isLiked);
+            });
         }
 
         function updatePlayerLikeButtons(isLiked) {
@@ -3840,9 +4146,14 @@
             emptyState.classList.remove('hidden');
             hideLoadMoreButton();
         }
+
+        function hideEmptyState() {
+            emptyState.classList.add('hidden');
+        }
         
         // 显示错误状态
         function showErrorState(message) {
+            hideEmptyState();
             videoList.innerHTML = `
                 <div class="col-span-full text-center py-16">
                     <i class="fa fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
@@ -3867,7 +4178,7 @@
         }
         
         function getPanels() {
-            return [historyPanel, favoritePanel, userPanel, aboutPanel, hostModal].filter(Boolean);
+            return [historyPanel, favoritePanel, sharePanel, userPanel, aboutPanel, hostModal].filter(Boolean);
         }
 
         function updateOverlayForPanels() {
@@ -3885,6 +4196,169 @@
         function closeAllPanels() {
             getPanels().forEach(panel => panel.classList.add('translate-x-full'));
             overlay.classList.add('hidden');
+        }
+
+        function getShareExpireLabel(expiresAt) {
+            if (!expiresAt || expiresAt === 0) return '永久';
+            const diff = expiresAt - Date.now();
+            if (diff <= 0) return '已过期';
+            const minutes = Math.ceil(diff / 60000);
+            if (minutes < 60) return `${minutes}分钟后过期`;
+            const hours = Math.ceil(diff / 3600000);
+            if (hours < 24) return `${hours}小时后过期`;
+            const days = Math.ceil(diff / 86400000);
+            return `${days}天后过期`;
+        }
+
+        function renderShareContent(list) {
+            if (!shareContent) return;
+            const shares = Array.isArray(list) ? list.map(normalizeShareItem).filter(Boolean) : [];
+            if (shares.length === 0) {
+                shareContent.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fa fa-share-alt text-4xl mb-3"></i>
+                        <p>暂无分享内容</p>
+                    </div>
+                `;
+                return;
+            }
+            shareContent.innerHTML = shares.map(item => {
+                const statusText = getShareExpireLabel(item.expiresAt);
+                const statusClass = statusText === '已过期' ? 'text-red-500' : 'text-gray-500';
+                return `
+                    <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
+                        <div class="flex space-x-3">
+                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0">
+                                ${
+                                    item.pic
+                                        ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
+                                        : `<img src="${FALLBACK_IMAGE}" alt="loading" loading="lazy" class="w-full h-full object-cover">`
+                                }
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-medium text-sm mb-2 line-clamp-1">
+                                    <span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${item.source || '未知来源'}</span>
+                                    ${item.title}
+                                </h4>
+                                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                    <span>分享时间: ${formatDate(item.createdAt)}</span>
+                                    <span class="${statusClass}">${statusText}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 space-y-2">
+                            <label class="block text-xs text-gray-500">有效时间</label>
+                            <div class="flex items-center space-x-2">
+                                <select class="input-primary w-full text-xs" onchange="updateShareExpire('${item.id}', this.value)">
+                                    <option value="1800" ${Number(item.expireSeconds) === 1800 ? 'selected' : ''}>30分钟</option>
+                                    <option value="7200" ${Number(item.expireSeconds) === 7200 ? 'selected' : ''}>2小时</option>
+                                    <option value="86400" ${Number(item.expireSeconds) === 86400 ? 'selected' : ''}>1天</option>
+                                    <option value="604800" ${Number(item.expireSeconds) === 604800 ? 'selected' : ''}>7天</option>
+                                    <option value="0" ${Number(item.expireSeconds) === 0 ? 'selected' : ''}>永久</option>
+                                </select>
+                                <button onclick="copyShareLink('${item.id}')" class="btn-secondary text-xs px-3">
+                                    <i class="fa fa-copy mr-1"></i> 复制
+                                </button>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <button 
+                                    onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
+                                    class="btn-primary text-xs py-1 px-2 flex-1"
+                                >
+                                    <i class="fa fa-play mr-1"></i> 播放
+                                </button>
+                                <button 
+                                    onclick="cancelShare('${item.id}')"
+                                    class="text-gray-500 hover:text-red-500 p-1 ml-2"
+                                    title="取消分享"
+                                >
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function toggleSharePanel() {
+            if (!sharePanel) return;
+            const willOpen = sharePanel.classList.contains('translate-x-full');
+            if (!willOpen) {
+                sharePanel.classList.add('translate-x-full');
+                updateOverlayForPanels();
+                return;
+            }
+            shareContent.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <span class="inline-flex items-center space-x-2">
+                        <span class="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+                        <span>加载中...</span>
+                    </span>
+                </div>
+            `;
+            closePanelsExcept(sharePanel);
+            sharePanel.classList.remove('translate-x-full');
+            updateOverlayForPanels();
+            let remote = null;
+            if (!shareListLoaded) {
+                remote = await loadRemoteShares();
+            }
+            const shares = (remote || getShareList()).map(normalizeShareItem).filter(Boolean);
+            renderShareContent(shares);
+        }
+
+        function updateShareExpire(id, seconds) {
+            const list = getShareList().map(normalizeShareItem).filter(Boolean);
+            const target = list.find(item => item.id === id);
+            if (!target) return;
+            const expireSeconds = Number(seconds || 0);
+            const now = Date.now();
+            target.expireSeconds = Number.isFinite(expireSeconds) ? expireSeconds : 0;
+            target.expiresAt = target.expireSeconds > 0 ? now + target.expireSeconds * 1000 : 0;
+            target.shareUrl = buildShareUrl(target.url, target.title, target.pic, target.source, target.expireSeconds, target.id);
+            target.updatedAt = now;
+            setShareList(list);
+            renderShareContent(list);
+            showToast('已更新分享有效期');
+            const token = getUserToken ? getUserToken() : '';
+            if (token) {
+                fetch(`/user/shares/${encodeURIComponent(id)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ expireSeconds: target.expireSeconds })
+                }).catch(() => {});
+            }
+        }
+
+        function copyShareLink(id) {
+            const list = getShareList().map(normalizeShareItem).filter(Boolean);
+            const target = list.find(item => item.id === id);
+            if (!target || !target.shareUrl) return;
+            try {
+                navigator.clipboard.writeText(target.shareUrl).then(() => {
+                    showToast('分享链接已复制到剪贴板');
+                }).catch(() => {
+                    prompt('请复制分享链接:', target.shareUrl);
+                });
+            } catch (err) {
+                prompt('请复制分享链接:', target.shareUrl);
+            }
+        }
+
+        function cancelShare(id) {
+            const list = getShareList().map(normalizeShareItem).filter(Boolean);
+            const next = list.filter(item => item.id !== id);
+            setShareList(next);
+            renderShareContent(next);
+            showToast('已取消分享');
+            const token = getUserToken ? getUserToken() : '';
+            if (token) {
+                fetch(`/user/shares/${encodeURIComponent(id)}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${token}` }
+                }).catch(() => {});
+            }
         }
 
         
