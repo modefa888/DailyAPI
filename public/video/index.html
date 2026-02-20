@@ -432,6 +432,10 @@
                     <span id="userFavoriteCount" class="font-medium text-gray-800">0</span>
                 </div>
                 <div class="flex items-center justify-between">
+                    <span class="text-gray-500">分享数量</span>
+                    <span id="userShareCount" class="font-medium text-gray-800">0</span>
+                </div>
+                <div class="flex items-center justify-between">
                     <span class="text-gray-500">播放历史</span>
                     <span id="userHistoryCount" class="font-medium text-gray-800">0</span>
                 </div>
@@ -1115,19 +1119,69 @@
             const searchHistory = getSearchHistory();
             const watchSeconds = getTodayWatchTime();
             try {
-                await fetch('/user/stats', {
+                const res = await fetch('/user/stats', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                     body: JSON.stringify({
                         favoriteCount: favorites.length,
+                        shareCount: getShareList().length,
                         historyCount: history.length,
                         searchCount: searchHistory.length,
                         watchSeconds
                     })
                 });
+                if (res && res.ok) {
+                    currentUserStats = {
+                        favoriteCount: favorites.length,
+                        shareCount: getShareList().length,
+                        historyCount: history.length,
+                        searchCount: searchHistory.length,
+                        watchSeconds
+                    };
+                    const favoriteCountEl = document.getElementById('userFavoriteCount');
+                    const historyCountEl = document.getElementById('userHistoryCount');
+                    const searchCountEl = document.getElementById('userSearchCount');
+                    const watchTodayEl = document.getElementById('userWatchToday');
+                    if (favoriteCountEl) favoriteCountEl.textContent = String(favorites.length);
+                    if (historyCountEl) historyCountEl.textContent = String(history.length);
+                    if (searchCountEl) searchCountEl.textContent = String(searchHistory.length);
+                    if (watchTodayEl) watchTodayEl.textContent = formatDuration(watchSeconds);
+                }
             } catch (e) {
                 // ignore
             }
+        }
+
+        function refreshLocalStatsDisplay() {
+            const favoriteCountEl = document.getElementById('userFavoriteCount');
+            const shareCountEl = document.getElementById('userShareCount');
+            const historyCountEl = document.getElementById('userHistoryCount');
+            const searchCountEl = document.getElementById('userSearchCount');
+            const watchTodayEl = document.getElementById('userWatchToday');
+            const favorites = getFavorites();
+            const shares = getShareList();
+            const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
+            const searchHistory = getSearchHistory();
+            const watchSeconds = getTodayWatchTime();
+            if (favoriteCountEl) favoriteCountEl.textContent = String(favorites.length);
+            if (shareCountEl) shareCountEl.textContent = String(shares.length);
+            if (historyCountEl) historyCountEl.textContent = String(history.length);
+            if (searchCountEl) searchCountEl.textContent = String(searchHistory.length);
+            if (watchTodayEl) watchTodayEl.textContent = formatDuration(watchSeconds);
+        }
+
+        async function syncRemoteListsAndStats() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) {
+                refreshLocalStatsDisplay();
+                return;
+            }
+            await Promise.all([
+                loadFavorites(true),
+                loadRemoteShares(),
+            ]);
+            refreshLocalStatsDisplay();
+            updateUserStats();
         }
         
         // 初始化
@@ -1195,6 +1249,7 @@
 
             renderTransferHistory();
 
+            syncRemoteListsAndStats();
             
             // 加载初始数据
             loadInitialData();
@@ -1430,13 +1485,21 @@
                 return fetchAggregatedData(keyword, page);
             }
             try {
+                const token = getUserToken ? getUserToken() : '';
+                if (!token) {
+                    showToast('请先登录');
+                    return [];
+                }
+                await ensureFavoritesLoaded();
                 const params = {
                     wd: keyword,
                     pg: page,
                     url: host
                 };
                 
-                const response = await fetch(getProxyUrl('', params));
+                const response = await fetch(getProxyUrl('', params), {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
                 const data = await response.json();
                 
                 if (!data.list || data.list.length === 0) {
@@ -1503,6 +1566,7 @@
                 if (page === 1) {
                     aggregateNoMore = new Set();
                 }
+                await ensureFavoritesLoaded();
                 const apis = await getOfficialApis();
                 const selectedUrls = getAggregateApiSelection();
                 const targetApis = selectedUrls.length > 0
@@ -1529,7 +1593,10 @@
                             pg: page,
                             url: item.url
                         };
-                        return fetch(getProxyUrl('', params))
+                        const token = getUserToken ? getUserToken() : '';
+                        return fetch(getProxyUrl('', params), {
+                            headers: token ? { Authorization: `Bearer ${token}` } : {}
+                        })
                             .then(res => res.json())
                             .then(data => ({
                                 item,
@@ -1620,6 +1687,11 @@
             if (loadingText) {
                 loadingText.textContent = text;
             }
+        }
+
+        async function ensureFavoritesLoaded() {
+            if (Array.isArray(favoritesCache)) return;
+            await loadFavorites(true);
         }
         
         // 渲染视频卡片
@@ -2611,10 +2683,11 @@
 
         // 喜欢功能
         let favoritesCache = null;
+        const FAVORITES_REMOTE_LOADED_KEY = 'videoFavoritesRemoteLoaded';
 
         function getFavorites() {
             if (Array.isArray(favoritesCache)) return favoritesCache;
-            return JSON.parse(localStorage.getItem('videoFavorites') || '[]');
+            return [];
         }
 
         function ensureFavoritesCacheImmediate() {
@@ -2632,10 +2705,12 @@
             }
         }
 
-        async function loadFavorites() {
+        async function loadFavorites(force = false) {
             const token = getUserToken ? getUserToken() : '';
-            if (!token) {
+            const alreadyLoaded = localStorage.getItem(FAVORITES_REMOTE_LOADED_KEY) === '1';
+            if (!force && (alreadyLoaded || !token)) {
                 setFavoritesCache(getFavorites());
+                refreshLocalStatsDisplay();
                 return;
             }
             try {
@@ -2645,6 +2720,8 @@
                 const data = await res.json();
                 if (data && data.code === 200 && Array.isArray(data.data)) {
                     setFavoritesCache(data.data);
+                    localStorage.setItem(FAVORITES_REMOTE_LOADED_KEY, '1');
+                    refreshLocalStatsDisplay();
                 }
             } catch (e) {
                 // ignore
@@ -2676,94 +2753,7 @@
         }
 
         async function uploadLocalFavorites() {
-            const token = getUserToken ? getUserToken() : '';
-            if (!token) {
-                showToast('请先登录');
-                return;
-            }
-            if (uploadFavoritesButton) {
-                uploadFavoritesButton.disabled = true;
-                uploadFavoritesButton.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>上传中...</span></span>';
-            }
-            const local = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
-            let remote = [];
-            try {
-                const res = await fetch('/user/favorites', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (data && data.code === 200 && Array.isArray(data.data)) {
-                    remote = data.data;
-                }
-            } catch (e) {
-                // ignore
-            }
-            const localSet = new Set((local || []).map(item => item.url).filter(Boolean));
-            const remoteSet = new Set((remote || []).map(item => item.url).filter(Boolean));
-
-            if ((!local || local.length === 0) && remoteSet.size > 0) {
-                setFavoritesCache(remote);
-                showToast('已从线上同步到本地');
-                if (uploadFavoritesButton) {
-                    uploadFavoritesButton.disabled = false;
-                    uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
-                }
-                return;
-            }
-
-            const toUpload = (local || []).filter(item => item.url && !remoteSet.has(item.url));
-            const toDownload = (remote || []).filter(item => item.url && !localSet.has(item.url));
-            const isSame =
-                localSet.size === remoteSet.size &&
-                [...localSet].every(url => remoteSet.has(url));
-            if (isSame) {
-                showToast('本地和线上一致，无需上传');
-                if (uploadFavoritesButton) {
-                    uploadFavoritesButton.disabled = false;
-                    uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
-                }
-                return;
-            }
-            if (toUpload.length > 0) {
-                await Promise.all(toUpload.map(item => {
-                    return fetch('/user/favorites', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                        body: JSON.stringify({
-                            title: item.title,
-                            url: item.url,
-                            pic: item.pic || '',
-                            source: item.source || '',
-                            timestamp: item.timestamp || Date.now()
-                        })
-                    });
-                }));
-            }
-            const mergedRemote = remote.concat(toUpload.filter(item => !remoteSet.has(item.url)));
-            const mergedLocal = local.concat(toDownload.filter(item => !localSet.has(item.url)));
-            const mergedMap = new Map();
-            mergedLocal.concat(mergedRemote).forEach(item => {
-                if (!item || !item.url) return;
-                if (!mergedMap.has(item.url)) {
-                    mergedMap.set(item.url, item);
-                } else {
-                    const existing = mergedMap.get(item.url);
-                    if ((item.timestamp || 0) > (existing.timestamp || 0)) {
-                        mergedMap.set(item.url, item);
-                    }
-                }
-            });
-            const mergedList = Array.from(mergedMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-            setFavoritesCache(mergedList);
-            if (!favoritePanel.classList.contains('translate-x-full')) {
-                const favorites = buildFavoriteStatusList();
-                renderFavoriteContent(favorites);
-            }
-            showToast(`同步完成：上传 ${toUpload.length} 条，下载 ${toDownload.length} 条`);
-            if (uploadFavoritesButton) {
-                uploadFavoritesButton.disabled = false;
-                uploadFavoritesButton.innerHTML = '<i class="fa fa-cloud-upload mr-1"></i> 一键上传本地喜欢';
-            }
+            showToast('已关闭一键同步：喜欢只会从线上读取一次并保存到本地');
         }
 
         function isFavorited(videoUrl) {
@@ -2844,23 +2834,10 @@
         }
 
         function buildFavoriteStatusList() {
-            const localFavorites = JSON.parse(localStorage.getItem('videoFavorites') || '[]');
             const remoteFavorites = Array.isArray(favoritesCache) ? favoritesCache : [];
-            const localMap = new Map((localFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
-            const remoteMap = new Map((remoteFavorites || []).filter(item => item && item.url).map(item => [item.url, item]));
-            const unionUrls = Array.from(new Set([...localMap.keys(), ...remoteMap.keys()]));
-            return unionUrls
-                .map(url => {
-                    const remoteItem = remoteMap.get(url);
-                    const localItem = localMap.get(url);
-                    const base = remoteItem || localItem || { url };
-                    const inLocal = !!localItem;
-                    const inRemote = !!remoteItem;
-                    return {
-                        ...base,
-                        _status: inLocal && inRemote ? 'both' : (inLocal ? 'local' : 'remote')
-                    };
-                })
+            return remoteFavorites
+                .filter(item => item && item.url)
+                .map(item => ({ ...item, _status: 'remote' }))
                 .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         }
 
@@ -2930,8 +2907,7 @@
                 </div>
             `;
             if (uploadFavoritesButton) {
-                const token = getUserToken ? getUserToken() : '';
-                uploadFavoritesButton.classList.toggle('hidden', !token);
+                uploadFavoritesButton.classList.add('hidden');
             }
             closePanelsExcept(favoritePanel);
             favoritePanel.classList.remove('translate-x-full');
@@ -3319,7 +3295,7 @@
                     } else {
                         localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({}));
                     }
-                    renderUserInfo();
+                    renderUserInfo({ skipStatsFetch: true });
                     addTransferHistory('导入', file.name);
                     showToast('导入成功');
                     scheduleUserStatsUpdate();
@@ -3421,6 +3397,7 @@
         }
 
         let currentUserProfile = null;
+        let currentUserStats = null;
 
         async function fetchUserProfile() {
             const token = getUserToken ? getUserToken() : '';
@@ -3440,12 +3417,31 @@
             return null;
         }
 
-        async function renderUserInfo() {
+        async function fetchUserStats() {
+            const token = getUserToken ? getUserToken() : '';
+            if (!token) return null;
+            try {
+                const res = await fetch('/user/stats', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && data.data) {
+                    currentUserStats = data.data;
+                    return currentUserStats;
+                }
+            } catch (e) {
+                // ignore
+            }
+            return null;
+        }
+
+        async function renderUserInfo(options = {}) {
             if (!userInfoContent) return;
             const nicknameDisplay = document.getElementById('userNicknameDisplay');
             const nicknameInput = document.getElementById('userNicknameInput');
             const noteInput = document.getElementById('userNoteInput');
             const logoutBtn = document.querySelector('[data-action="logout"]');
+            const skipStatsFetch = !!options.skipStatsFetch;
             if (nicknameDisplay) {
                 nicknameDisplay.innerHTML = `
                     <span class="inline-flex items-center space-x-2 text-gray-500">
@@ -3464,10 +3460,14 @@
                 logoutBtn.disabled = true;
             }
             let profile = currentUserProfile;
+            let stats = currentUserStats;
             if (!profile) {
                 const token = getUserToken ? getUserToken() : '';
                 if (token) {
                     profile = await fetchUserProfile();
+                    if (!skipStatsFetch) {
+                        // stats fetch disabled; keep cached stats
+                    }
                 }
             }
             if (nicknameDisplay) {
@@ -3493,17 +3493,25 @@
             if (logoutBtn) {
                 logoutBtn.disabled = !profile;
             }
-            const favorites = getFavorites();
-            const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
-            const searchHistory = getSearchHistory();
             const favoriteCountEl = document.getElementById('userFavoriteCount');
+            const shareCountEl = document.getElementById('userShareCount');
             const historyCountEl = document.getElementById('userHistoryCount');
             const searchCountEl = document.getElementById('userSearchCount');
             const watchTodayEl = document.getElementById('userWatchToday');
-            if (favoriteCountEl) favoriteCountEl.textContent = String(favorites.length);
-            if (historyCountEl) historyCountEl.textContent = String(history.length);
-            if (searchCountEl) searchCountEl.textContent = String(searchHistory.length);
-            if (watchTodayEl) watchTodayEl.textContent = formatDuration(getTodayWatchTime());
+            let favoriteCount = Math.max(0, Number(stats?.favoriteCount || 0));
+            let shareCount = Math.max(0, Number(stats?.shareCount || 0));
+            let historyCount = Math.max(0, Number(stats?.historyCount || 0));
+            let searchCount = Math.max(0, Number(stats?.searchCount || 0));
+            let watchSeconds = Math.max(0, Number(stats?.watchSeconds || 0));
+            if (skipStatsFetch) {
+                refreshLocalStatsDisplay();
+                return;
+            }
+            if (favoriteCountEl) favoriteCountEl.textContent = String(favoriteCount);
+            if (shareCountEl) shareCountEl.textContent = String(shareCount);
+            if (historyCountEl) historyCountEl.textContent = String(historyCount);
+            if (searchCountEl) searchCountEl.textContent = String(searchCount);
+            if (watchTodayEl) watchTodayEl.textContent = formatDuration(watchSeconds);
 
             const lastVisitEl = document.getElementById('userLastVisit');
             if (lastVisitEl) {
@@ -3551,7 +3559,7 @@
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ nickname: value })
             });
-            await renderUserInfo();
+            await renderUserInfo({ skipStatsFetch: true });
             showToast('昵称已保存');
             if (saveButton) {
                 saveButton.disabled = false;
@@ -3595,7 +3603,7 @@
                 if (currentUserProfile) currentUserProfile.profileNote = value;
             }
             if (noteInput) noteInput.value = value;
-            await renderUserInfo();
+            await renderUserInfo({ skipStatsFetch: true });
             showToast('备注已保存');
         }
 
@@ -3657,7 +3665,7 @@
             localStorage.removeItem(USER_AVATAR_KEY);
             applyAvatarFromStorage();
             currentUserProfile = null;
-            renderUserInfo();
+            renderUserInfo({ skipStatsFetch: true });
             if (logoutBtn) {
                 logoutBtn.disabled = false;
                 logoutBtn.innerHTML = originalHtml;
@@ -3668,7 +3676,7 @@
 
         function toggleUserInfo() {
             if (!userPanel) return;
-            renderUserInfo();
+            renderUserInfo({ skipStatsFetch: true });
             const willOpen = userPanel.classList.contains('translate-x-full');
             if (willOpen) closePanelsExcept(userPanel);
             userPanel.classList.toggle('translate-x-full');
@@ -4051,6 +4059,7 @@
                     }));
                     setShareList(mapped);
                     shareListLoaded = true;
+                    refreshLocalStatsDisplay();
                     return mapped;
                 }
             } catch (e) {

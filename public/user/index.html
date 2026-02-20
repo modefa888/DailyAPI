@@ -5,34 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>用户管理</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
-  <div id="appContent" class="max-w-6xl mx-auto p-4 space-y-6">
-    <header class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">用户管理</h1>
-      <div class="flex items-center space-x-2">
-        <span id="authStatus" class="text-sm text-slate-500">校验中...</span>
-        <button id="logoutBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">退出</button>
+  <div class="min-h-screen flex flex-col">
+    <nav class="bg-white border-b shadow-sm fixed top-0 left-0 right-0 z-40">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div class="text-lg font-semibold">DailyAPI 管理后台</div>
+        <div class="flex items-center space-x-2">
+          <span id="authStatus" class="text-sm text-slate-500">校验中...</span>
+          <button id="logoutBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">退出</button>
+        </div>
       </div>
-    </header>
+    </nav>
+    <div class="flex flex-1 pt-14">
+      <aside class="w-52 bg-white border-r p-3 space-y-2 fixed top-14 bottom-0 left-0 overflow-y-auto">
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-800 text-white" data-module-target="profile">我的信息</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="users">用户</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="online">在线</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="official">接口</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="routeAccess">访问控制</button>
+      </aside>
+      <main class="flex-1 p-4 ml-52">
+        <div id="appContent" class="max-w-6xl mx-auto space-y-6">
 
-
-    <section id="favoritesSection" class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section id="favoritesSection" class="module-section bg-white rounded-xl shadow p-4 space-y-4" data-module="profile">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">我的信息</h2>
       </div>
-      <div id="profileBox" class="text-sm text-slate-600 flex items-center justify-center min-h-[32px]">
+      <div id="profileBox" class="text-sm text-slate-600 min-h-[32px]">
         <span class="inline-flex items-center space-x-2 text-slate-500">
           <span class="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
           <span>加载中...</span>
         </span>
       </div>
-      <div>
-        <button id="openUpdateModal" class="hidden bg-slate-800 text-white rounded px-4 py-2">修改个人信息</button>
-      </div>
+      <div></div>
     </section>
 
-    <section id="sharesSection" class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section id="sharesSection" class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="users">
       <div class="flex items-center justify-between">
         <h2 class="font-semibold">用户列表（管理员）</h2>
         <div class="flex items-center space-x-2 text-sm">
@@ -54,6 +65,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                   <span>统计</span>
                   <button class="text-xs text-blue-600" data-sort="favoriteCount">收藏</button>
+                  <button class="text-xs text-blue-600" data-sort="shareCount">分享</button>
                   <button class="text-xs text-blue-600" data-sort="historyCount">历史</button>
                   <button class="text-xs text-blue-600" data-sort="searchCount">搜索</button>
                   <button class="text-xs text-blue-600" data-sort="watchSeconds">时长</button>
@@ -78,7 +90,7 @@
       </div>
     </section>
 
-    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="online">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-semibold">在线用户（管理员）</h2>
         <div class="flex items-center gap-2 text-sm text-slate-600">
@@ -107,7 +119,7 @@
       </div>
     </section>
 
-    <section class="bg-white rounded-xl shadow p-4 space-y-4">
+    <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="official">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-semibold">官方推荐接口（管理员）</h2>
         <div class="flex flex-wrap items-center gap-2">
@@ -139,7 +151,55 @@
           <tbody id="officialTbody" class="divide-y"></tbody>
         </table>
       </div>
+
+      <div class="border-t pt-4 space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h3 class="font-semibold text-slate-800">视频解析接口（管理员）</h3>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="parseEnableAllBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white text-sm">全部启用</button>
+            <button id="parseDisableAllBtn" class="hidden px-3 py-1.5 rounded bg-slate-600 text-white text-sm">全部停用</button>
+            <button id="parseSaveSortBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">保存排序</button>
+            <button id="loadParseApisBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+          <input id="parseNameInput" class="border rounded px-3 py-2" placeholder="名称">
+          <input id="parseUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="解析接口 URL">
+          <button id="addParseBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
+        </div>
+        <div id="parseMeta" class="text-sm text-slate-500"></div>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500">
+              <tr>
+                <th class="py-2">排序</th>
+                <th class="py-2">名称</th>
+                <th>URL</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="parseTbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
+
+    <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="routeAccess">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold">接口访问控制（管理员）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="loadRouteAccessBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
+        </div>
+      </div>
+      <div id="routeAccessMeta" class="text-sm text-slate-500"></div>
+      <div id="routeAccessGroups" class="space-y-4"></div>
+    </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
 
     <div id="favoritesModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
       <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl p-4 space-y-4">
@@ -171,6 +231,17 @@
       </div>
     </div>
 
+    <div id="adminPlayerModal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/70 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-4xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div id="adminPlayerTitle" class="font-semibold text-slate-800">播放</div>
+          <button id="closeAdminPlayer" class="text-slate-500">✕</button>
+        </div>
+        <div id="adminPlayerContainer" class="w-full aspect-video bg-black rounded overflow-hidden"></div>
+        <div class="text-xs text-slate-500">如无法播放，可复制链接到新窗口播放。</div>
+      </div>
+    </div>
+
   </div>
 
   <div id="toast" class="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm px-4 py-2 rounded hidden z-[70]"></div>
@@ -180,23 +251,6 @@
     <div class="flex items-center space-x-3 bg-white px-5 py-3 rounded-full shadow-lg">
       <div class="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
       <span id="loadingText" class="text-sm text-slate-700">处理中...</span>
-    </div>
-  </div>
-
-  <!-- 个人信息修改弹窗 -->
-  <div id="updateModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-5 space-y-3">
-      <div class="flex items-center justify-between">
-        <h2 class="font-semibold">修改个人信息</h2>
-        <button id="closeUpdateModal" class="text-slate-500">✕</button>
-      </div>
-      <div class="text-sm text-slate-600 space-y-1">
-        <div>用户名：<span id="updateUsername" class="text-slate-800"></span></div>
-        <div>角色：<span id="updateRole" class="text-slate-800"></span></div>
-      </div>
-      <input id="updateNickname" class="w-full border rounded px-3 py-2" placeholder="更新昵称">
-      <input id="updatePassword" type="password" class="w-full border rounded px-3 py-2" placeholder="如不修改请留空">
-      <button id="updateSelfBtn" class="w-full bg-slate-800 text-white rounded py-2">更新</button>
     </div>
   </div>
 
@@ -296,12 +350,191 @@
     let userPermissionsById = {};
     let statsSort = { key: "", dir: "" };
     let officialApisCache = [];
+    let parseApisCache = [];
+    let routeAccessRulesCache = [];
+    let routeAccessRoutesCache = [];
     let usersCache = [];
     const FALLBACK_IMAGE = "/video/loading.gif";
 
     const authHeaders = () => {
       const token = getToken();
       return token ? { Authorization: "Bearer " + token } : {};
+    };
+
+    const renderProfileBox = (profile) => {
+      const box = document.getElementById("profileBox");
+      if (!box) return;
+      if (!profile) {
+        box.textContent = "未登录";
+        return;
+      }
+      const avatar = String(profile.avatar || "").trim();
+      const nickname = String(profile.nickname || "").trim();
+      const username = String(profile.username || "").trim();
+      const role = String(profile.role || "").trim();
+      const profileNote = String(profile.profileNote || "").trim();
+      const adminNote = String(profile.note || "").trim();
+      const title = nickname || username || "-";
+      const subtitle = nickname && username ? `@${username}` : (username || "");
+      box.innerHTML = `
+        <div class="flex items-start gap-4">
+          <div class="w-16 h-16 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center text-lg font-semibold text-slate-600">
+            ${avatar
+              ? `<img src="${avatar}" alt="avatar" class="w-full h-full object-cover" onerror="this.remove();this.parentNode.textContent='${(title || "U").slice(0, 1).toUpperCase()}';">`
+              : (title || "U").slice(0, 1).toUpperCase()}
+          </div>
+          <div class="flex-1 text-sm space-y-2">
+            <div>
+              <div class="text-slate-900 font-medium">${title}</div>
+              ${subtitle ? `<div class="text-slate-500">${subtitle}</div>` : ""}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div class="text-slate-500">用户名：<span class="text-slate-800">${username || "-"}</span></div>
+              <div class="text-slate-500">角色：<span class="text-slate-800">${role || "-"}</span></div>
+              <div class="text-slate-500">昵称：
+                <span class="profile-editable text-slate-800 border-b border-dashed border-slate-300 cursor-text" data-field="nickname" data-value="${nickname.replace(/"/g, "&quot;")}">${nickname || "-"}</span>
+              </div>
+              <div class="text-slate-500">头像URL：
+                <span class="profile-editable text-slate-800 border-b border-dashed border-slate-300 cursor-text" data-field="avatar" data-value="${avatar.replace(/"/g, "&quot;")}">${avatar || "-"}</span>
+                <button class="ml-2 text-xs px-2 py-0.5 rounded bg-slate-200 text-slate-700" data-action="random-avatar">随机</button>
+              </div>
+              <div class="text-slate-500 md:col-span-2">个人备注：
+                <span class="profile-editable text-slate-800 border-b border-dashed border-slate-300 cursor-text" data-field="profileNote" data-value="${profileNote.replace(/"/g, "&quot;")}">${profileNote || "-"}</span>
+              </div>
+              <div class="text-slate-500 md:col-span-2">管理员备注：
+                <span class="profile-editable text-slate-800 border-b border-dashed border-slate-300 cursor-text" data-field="adminNote" data-value="${adminNote.replace(/"/g, "&quot;")}">${adminNote || "-"}</span>
+              </div>
+              <div class="text-slate-500 md:col-span-2">密码：
+                <span class="profile-editable text-slate-800 border-b border-dashed border-slate-300 cursor-text" data-field="password" data-value="">点击修改</span>
+              </div>
+            </div>
+            <div class="text-xs text-slate-400">点击可编辑字段，离开输入框自动保存。</div>
+          </div>
+        </div>
+      `;
+    };
+
+    const saveProfileField = async (field, value) => {
+      if (!currentProfile || !currentProfile._id) {
+        toast("请先登录");
+        return false;
+      }
+      const payload = {};
+      if (field === "nickname") payload.nickname = value;
+      if (field === "avatar") payload.avatar = value;
+      if (field === "profileNote") payload.profileNote = value;
+      if (field === "password") payload.password = value;
+      if (field === "adminNote") payload.adminNote = value;
+      const res = await fetch(`/user/${currentProfile._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "更新失败");
+        return false;
+      }
+      currentProfile = data.data || currentProfile;
+      renderProfileBox(currentProfile);
+      return true;
+    };
+
+    const beginInlineEdit = (el) => {
+      if (!el || el.dataset.editing === "1") return;
+      const field = el.dataset.field;
+      const oldValue = el.dataset.value || "";
+      el.dataset.editing = "1";
+      const input = document.createElement("input");
+      input.type = field === "password" ? "password" : "text";
+      input.className = "border rounded px-2 py-1 text-sm w-full md:w-80";
+      input.value = field === "password" ? "" : oldValue;
+      el.classList.add("hidden");
+      el.parentNode.appendChild(input);
+      input.focus();
+      input.select();
+      const cleanup = async (save) => {
+        const newValue = (input.value || "").trim();
+        input.remove();
+        el.classList.remove("hidden");
+        el.dataset.editing = "0";
+        if (!save) return;
+        if (field === "password") {
+          if (!newValue) return;
+        } else if (field === "adminNote" && !currentProfile?.role) {
+          return;
+        } else if (newValue === oldValue) {
+          return;
+        }
+        const ok = await saveProfileField(field, newValue);
+        if (!ok) {
+          renderProfileBox(currentProfile);
+        }
+      };
+      input.addEventListener("blur", async () => cleanup(true));
+      input.addEventListener("keydown", async (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          input.blur();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          await cleanup(false);
+        }
+      });
+    };
+
+    const randomizeProfileAvatar = async () => {
+      try {
+        const res = await fetch("https://v2.xxapi.cn/api/head");
+        const data = await res.json();
+        if (data && data.code === 200 && data.data) {
+          const url = String(data.data).trim();
+          const ok = await saveProfileField("avatar", url);
+          if (ok) toast("头像已更新");
+        } else {
+          toast("获取头像失败");
+        }
+      } catch (e) {
+        toast("获取头像失败");
+      }
+    };
+
+    const moduleLoaded = {
+      profile: true,
+      users: false,
+      online: false,
+      official: false,
+      routeAccess: false,
+    };
+
+    const setActiveModule = async (name) => {
+      const sections = document.querySelectorAll(".module-section");
+      sections.forEach((sec) => {
+        const active = sec.dataset.module === name;
+        sec.classList.toggle("hidden", !active);
+      });
+      const tabs = document.querySelectorAll(".module-tab");
+      tabs.forEach((tab) => {
+        const active = tab.dataset.moduleTarget === name;
+        tab.classList.toggle("bg-slate-800", active);
+        tab.classList.toggle("text-white", active);
+        tab.classList.toggle("bg-slate-200", !active);
+        tab.classList.toggle("text-slate-700", !active);
+      });
+      if (name === "users" && !moduleLoaded.users) {
+        moduleLoaded.users = true;
+        await loadUsers(currentUsersPage);
+      } else if (name === "online" && !moduleLoaded.online) {
+        moduleLoaded.online = true;
+        await loadOnline();
+      } else if (name === "official" && !moduleLoaded.official) {
+        moduleLoaded.official = true;
+        await loadOfficialApis();
+        await loadParseApis();
+      } else if (name === "routeAccess" && !moduleLoaded.routeAccess) {
+        moduleLoaded.routeAccess = true;
+        await loadRouteAccess();
+      }
     };
 
     const redirectToLogin = () => {
@@ -313,21 +546,25 @@
       setLoading(true, "校验登录...");
       const status = document.getElementById("authStatus");
       const logoutBtn = document.getElementById("logoutBtn");
-      const updateBtn = document.getElementById("openUpdateModal");
       const loadUsersBtn = document.getElementById("loadUsersBtn");
       const loadOnlineBtn = document.getElementById("loadOnlineBtn");
       const loadOfficialApisBtn = document.getElementById("loadOfficialApisBtn");
       const officialEnableAllBtn = document.getElementById("officialEnableAllBtn");
       const officialDisableAllBtn = document.getElementById("officialDisableAllBtn");
       const officialSaveSortBtn = document.getElementById("officialSaveSortBtn");
+      const parseEnableAllBtn = document.getElementById("parseEnableAllBtn");
+      const parseDisableAllBtn = document.getElementById("parseDisableAllBtn");
+      const parseSaveSortBtn = document.getElementById("parseSaveSortBtn");
+      const loadParseApisBtn = document.getElementById("loadParseApisBtn");
       const token = getToken();
       if (!token) {
         status.textContent = isCheckingAuth ? "校验中..." : "未登录";
         logoutBtn.classList.add("hidden");
-        if (updateBtn) updateBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+      const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
+      if (loadRouteAccessBtn) loadRouteAccessBtn.classList.add("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
       const loadSharesBtn = document.getElementById("loadSharesBtn");
       const favoritesUserSelect = document.getElementById("favoritesUserSelect");
@@ -339,12 +576,16 @@
         if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
         if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
         if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
+        if (parseEnableAllBtn) parseEnableAllBtn.classList.add("hidden");
+        if (parseDisableAllBtn) parseDisableAllBtn.classList.add("hidden");
+        if (parseSaveSortBtn) parseSaveSortBtn.classList.add("hidden");
+        if (loadParseApisBtn) loadParseApisBtn.classList.add("hidden");
         document.getElementById("profileBox").innerHTML = isCheckingAuth
           ? '<span class="inline-flex items-center space-x-2 text-slate-500"><span class="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span><span>加载中...</span></span>'
           : "未登录";
-        if (!isCheckingAuth) redirectToLogin();
         isCheckingAuth = false;
         setLoading(false);
+        redirectToLogin();
         return;
       }
       let res;
@@ -355,10 +596,11 @@
       } catch (err) {
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
-        if (updateBtn) updateBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+      const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
+      if (loadRouteAccessBtn) loadRouteAccessBtn.classList.add("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
       const loadSharesBtn = document.getElementById("loadSharesBtn");
       const favoritesUserSelect = document.getElementById("favoritesUserSelect");
@@ -370,7 +612,11 @@
         if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
         if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
         if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
-        document.getElementById("profileBox").textContent = "未登录";
+        if (parseEnableAllBtn) parseEnableAllBtn.classList.add("hidden");
+        if (parseDisableAllBtn) parseDisableAllBtn.classList.add("hidden");
+        if (parseSaveSortBtn) parseSaveSortBtn.classList.add("hidden");
+        if (loadParseApisBtn) loadParseApisBtn.classList.add("hidden");
+        renderProfileBox(null);
         toast("登录状态校验失败");
         redirectToLogin();
         isCheckingAuth = false;
@@ -380,7 +626,6 @@
       if (data.code !== 200) {
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
-        if (updateBtn) updateBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
@@ -395,7 +640,11 @@
         if (officialEnableAllBtn) officialEnableAllBtn.classList.add("hidden");
         if (officialDisableAllBtn) officialDisableAllBtn.classList.add("hidden");
         if (officialSaveSortBtn) officialSaveSortBtn.classList.add("hidden");
-        document.getElementById("profileBox").textContent = "未登录";
+        if (parseEnableAllBtn) parseEnableAllBtn.classList.add("hidden");
+        if (parseDisableAllBtn) parseDisableAllBtn.classList.add("hidden");
+        if (parseSaveSortBtn) parseSaveSortBtn.classList.add("hidden");
+        if (loadParseApisBtn) loadParseApisBtn.classList.add("hidden");
+        renderProfileBox(null);
         redirectToLogin();
         isCheckingAuth = false;
         setLoading(false);
@@ -403,10 +652,11 @@
       }
       status.textContent = "已登录";
       logoutBtn.classList.remove("hidden");
-      if (updateBtn) updateBtn.classList.remove("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.remove("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.remove("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.remove("hidden");
+      const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
+      if (loadRouteAccessBtn) loadRouteAccessBtn.classList.remove("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
       const loadSharesBtn = document.getElementById("loadSharesBtn");
       const favoritesUserSelect = document.getElementById("favoritesUserSelect");
@@ -418,8 +668,11 @@
       if (officialEnableAllBtn) officialEnableAllBtn.classList.remove("hidden");
       if (officialDisableAllBtn) officialDisableAllBtn.classList.remove("hidden");
       if (officialSaveSortBtn) officialSaveSortBtn.classList.remove("hidden");
-      document.getElementById("profileBox").textContent =
-        `用户名：${data.data.username}，昵称：${data.data.nickname}，角色：${data.data.role}`;
+      if (parseEnableAllBtn) parseEnableAllBtn.classList.remove("hidden");
+      if (parseDisableAllBtn) parseDisableAllBtn.classList.remove("hidden");
+      if (parseSaveSortBtn) parseSaveSortBtn.classList.remove("hidden");
+      if (loadParseApisBtn) loadParseApisBtn.classList.remove("hidden");
+      renderProfileBox(data.data);
       currentProfile = data.data;
       if (data.data.role !== "admin") {
         clearToken();
@@ -436,9 +689,7 @@
       setLoading(false);
       if (data.data.role === "admin" && !hasAutoLoadedUsers) {
         hasAutoLoadedUsers = true;
-        document.getElementById("loadUsersBtn").click();
-        document.getElementById("loadOnlineBtn").click();
-        document.getElementById("loadOfficialApisBtn").click();
+        await setActiveModule("profile");
       }
     };
 
@@ -447,7 +698,7 @@
       if (!el) return;
       el.classList.remove("hidden");
       el.classList.add("flex");
-      if (id !== "disableModal" && id !== "updateModal") {
+      if (id !== "disableModal") {
         document.body.style.overflow = "hidden";
         const app = document.getElementById("appContent");
         if (app) app.classList.add("hidden");
@@ -462,38 +713,14 @@
       if (!el) return;
       el.classList.add("hidden");
       el.classList.remove("flex");
-      if (id !== "disableModal" && id !== "updateModal") {
+      if (id !== "disableModal") {
         document.body.style.overflow = "";
         const app = document.getElementById("appContent");
         if (app) app.classList.remove("hidden");
       }
     };
 
-    document.getElementById("closeUpdateModal").addEventListener("click", () => hideModal("updateModal"));
     document.getElementById("closeDisableModal").addEventListener("click", () => hideModal("disableModal"));
-    document.getElementById("openUpdateModal").addEventListener("click", async () => {
-      if (!getToken()) {
-        toast("请先登录");
-        return;
-      }
-      setLoading(true, "正在获取资料...");
-      try {
-        const res = await fetch("/user/profile", { headers: authHeaders() });
-        const data = await res.json();
-        if (data.code !== 200) {
-          toast("请先登录");
-          return;
-        }
-        currentProfile = data.data;
-        document.getElementById("updateUsername").textContent = currentProfile.username || "";
-        document.getElementById("updateRole").textContent = currentProfile.role || "";
-        document.getElementById("updateNickname").value = currentProfile.nickname || "";
-        document.getElementById("updatePassword").value = "";
-        showModal("updateModal");
-      } finally {
-        setLoading(false);
-      }
-    });
 
     document.getElementById("logoutBtn").addEventListener("click", async () => {
       await fetch("/user/logout", { method: "POST", headers: authHeaders() });
@@ -503,39 +730,6 @@
       redirectToLogin();
     });
 
-    document.getElementById("updateSelfBtn").addEventListener("click", async () => {
-      if (!currentProfile) {
-        await refreshAuthUI();
-      }
-      if (!currentProfile) {
-        toast("请先登录");
-        return;
-      }
-      const nickname = document.getElementById("updateNickname").value.trim();
-      const password = document.getElementById("updatePassword").value.trim();
-      const btn = document.getElementById("updateSelfBtn");
-      const originalText = btn.textContent;
-      btn.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>更新中...</span></span>';
-      btn.disabled = true;
-      try {
-        const res = await fetch(`/user/${currentProfile._id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ nickname, password })
-        });
-        const data = await res.json();
-        if (data.code === 200) {
-          toast("更新成功");
-          hideModal("updateModal");
-          refreshAuthUI();
-        } else {
-          toast(data.message || "更新失败");
-        }
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalText;
-      }
-    });
 
     const renderPagination = () => {
       const info = document.getElementById("paginationInfo");
@@ -886,6 +1080,418 @@
       setBtnLoading(btn, false, enabled ? "全部启用" : "全部停用");
     };
 
+    const loadParseApis = async () => {
+      const btn = document.getElementById("loadParseApisBtn");
+      const tbody = document.getElementById("parseTbody");
+      const meta = document.getElementById("parseMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const res = await fetch("/user/parse-apis", { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取失败");
+          return;
+        }
+        parseApisCache = Array.isArray(data.data) ? data.data : [];
+        if (meta) meta.textContent = `共 ${parseApisCache.length} 条`;
+        if (tbody) {
+          tbody.innerHTML = "";
+          parseApisCache.forEach((item) => {
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-id", item.id);
+            tr.setAttribute("draggable", "true");
+            tr.innerHTML = `
+              <td class="py-2">
+                <div class="inline-flex items-center gap-2 text-slate-400 cursor-move" data-action="drag-handle" title="拖拽排序">
+                  <span class="text-xs">≡</span>
+                  <span class="text-xs">${Number(item.sort || 0)}</span>
+                </div>
+              </td>
+              <td class="py-2">
+                <input class="border rounded px-2 py-1 w-40" value="${item.name || ""}" data-field="name" data-id="${item.id}">
+              </td>
+              <td>
+                <input class="border rounded px-2 py-1 w-full min-w-[220px]" value="${item.url || ""}" data-field="url" data-id="${item.id}">
+              </td>
+              <td>
+                <button class="px-2 py-1 rounded text-xs ${item.enabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"}" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? "1" : "0"}">
+                  ${item.enabled ? "已启用" : "已停用"}
+                </button>
+              </td>
+              <td class="space-x-2">
+                <button class="text-xs text-blue-600" data-action="save" data-id="${item.id}">保存</button>
+                <button class="text-xs text-rose-600" data-action="delete" data-id="${item.id}">删除</button>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+          if (parseApisCache.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="5">暂无数据</td>';
+            tbody.appendChild(tr);
+          }
+          tbody.dataset.sortSignature = getParseSortSignature();
+        }
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
+    const addParseApi = async () => {
+      const nameInput = document.getElementById("parseNameInput");
+      const urlInput = document.getElementById("parseUrlInput");
+      const name = (nameInput.value || "").trim();
+      const url = (urlInput.value || "").trim();
+      if (!name || !url) {
+        toast("名称或URL不能为空");
+        return;
+      }
+      const btn = document.getElementById("addParseBtn");
+      setBtnLoading(btn, true, "提交中...");
+      try {
+        const res = await fetch("/user/parse-apis", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ name, url, enabled: true })
+        });
+        const data = await res.json();
+        if (data.code === 200) {
+          nameInput.value = "";
+          urlInput.value = "";
+          toast("新增成功");
+          await loadParseApis();
+        } else {
+          toast(data.message || "新增失败");
+        }
+      } finally {
+        setBtnLoading(btn, false, "新增");
+      }
+    };
+
+    const updateParseApi = async (id, payload) => {
+      const res = await fetch(`/user/parse-apis/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "更新失败");
+        return false;
+      }
+      return true;
+    };
+
+    const deleteParseApi = async (id) => {
+      if (!confirm("确认删除该接口？")) return;
+      const res = await fetch(`/user/parse-apis/${id}`, {
+        method: "DELETE",
+        headers: authHeaders()
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        toast("已删除");
+        await loadParseApis();
+      } else {
+        toast(data.message || "删除失败");
+      }
+    };
+
+    const getParseSortSignature = () => {
+      const tbody = document.getElementById("parseTbody");
+      if (!tbody) return "";
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      return rows.map((row) => row.getAttribute("data-id") || "").join(",");
+    };
+
+    const syncParseSortNumbers = () => {
+      const tbody = document.getElementById("parseTbody");
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      rows.forEach((row, index) => {
+        const id = row.getAttribute("data-id");
+        const sortValue = index + 1;
+        const sortLabel = row.querySelector('[data-action="drag-handle"] span:last-child');
+        if (sortLabel) sortLabel.textContent = String(sortValue);
+        const hidden = row.querySelector(`input[data-id="${id}"][data-field="sort"]`);
+        if (hidden) {
+          hidden.value = String(sortValue);
+        } else {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.setAttribute("data-field", "sort");
+          input.setAttribute("data-id", id);
+          input.value = String(sortValue);
+          row.appendChild(input);
+        }
+      });
+    };
+
+    const saveParseSort = async (shouldReload = true) => {
+      const tbody = document.getElementById("parseTbody");
+      if (!tbody) return;
+      const btn = document.getElementById("parseSaveSortBtn");
+      const currentSignature = getParseSortSignature();
+      const savedSignature = tbody.dataset.sortSignature || "";
+      if (currentSignature && currentSignature === savedSignature) {
+        setBtnLoading(btn, false, "保存排序");
+        return;
+      }
+      setBtnLoading(btn, true, "保存中...");
+      syncParseSortNumbers();
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      const items = rows.map((row, index) => ({
+        id: row.getAttribute("data-id"),
+        sort: index + 1,
+      }));
+      const res = await fetch("/user/parse-apis/sort", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ items }),
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "排序保存失败");
+      } else {
+        toast("排序已保存");
+      }
+      if (shouldReload) {
+        await loadParseApis();
+      } else if (tbody) {
+        tbody.dataset.sortSignature = currentSignature;
+      }
+      setBtnLoading(btn, false, "保存排序");
+    };
+
+    const batchToggleParse = async (enabled) => {
+      const tbody = document.getElementById("parseTbody");
+      if (!tbody) return;
+      const btn = document.getElementById(enabled ? "parseEnableAllBtn" : "parseDisableAllBtn");
+      setBtnLoading(btn, true, enabled ? "启用中..." : "停用中...");
+      const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
+      const targets = rows.filter((row) => {
+        const toggleBtn = row.querySelector('[data-action="toggle"]');
+        if (!toggleBtn) return false;
+        const isEnabled = toggleBtn.getAttribute("data-enabled") === "1";
+        return enabled ? !isEnabled : isEnabled;
+      });
+      const ids = targets.map((row) => row.getAttribute("data-id")).filter(Boolean);
+      if (ids.length === 0) {
+        toast(enabled ? "无需启用，全部已启用" : "无需停用，全部已停用");
+        setBtnLoading(btn, false, enabled ? "全部启用" : "全部停用");
+        return;
+      }
+      const res = await fetch("/user/parse-apis/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ ids, enabled })
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "批量更新失败");
+      } else {
+        toast(enabled ? "已启用所有已停用接口" : "已停用所有已启用接口");
+      }
+      await loadParseApis();
+      setBtnLoading(btn, false, enabled ? "全部启用" : "全部停用");
+    };
+
+    const getRouteAccessKey = (method, path) => `${String(method || "").toUpperCase()} ${String(path || "").trim()}`;
+
+    const loadRouteAccess = async () => {
+      const btn = document.getElementById("loadRouteAccessBtn");
+      const container = document.getElementById("routeAccessGroups");
+      const meta = document.getElementById("routeAccessMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const [rulesRes, allRes] = await Promise.all([
+          fetch("/user/route-access", { headers: authHeaders() }),
+          fetch("/all"),
+        ]);
+        const rulesData = await rulesRes.json();
+        const allData = await allRes.json();
+        if (rulesData.code !== 200) {
+          toast(rulesData.message || "获取规则失败");
+          return;
+        }
+        routeAccessRulesCache = Array.isArray(rulesData.data) ? rulesData.data : [];
+        const ruleMap = new Map(routeAccessRulesCache.map((r) => [getRouteAccessKey(r.method, r.path), r]));
+        const modules = Array.isArray(allData?.data) ? allData.data : [];
+        const groups = [];
+        modules.forEach((mod) => {
+          const stack = Array.isArray(mod?.stack) ? mod.stack : [];
+          const items = [];
+          stack.forEach((layer) => {
+            const path = layer?.path;
+            const methods = Array.isArray(layer?.methods) ? layer.methods : [];
+            methods
+              .filter((m) => m && m !== "HEAD" && m !== "OPTIONS")
+              .forEach((m) => {
+                if (!path) return;
+                items.push({ method: m, path });
+              });
+          });
+          const map = new Map();
+          items.forEach((item) => {
+            const key = getRouteAccessKey(item.method, item.path);
+            if (!map.has(key)) map.set(key, item);
+          });
+          const list = Array.from(map.values()).sort((a, b) => {
+            if (a.path !== b.path) return a.path.localeCompare(b.path);
+            return String(a.method).localeCompare(String(b.method));
+          });
+          const folder = String(mod?.folder || "unknown");
+          const file = String(mod?.file || "unknown.js");
+          groups.push({
+            folder,
+            file,
+            name: mod?.name || mod?.title || "未命名模块",
+            subtitle: mod?.subtitle || "",
+            list,
+          });
+        });
+        routeAccessRoutesCache = groups.flatMap((g) => g.list);
+        if (meta) meta.textContent = `共 ${routeAccessRoutesCache.length} 条`;
+        if (container) {
+          container.innerHTML = "";
+          const folderMap = new Map();
+          groups.forEach((group) => {
+            if (!folderMap.has(group.folder)) folderMap.set(group.folder, []);
+            folderMap.get(group.folder).push(group);
+          });
+          Array.from(folderMap.entries()).forEach(([folderName, files]) => {
+            const folderDetails = document.createElement("details");
+            folderDetails.className = "border rounded-lg bg-slate-50";
+            folderDetails.innerHTML = `
+              <summary class="cursor-pointer px-3 py-2 font-medium text-slate-800 flex items-center justify-between">
+                <span>${folderName}</span>
+                <span class="text-xs text-slate-500">${files.length} 个文件</span>
+              </summary>
+            `;
+            files.forEach((fileGroup) => {
+              const fileDetails = document.createElement("details");
+              fileDetails.className = "ml-4 mr-3 mb-3 border rounded bg-white";
+              fileDetails.innerHTML = `
+                <summary class="cursor-pointer px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                  <div class="font-medium text-slate-700">${fileGroup.file}</div>
+                  <div class="text-xs text-slate-500">${fileGroup.name}${fileGroup.subtitle ? ` · ${fileGroup.subtitle}` : ""} · ${fileGroup.list.length} 条</div>
+                </summary>
+                <div class="px-3 pb-3 overflow-auto">
+                  <table class="min-w-full text-sm">
+                    <thead class="text-left text-slate-500">
+                      <tr>
+                        <th class="py-2">方法</th>
+                        <th>路径</th>
+                        <th>备注</th>
+                        <th>访问级别</th>
+                        <th>启用</th>
+                        <th>状态</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y" data-group="route-access"></tbody>
+                  </table>
+                </div>
+              `;
+              const tbody = fileDetails.querySelector('tbody[data-group="route-access"]');
+              if (tbody) {
+                if (fileGroup.list.length === 0) {
+                  const tr = document.createElement("tr");
+                  tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="5">暂无接口</td>';
+                  tbody.appendChild(tr);
+                } else {
+                  fileGroup.list.forEach((item) => {
+                    const key = getRouteAccessKey(item.method, item.path);
+                    const rule = ruleMap.get(key);
+                    const access = rule ? String(rule.access || "open") : "open";
+                    const enabled = rule ? rule.enabled !== false : false;
+                    const note = rule ? String(rule.note || "") : "";
+                    const tr = document.createElement("tr");
+                    tr.setAttribute("data-key", key);
+                    tr.setAttribute("data-method", item.method);
+                    tr.setAttribute("data-path", item.path);
+                    tr.setAttribute("data-initial-access", access);
+                    tr.setAttribute("data-initial-enabled", enabled ? "1" : "0");
+                    tr.setAttribute("data-initial-note", note);
+                    tr.innerHTML = `
+                      <td class="py-2">${item.method}</td>
+                      <td class="text-xs text-slate-700">${item.path}</td>
+                      <td class="text-xs text-slate-700">
+                        <span class="route-note-editable border-b border-dashed border-slate-300 cursor-text" data-value="${note.replace(/"/g, "&quot;")}">${note || "点击添加"}</span>
+                      </td>
+                      <td>
+                        <select class="border rounded px-2 py-1 text-sm" data-field="access">
+                          <option value="open">开放</option>
+                          <option value="user">登录用户</option>
+                          <option value="admin">管理员</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input type="checkbox" data-field="enabled">
+                      </td>
+                      <td class="text-xs text-slate-500" data-field="status">${rule ? "已配置" : "未配置"}</td>
+                    `;
+                    const accessSelect = tr.querySelector('select[data-field="access"]');
+                    const enabledInput = tr.querySelector('input[data-field="enabled"]');
+                    if (accessSelect) accessSelect.value = access;
+                    if (enabledInput) enabledInput.checked = enabled;
+                    tbody.appendChild(tr);
+                  });
+                }
+              }
+              folderDetails.appendChild(fileDetails);
+            });
+            container.appendChild(folderDetails);
+          });
+          if (groups.length === 0) {
+            container.innerHTML = '<div class="text-center text-slate-500 py-6">暂无数据</div>';
+          }
+        }
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
+    const saveRouteAccessSingle = async (row, options = {}) => {
+      if (!row) return;
+      const method = row.getAttribute("data-method") || "";
+      const path = row.getAttribute("data-path") || "";
+      const access = row.querySelector('select[data-field="access"]')?.value || "open";
+      const enabled = !!row.querySelector('input[data-field="enabled"]')?.checked;
+      const note = row.querySelector('.route-note-editable')?.getAttribute("data-value") || "";
+      const initialAccess = row.getAttribute("data-initial-access") || "open";
+      const initialEnabled = row.getAttribute("data-initial-enabled") === "1";
+      const initialNote = row.getAttribute("data-initial-note") || "";
+      const fields = Array.isArray(options.fields) && options.fields.length > 0 ? options.fields : ["access", "enabled"];
+      const changes = {};
+      if (fields.includes("access") && access !== initialAccess) changes.access = access;
+      if (fields.includes("enabled") && enabled !== initialEnabled) changes.enabled = enabled;
+      if (fields.includes("note") && note !== initialNote) changes.note = note;
+      const hasChanges = Object.keys(changes).length > 0;
+      if (!hasChanges) return;
+      const res = await fetch("/user/route-access/batch", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ items: [{ method, path, ...changes }] }),
+      });
+      const data = await res.json();
+      if (data.code !== 200) {
+        toast(data.message || "更新失败");
+        if (changes.enabled !== undefined) {
+          row.querySelector('input[data-field="enabled"]').checked = initialEnabled;
+        }
+        if (changes.access !== undefined) {
+          row.querySelector('select[data-field="access"]').value = initialAccess;
+        }
+        return;
+      }
+      if (changes.access !== undefined) row.setAttribute("data-initial-access", access);
+      if (changes.enabled !== undefined) row.setAttribute("data-initial-enabled", enabled ? "1" : "0");
+      if (changes.note !== undefined) row.setAttribute("data-initial-note", note);
+      const statusEl = row.querySelector('[data-field="status"]');
+      if (statusEl) statusEl.textContent = enabled ? "已配置" : "未配置";
+      toast("已更新");
+    };
+
     const renderVideoCards = (items, container, options = {}) => {
       if (!container) return;
       const list = Array.isArray(items) ? items : [];
@@ -907,11 +1513,11 @@
         const deleteBtn = allowDelete
           ? `<button class="px-3 py-1.5 rounded bg-rose-600 text-white text-xs" data-action="${deleteAction}" data-url="${url}" data-share-id="${item.shareId || item.id || ""}">删除</button>`
           : "";
-        const openBtn = url
-          ? `<button class="px-3 py-1.5 rounded bg-blue-600 text-white text-xs" onclick="window.open('${url}', '_blank')">打开</button>`
+        const playBtn = url
+          ? `<button class="px-3 py-1.5 rounded bg-emerald-600 text-white text-xs" data-action="play" data-url="${url}" data-title="${title.replace(/"/g, "&quot;")}">播放</button>`
           : "";
         const shareBtn = shareUrl
-          ? `<button class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs" onclick="navigator.clipboard.writeText('${shareUrl}').then(()=>toast('已复制')).catch(()=>prompt('复制链接', '${shareUrl}'))">复制分享</button>`
+          ? `<button class="px-3 py-1.5 rounded bg-slate-700 text-white text-xs" data-action="copy" data-share-url="${shareUrl}">复制分享</button>`
           : "";
         return `
           <div class="bg-white rounded-lg overflow-hidden shadow-md h-[260px] flex flex-col" data-card-id="${cardId}">
@@ -923,7 +1529,7 @@
             <div class="p-3 space-y-2 flex-1 flex flex-col justify-between">
               <div class="text-xs text-slate-500 truncate">${source}</div>
               <div class="flex items-center gap-2">
-                ${openBtn}
+                ${playBtn}
                 ${shareBtn}
                 ${deleteBtn}
               </div>
@@ -951,6 +1557,42 @@
       ].join("|"));
       const base = window.location.origin;
       return `${base}/video/play.html?key=${payload}`;
+    };
+
+    let adminPlayerInstance = null;
+    const openAdminPlayer = (url, title = "") => {
+      const modal = document.getElementById("adminPlayerModal");
+      const container = document.getElementById("adminPlayerContainer");
+      const titleEl = document.getElementById("adminPlayerTitle");
+      if (!modal || !container || !window.DPlayer) return;
+      if (titleEl) titleEl.textContent = title || "播放";
+      if (adminPlayerInstance) {
+        adminPlayerInstance.destroy();
+        adminPlayerInstance = null;
+      }
+      const safeUrl = String(url || "").trim();
+      const isHls = safeUrl.toLowerCase().includes(".m3u8");
+      adminPlayerInstance = new DPlayer({
+        container,
+        video: isHls ? { url: safeUrl, type: "hls" } : { url: safeUrl },
+        autoplay: true,
+      });
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    };
+
+    const closeAdminPlayer = () => {
+      const modal = document.getElementById("adminPlayerModal");
+      if (adminPlayerInstance) {
+        adminPlayerInstance.destroy();
+        adminPlayerInstance = null;
+      }
+      if (modal) {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }
+      document.body.style.overflow = "";
     };
 
     const getSelectedUserId = () => {
@@ -1140,10 +1782,13 @@
               >查看/编辑</button>
             </td>
             <td class="text-xs text-slate-600">
-              <div>收藏：${stat.favoriteCount || 0}</div>
-              <div>历史：${stat.historyCount || 0}</div>
-              <div>搜索：${stat.searchCount || 0}</div>
-              <div>时长：${watchH}:${watchM}:${watchS}</div>
+              <div class="grid grid-cols-2 gap-2 min-w-[200px]">
+                <div class="bg-slate-50 rounded px-2 py-1">收藏：${stat.favoriteCount || 0}</div>
+                <div class="bg-slate-50 rounded px-2 py-1">分享：${stat.shareCount || 0}</div>
+                <div class="bg-slate-50 rounded px-2 py-1">历史：${stat.historyCount || 0}</div>
+                <div class="bg-slate-50 rounded px-2 py-1">搜索：${stat.searchCount || 0}</div>
+                <div class="bg-slate-50 rounded px-2 py-1 col-span-2">时长：${watchH}:${watchM}:${watchS}</div>
+              </div>
             </td>
             <td class="space-x-2">
               <button class="text-indigo-600" data-action="view-favorites" data-id="${u._id}">喜欢</button>
@@ -1186,6 +1831,21 @@
     document.getElementById("addOfficialBtn").addEventListener("click", async () => {
       await addOfficialApi();
     });
+    document.getElementById("loadParseApisBtn").addEventListener("click", async () => {
+      await loadParseApis();
+    });
+    document.getElementById("addParseBtn").addEventListener("click", async () => {
+      await addParseApi();
+    });
+    document.getElementById("parseEnableAllBtn").addEventListener("click", async () => {
+      await batchToggleParse(true);
+    });
+    document.getElementById("parseDisableAllBtn").addEventListener("click", async () => {
+      await batchToggleParse(false);
+    });
+    document.getElementById("parseSaveSortBtn").addEventListener("click", async () => {
+      await saveParseSort();
+    });
     document.getElementById("officialEnableAllBtn").addEventListener("click", async () => {
       if (!confirm("确认启用所有官方接口？")) return;
       await batchToggleOfficial(true);
@@ -1196,6 +1856,81 @@
     });
     document.getElementById("officialSaveSortBtn").addEventListener("click", async () => {
       await saveOfficialSort();
+    });
+    document.getElementById("loadRouteAccessBtn").addEventListener("click", async () => {
+      await loadRouteAccess();
+    });
+    const routeAccessContainer = document.getElementById("routeAccessGroups");
+    if (routeAccessContainer) {
+      routeAccessContainer.addEventListener("change", async (e) => {
+        const target = e.target;
+        if (!target) return;
+        if (target.matches('input[data-field="enabled"]')) {
+          const row = target.closest("tr[data-key]");
+          await saveRouteAccessSingle(row, { fields: ["enabled"] });
+        } else if (target.matches('select[data-field="access"]')) {
+          const row = target.closest("tr[data-key]");
+          await saveRouteAccessSingle(row, { fields: ["access"] });
+        }
+      });
+      routeAccessContainer.addEventListener("click", (e) => {
+        const target = e.target.closest(".route-note-editable");
+        if (!target) return;
+        if (target.dataset.editing === "1") return;
+        const row = target.closest("tr[data-key]");
+        if (!row) return;
+        target.dataset.editing = "1";
+        const oldValue = target.getAttribute("data-value") || "";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "border rounded px-2 py-1 text-xs w-48";
+        input.value = oldValue;
+        target.classList.add("hidden");
+        target.parentNode.appendChild(input);
+        input.focus();
+        input.select();
+        const cleanup = async (save) => {
+          const newValue = (input.value || "").trim();
+          input.remove();
+          target.classList.remove("hidden");
+          target.dataset.editing = "0";
+          if (!save) return;
+          if (newValue === oldValue) return;
+          target.setAttribute("data-value", newValue);
+          target.textContent = newValue || "点击添加";
+          await saveRouteAccessSingle(row, { fields: ["note"] });
+        };
+        input.addEventListener("blur", () => cleanup(true));
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            input.blur();
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            cleanup(false);
+          }
+        });
+      });
+    }
+    const profileBox = document.getElementById("profileBox");
+    if (profileBox) {
+      profileBox.addEventListener("click", (e) => {
+        const actionBtn = e.target.closest('[data-action="random-avatar"]');
+        if (actionBtn) {
+          randomizeProfileAvatar();
+          return;
+        }
+        const target = e.target.closest(".profile-editable");
+        if (!target) return;
+        beginInlineEdit(target);
+      });
+    }
+    document.querySelectorAll(".module-tab").forEach((tab) => {
+      tab.addEventListener("click", async () => {
+        const target = tab.dataset.moduleTarget;
+        if (!target) return;
+        await setActiveModule(target);
+      });
     });
     document.getElementById("loadFavoritesBtn").addEventListener("click", async () => {
       await loadFavorites();
@@ -1210,6 +1945,27 @@
     });
     document.getElementById("closeSharesBtn").addEventListener("click", () => {
       closeModal("sharesModal");
+    });
+    const adminPlayerCloseBtn = document.getElementById("closeAdminPlayer");
+    if (adminPlayerCloseBtn) {
+      adminPlayerCloseBtn.addEventListener("click", () => closeAdminPlayer());
+    }
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action]");
+      if (!btn) return;
+      const action = btn.getAttribute("data-action");
+      if (action === "play") {
+        const url = btn.getAttribute("data-url") || "";
+        const title = btn.getAttribute("data-title") || "";
+        if (url) openAdminPlayer(url, title);
+      } else if (action === "open") {
+        const url = btn.getAttribute("data-url") || "";
+        if (url) window.open(url, "_blank");
+      } else if (action === "copy") {
+        const shareUrl = btn.getAttribute("data-share-url") || "";
+        if (!shareUrl) return;
+        navigator.clipboard.writeText(shareUrl).then(() => toast("已复制")).catch(() => prompt("复制链接", shareUrl));
+      }
     });
     const favoritesUserSelect = document.getElementById("favoritesUserSelect");
     const sharesUserSelect = document.getElementById("sharesUserSelect");
@@ -1385,6 +2141,114 @@
             await loadOfficialApis();
           }
           setBtnLoading(target, false, "保存");
+        }
+      });
+    }
+
+    const parseTbody = document.getElementById("parseTbody");
+    if (parseTbody) {
+      let dragSourceRow = null;
+      let sortAutoSaveTimer = null;
+      const lockBtnWidth = (btn) => {
+        if (!btn) return;
+        const width = btn.getBoundingClientRect().width;
+        if (width) btn.style.minWidth = `${Math.ceil(width)}px`;
+      };
+      const unlockBtnWidth = (btn) => {
+        if (!btn) return;
+        btn.style.minWidth = "";
+      };
+      parseTbody.addEventListener("dragstart", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        dragSourceRow = row;
+        e.dataTransfer.effectAllowed = "move";
+        row.classList.add("opacity-50");
+      });
+      parseTbody.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const overRow = e.target && e.target.closest("tr[data-id]");
+        if (!overRow || overRow === dragSourceRow) return;
+        const rect = overRow.getBoundingClientRect();
+        const next = (e.clientY - rect.top) > rect.height / 2;
+        if (next) {
+          overRow.after(dragSourceRow);
+        } else {
+          overRow.before(dragSourceRow);
+        }
+      });
+      parseTbody.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
+        dragSourceRow = null;
+        syncParseSortNumbers();
+        const currentSignature = getParseSortSignature();
+        if (currentSignature === (parseTbody.dataset.sortSignature || "")) {
+          return;
+        }
+        if (sortAutoSaveTimer) clearTimeout(sortAutoSaveTimer);
+        sortAutoSaveTimer = setTimeout(() => {
+          saveParseSort(false);
+        }, 400);
+      });
+      parseTbody.addEventListener("dragend", () => {
+        if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
+        dragSourceRow = null;
+      });
+      parseTbody.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        const id = target.getAttribute("data-id");
+        if (!action || !id) return;
+        if (action === "toggle") {
+          lockBtnWidth(target);
+          setBtnLoading(target, true, "");
+          const enabled = target.getAttribute("data-enabled") !== "1";
+          const res = await fetch("/user/parse-apis/batch", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ ids: [id], enabled })
+          });
+          const data = await res.json();
+          if (data.code !== 200) {
+            toast(data.message || "更新失败");
+          }
+          await loadParseApis();
+          setBtnLoading(target, false, enabled ? "已启用" : "已停用");
+          unlockBtnWidth(target);
+          return;
+        }
+        if (action === "delete") {
+          lockBtnWidth(target);
+          setBtnLoading(target, true, "");
+          await deleteParseApi(id);
+          setBtnLoading(target, false, "删除");
+          unlockBtnWidth(target);
+          return;
+        }
+        if (action === "save") {
+          lockBtnWidth(target);
+          setBtnLoading(target, true, "");
+          const rowInputs = parseTbody.querySelectorAll(`[data-id="${id}"][data-field]`);
+          const payload = {};
+          rowInputs.forEach((input) => {
+            const field = input.getAttribute("data-field");
+            if (!field) return;
+            if (field === "sort") {
+              payload.sort = Number(input.value || 0);
+            } else {
+              payload[field] = input.value;
+            }
+          });
+          const ok = await updateParseApi(id, payload);
+          if (ok) {
+            toast("已保存");
+            await loadParseApis();
+          }
+          setBtnLoading(target, false, "保存");
+          unlockBtnWidth(target);
         }
       });
     }
@@ -1689,6 +2553,7 @@
       await refreshAuthUI();
     })();
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.js"></script>
   <script src="/assets/page-permission.js"></script>
   </body>
 </html>

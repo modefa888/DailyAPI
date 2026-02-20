@@ -4,6 +4,7 @@ const bodyParser = require("koa-bodyparser");
 const cors = require("koa2-cors");
 const serve = require("koa-static");
 const views = require("koa-views");
+const routeAccess = require("./middlewares/routeAccess");
 
 const app = new Koa();
 const net = require("net");
@@ -52,6 +53,9 @@ app.use(async (ctx, next) => {
         }
     }
 });
+
+// 路由访问控制
+app.use(routeAccess);
 
 const fs = require("fs");
 

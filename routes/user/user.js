@@ -5,6 +5,7 @@ const path = require("path");
 const { ObjectId } = require("mongodb");
 const client = require("../../utils/mongo");
 const { DEFAULT_OFFICIAL_APIS } = require("../../utils/officialApis");
+const { DEFAULT_PARSE_APIS } = require("../../utils/parseApis");
 
 const userRouter = new Router();
 
@@ -25,6 +26,10 @@ const ensureIndexes = async (db) => {
     await db.collection("user_sessions").createIndex({ lastSeenAt: -1 });
     await db.collection("official_apis").createIndex({ url: 1 }, { unique: true });
     await db.collection("official_apis").createIndex({ enabled: 1, sort: 1, updatedAt: -1 });
+    await db.collection("parse_apis").createIndex({ url: 1 }, { unique: true });
+    await db.collection("parse_apis").createIndex({ enabled: 1, sort: 1, updatedAt: -1 });
+    await db.collection("route_access").createIndex({ method: 1, path: 1 }, { unique: true });
+    await db.collection("route_access").createIndex({ enabled: 1, updatedAt: -1 });
     await db.collection("user_favorites").createIndex({ userId: 1, url: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ userId: 1, shareId: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -312,7 +317,7 @@ userRouter.get("/user/list", authMiddleware, requireAdmin, async (ctx) => {
     const skip = (page - 1) * pageSize;
     const sortKey = String(ctx.query.sortKey || "").trim();
     const sortDir = String(ctx.query.sortDir || "desc").toLowerCase() === "asc" ? 1 : -1;
-    const allowedSortKeys = new Set(["favoriteCount", "historyCount", "searchCount", "watchSeconds"]);
+    const allowedSortKeys = new Set(["favoriteCount", "historyCount", "searchCount", "watchSeconds", "shareCount"]);
 
     const db = await getDb();
     const total = await db.collection("users").countDocuments();
@@ -339,6 +344,7 @@ userRouter.get("/user/list", authMiddleware, requireAdmin, async (ctx) => {
                     historyCount: { $ifNull: ["$stats.historyCount", 0] },
                     searchCount: { $ifNull: ["$stats.searchCount", 0] },
                     watchSeconds: { $ifNull: ["$stats.watchSeconds", 0] },
+                    shareCount: { $ifNull: ["$stats.shareCount", 0] },
                 },
             },
             { $sort: { [sortKey]: sortDir, createdAt: -1 } },
@@ -347,11 +353,12 @@ userRouter.get("/user/list", authMiddleware, requireAdmin, async (ctx) => {
         ];
         const result = await db.collection("users").aggregate(pipeline).toArray();
         users = result.map((u) => {
-            const { stats, favoriteCount, historyCount, searchCount, watchSeconds, ...rest } = u;
+            const { stats, favoriteCount, historyCount, searchCount, watchSeconds, shareCount, ...rest } = u;
             statsMap[String(u._id)] = {
                 favoriteCount: favoriteCount || 0,
                 historyCount: historyCount || 0,
                 searchCount: searchCount || 0,
+                shareCount: shareCount || 0,
                 watchSeconds: watchSeconds || 0,
                 updatedAt: stats && stats.updatedAt ? stats.updatedAt.getTime() : null,
             };
@@ -578,6 +585,243 @@ userRouter.delete("/user/official-apis/:id", authMiddleware, requireAdmin, async
     const db = await getDb();
     await db.collection("official_apis").deleteOne({ _id: new ObjectId(id) });
     ctx.body = { code: 200, message: "已删除" };
+});
+
+// 解析接口列表（管理员）
+userRouter.get("/user/parse-apis", authMiddleware, requireAdmin, async (ctx) => {
+    const db = await getDb();
+    let list = await db.collection("parse_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    if (!list || list.length === 0) {
+        const now = new Date();
+        const payload = DEFAULT_PARSE_APIS.map((api, index) => ({
+            name: api.name,
+            url: api.url,
+            enabled: true,
+            sort: index + 1,
+            createdAt: now,
+            updatedAt: now,
+        }));
+        if (payload.length > 0) {
+            await db.collection("parse_apis").insertMany(payload, { ordered: false });
+        }
+        list = await db.collection("parse_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    }
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: list.map((item) => ({
+            id: String(item._id),
+            name: item.name,
+            url: item.url,
+            enabled: !!item.enabled,
+            sort: Number(item.sort || 0),
+            createdAt: item.createdAt ? item.createdAt.getTime() : 0,
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : 0,
+        })),
+    };
+});
+
+// 新增解析接口（管理员）
+userRouter.post("/user/parse-apis", authMiddleware, requireAdmin, async (ctx) => {
+    const { name, url, enabled, sort } = ctx.request.body || {};
+    const safeName = String(name || "").trim();
+    const safeUrl = String(url || "").trim();
+    if (!safeName || !safeUrl) {
+        ctx.body = { code: 400, message: "名称或URL不能为空" };
+        return;
+    }
+    const now = new Date();
+    const db = await getDb();
+    try {
+        const result = await db.collection("parse_apis").insertOne({
+            name: safeName,
+            url: safeUrl,
+            enabled: enabled !== false,
+            sort: Number(sort || 0),
+            createdAt: now,
+            updatedAt: now,
+        });
+        ctx.body = { code: 200, message: "新增成功", data: { id: String(result.insertedId) } };
+    } catch (err) {
+        if (err && err.code === 11000) {
+            ctx.body = { code: 409, message: "URL已存在" };
+            return;
+        }
+        ctx.body = { code: 500, message: "新增失败" };
+    }
+});
+
+// 批量排序更新（管理员）
+userRouter.put("/user/parse-apis/sort", authMiddleware, requireAdmin, async (ctx) => {
+    const items = Array.isArray(ctx.request.body?.items) ? ctx.request.body.items : [];
+    const updates = items
+        .map((item) => ({
+            id: String(item.id || "").trim(),
+            sort: Number(item.sort || 0),
+        }))
+        .filter((item) => ObjectId.isValid(item.id));
+    if (updates.length === 0) {
+        ctx.body = { code: 400, message: "无有效排序数据" };
+        return;
+    }
+    const db = await getDb();
+    const ops = updates.map((item) => ({
+        updateOne: {
+            filter: { _id: new ObjectId(item.id) },
+            update: { $set: { sort: item.sort, updatedAt: new Date() } },
+        },
+    }));
+    await db.collection("parse_apis").bulkWrite(ops, { ordered: false });
+    ctx.body = { code: 200, message: "排序已更新", total: updates.length };
+});
+
+// 批量启用/停用（管理员）
+userRouter.put("/user/parse-apis/batch", authMiddleware, requireAdmin, async (ctx) => {
+    const ids = Array.isArray(ctx.request.body?.ids) ? ctx.request.body.ids : [];
+    const enabled = ctx.request.body?.enabled;
+    if (enabled === undefined) {
+        ctx.body = { code: 400, message: "缺少 enabled 参数" };
+        return;
+    }
+    const validIds = ids.filter((id) => ObjectId.isValid(String(id || "")));
+    if (validIds.length === 0) {
+        ctx.body = { code: 400, message: "无有效ID" };
+        return;
+    }
+    const db = await getDb();
+    const objectIds = validIds.map((id) => new ObjectId(id));
+    const result = await db.collection("parse_apis").updateMany(
+        { _id: { $in: objectIds } },
+        { $set: { enabled: !!enabled, updatedAt: new Date() } },
+    );
+    ctx.body = { code: 200, message: "更新成功", total: result.modifiedCount };
+});
+
+// 更新解析接口（管理员）
+userRouter.put("/user/parse-apis/:id", authMiddleware, requireAdmin, async (ctx) => {
+    const id = String(ctx.params.id || "").trim();
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "ID不合法" };
+        return;
+    }
+    const { name, url, enabled, sort } = ctx.request.body || {};
+    const update = { updatedAt: new Date() };
+    if (name !== undefined) update.name = String(name || "").trim();
+    if (url !== undefined) update.url = String(url || "").trim();
+    if (enabled !== undefined) update.enabled = !!enabled;
+    if (sort !== undefined) update.sort = Number(sort || 0);
+    const db = await getDb();
+    try {
+        await db.collection("parse_apis").updateOne({ _id: new ObjectId(id) }, { $set: update });
+        ctx.body = { code: 200, message: "更新成功" };
+    } catch (err) {
+        if (err && err.code === 11000) {
+            ctx.body = { code: 409, message: "URL已存在" };
+            return;
+        }
+        ctx.body = { code: 500, message: "更新失败" };
+    }
+});
+
+// 删除解析接口（管理员）
+userRouter.delete("/user/parse-apis/:id", authMiddleware, requireAdmin, async (ctx) => {
+    const id = String(ctx.params.id || "").trim();
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "ID不合法" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("parse_apis").deleteOne({ _id: new ObjectId(id) });
+    ctx.body = { code: 200, message: "已删除" };
+});
+
+// 解析接口列表（普通用户可用）
+userRouter.get("/parse-apis", async (ctx) => {
+    const db = await getDb();
+    let list = await db.collection("parse_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    if (!list || list.length === 0) {
+        const now = new Date();
+        const payload = DEFAULT_PARSE_APIS.map((api, index) => ({
+            name: api.name,
+            url: api.url,
+            enabled: true,
+            sort: index + 1,
+            createdAt: now,
+            updatedAt: now,
+        }));
+        if (payload.length > 0) {
+            await db.collection("parse_apis").insertMany(payload, { ordered: false });
+        }
+        list = await db.collection("parse_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    }
+    const data = list
+        .filter((item) => item && item.enabled)
+        .map((item) => ({
+            name: item.name,
+            url: item.url,
+        }));
+    ctx.body = { code: 200, message: "获取成功", data };
+});
+
+// 路由访问控制列表（管理员）
+userRouter.get("/user/route-access", authMiddleware, requireAdmin, async (ctx) => {
+    const db = await getDb();
+    const list = await db.collection("route_access").find().sort({ updatedAt: -1 }).toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: list.map((item) => ({
+            id: String(item._id),
+            method: String(item.method || "*").toUpperCase(),
+            path: String(item.path || "").trim() || "/",
+            access: String(item.access || "open"),
+            note: String(item.note || ""),
+            enabled: item.enabled !== false,
+            createdAt: item.createdAt ? item.createdAt.getTime() : 0,
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : 0,
+        })),
+    };
+});
+
+// 批量更新路由访问控制（管理员）
+userRouter.put("/user/route-access/batch", authMiddleware, requireAdmin, async (ctx) => {
+    const items = Array.isArray(ctx.request.body?.items) ? ctx.request.body.items : [];
+    const normalized = items
+        .map((item) => ({
+            method: String(item.method || "*").trim().toUpperCase() || "*",
+            path: String(item.path || "").trim() || "/",
+            access: item.access !== undefined ? String(item.access || "open").trim().toLowerCase() : undefined,
+            enabled: item.enabled !== undefined ? !!item.enabled : undefined,
+            note: item.note !== undefined ? String(item.note || "").trim() : undefined,
+        }))
+        .filter((item) => !!item.path);
+    if (normalized.length === 0) {
+        ctx.body = { code: 400, message: "无有效配置" };
+        return;
+    }
+    const now = new Date();
+    const db = await getDb();
+    const ops = normalized.map((item) => {
+        const update = { updatedAt: now };
+        if (item.access !== undefined) update.access = item.access;
+        if (item.enabled !== undefined) update.enabled = item.enabled;
+        if (item.note !== undefined) update.note = item.note;
+        const onInsert = { createdAt: now };
+        if (item.access === undefined) onInsert.access = "open";
+        if (item.enabled === undefined) onInsert.enabled = false;
+        return {
+            updateOne: {
+                filter: { method: item.method, path: item.path },
+                update: {
+                    $set: update,
+                    $setOnInsert: onInsert,
+                },
+                upsert: true,
+            },
+        };
+    });
+    await db.collection("route_access").bulkWrite(ops, { ordered: false });
+    ctx.body = { code: 200, message: "更新成功", total: normalized.length };
 });
 
 // 获取喜欢列表（登录用户）
@@ -867,6 +1111,7 @@ userRouter.post("/user/stats", authMiddleware, async (ctx) => {
         favoriteCount: Math.max(0, Number(payload.favoriteCount || 0)),
         historyCount: Math.max(0, Number(payload.historyCount || 0)),
         searchCount: Math.max(0, Number(payload.searchCount || 0)),
+        shareCount: Math.max(0, Number(payload.shareCount || 0)),
         watchSeconds: Math.max(0, Number(payload.watchSeconds || 0)),
     };
     const db = await getDb();
@@ -887,6 +1132,24 @@ userRouter.post("/user/stats", authMiddleware, async (ctx) => {
     ctx.body = { code: 200, message: "已更新", data: stats };
 });
 
+// 获取用户统计（登录用户）
+userRouter.get("/user/stats", authMiddleware, async (ctx) => {
+    const db = await getDb();
+    const stats = await db.collection("user_stats").findOne({ userId: ctx.state.user._id });
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: {
+            favoriteCount: Math.max(0, Number(stats?.favoriteCount || 0)),
+            historyCount: Math.max(0, Number(stats?.historyCount || 0)),
+            searchCount: Math.max(0, Number(stats?.searchCount || 0)),
+            shareCount: Math.max(0, Number(stats?.shareCount || 0)),
+            watchSeconds: Math.max(0, Number(stats?.watchSeconds || 0)),
+            updatedAt: stats?.updatedAt ? stats.updatedAt.getTime() : 0,
+        },
+    };
+});
+
 // 获取用户统计（管理员批量）
 userRouter.post("/user/stats/batch", authMiddleware, requireAdmin, async (ctx) => {
     const ids = Array.isArray(ctx.request.body?.ids) ? ctx.request.body.ids : [];
@@ -904,6 +1167,7 @@ userRouter.post("/user/stats/batch", authMiddleware, requireAdmin, async (ctx) =
     stats.forEach((item) => {
         map[String(item.userId)] = {
             favoriteCount: item.favoriteCount || 0,
+            shareCount: item.shareCount || 0,
             historyCount: item.historyCount || 0,
             searchCount: item.searchCount || 0,
             watchSeconds: item.watchSeconds || 0,
@@ -997,7 +1261,7 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
         ctx.body = { code: 403, message: "无权限" };
         return;
     }
-    const { nickname, password, role, profileNote, avatar } = ctx.request.body || {};
+    const { nickname, password, role, profileNote, avatar, adminNote } = ctx.request.body || {};
     const update = { updatedAt: new Date() };
     if (nickname !== undefined) update.nickname = String(nickname || "").trim();
     if (profileNote !== undefined) update.profileNote = String(profileNote || "").trim();
@@ -1005,6 +1269,14 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
     if (password) {
         const hashed = hashPassword(String(password));
         Object.assign(update, hashed);
+    }
+    if (adminNote !== undefined) {
+        if (user.role !== "admin") {
+            ctx.status = 403;
+            ctx.body = { code: 403, message: "需要管理员权限" };
+            return;
+        }
+        update.note = String(adminNote || "").trim();
     }
     if (user.role === "admin" && role) update.role = String(role);
 
