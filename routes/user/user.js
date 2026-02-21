@@ -33,6 +33,8 @@ const ensureIndexes = async (db) => {
     await db.collection("user_favorites").createIndex({ userId: 1, url: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ userId: 1, shareId: 1 }, { unique: true });
     await db.collection("user_shares").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await db.collection("user_feedback").createIndex({ createdAt: -1 });
+    await db.collection("user_feedback").createIndex({ userId: 1, createdAt: -1 });
     indexesReady = true;
 };
 
@@ -177,6 +179,7 @@ userRouter.post("/user/register", async (ctx) => {
         username: safeUsername,
         nickname: String(nickname || "").trim() || safeUsername,
         role: totalUsers === 0 ? "admin" : "user",
+        apiAccess: totalUsers === 0 ? "all" : "normal",
         isDisabled: false,
         disabledReason: "",
         salt,
@@ -295,6 +298,22 @@ userRouter.get("/user/profile", authMiddleware, async (ctx) => {
         message: "获取成功",
         data: sanitizeUser(ctx.state.user),
     };
+});
+
+// 最近访问记录（登录用户）
+userRouter.get("/user/visit-history", authMiddleware, async (ctx) => {
+    const db = await getDb();
+    const userId = ctx.state.user._id;
+    const user = await db.collection("users").findOne({ _id: userId });
+    const raw = Array.isArray(user?.visitHistory) ? user.visitHistory : [];
+    const now = Date.now();
+    const list = [now, ...raw]
+        .map((v) => Number(v))
+        .filter((v) => Number.isFinite(v))
+        .filter((v, idx, arr) => arr.indexOf(v) === idx)
+        .slice(0, 5);
+    await db.collection("users").updateOne({ _id: userId }, { $set: { visitHistory: list, updatedAt: new Date() } });
+    ctx.body = { code: 200, message: "获取成功", data: list };
 });
 
 // 更新头像（登录用户）
@@ -445,6 +464,7 @@ userRouter.get("/user/official-apis", authMiddleware, requireAdmin, async (ctx) 
             name: api.name,
             url: api.url,
             type: api.type || "vod",
+            category: api.category || "adult",
             enabled: true,
             sort: index + 1,
             createdAt: now,
@@ -454,6 +474,25 @@ userRouter.get("/user/official-apis", authMiddleware, requireAdmin, async (ctx) 
             await db.collection("official_apis").insertMany(payload, { ordered: false });
         }
         list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    } else {
+        const existingUrls = new Set(list.map((api) => api && api.url).filter(Boolean));
+        const now = new Date();
+        const missing = DEFAULT_OFFICIAL_APIS.filter((api) => api && api.url && !existingUrls.has(api.url));
+        if (missing.length > 0) {
+            const baseSort = list.length;
+            const payload = missing.map((api, index) => ({
+                name: api.name,
+                url: api.url,
+                type: api.type || "vod",
+                category: api.category || "adult",
+                enabled: true,
+                sort: baseSort + index + 1,
+                createdAt: now,
+                updatedAt: now,
+            }));
+            await db.collection("official_apis").insertMany(payload, { ordered: false });
+            list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+        }
     }
     ctx.body = {
         code: 200,
@@ -463,6 +502,7 @@ userRouter.get("/user/official-apis", authMiddleware, requireAdmin, async (ctx) 
             name: item.name,
             url: item.url,
             type: item.type || "vod",
+            category: item.category || "adult",
             enabled: !!item.enabled,
             sort: Number(item.sort || 0),
             createdAt: item.createdAt ? item.createdAt.getTime() : 0,
@@ -473,7 +513,7 @@ userRouter.get("/user/official-apis", authMiddleware, requireAdmin, async (ctx) 
 
 // 新增官方推荐接口（管理员）
 userRouter.post("/user/official-apis", authMiddleware, requireAdmin, async (ctx) => {
-    const { name, url, type, enabled, sort } = ctx.request.body || {};
+    const { name, url, type, category, enabled, sort } = ctx.request.body || {};
     const safeName = String(name || "").trim();
     const safeUrl = String(url || "").trim();
     if (!safeName || !safeUrl) {
@@ -487,6 +527,7 @@ userRouter.post("/user/official-apis", authMiddleware, requireAdmin, async (ctx)
             name: safeName,
             url: safeUrl,
             type: String(type || "vod").trim() || "vod",
+            category: String(category || "adult").trim() || "adult",
             enabled: enabled !== false,
             sort: Number(sort || 0),
             createdAt: now,
@@ -555,11 +596,12 @@ userRouter.put("/user/official-apis/:id", authMiddleware, requireAdmin, async (c
         ctx.body = { code: 400, message: "ID不合法" };
         return;
     }
-    const { name, url, type, enabled, sort } = ctx.request.body || {};
+    const { name, url, type, category, enabled, sort } = ctx.request.body || {};
     const update = { updatedAt: new Date() };
     if (name !== undefined) update.name = String(name || "").trim();
     if (url !== undefined) update.url = String(url || "").trim();
     if (type !== undefined) update.type = String(type || "vod").trim() || "vod";
+    if (category !== undefined) update.category = String(category || "adult").trim() || "adult";
     if (enabled !== undefined) update.enabled = !!enabled;
     if (sort !== undefined) update.sort = Number(sort || 0);
     const db = await getDb();
@@ -936,10 +978,225 @@ userRouter.delete("/user/favorites/all", authMiddleware, async (ctx) => {
     ctx.body = { code: 200, message: "喜欢已清空" };
 });
 
+const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// 提交用户反馈（登录用户）
+userRouter.post("/user/feedback", authMiddleware, async (ctx) => {
+    const { type, message, nickname, page } = ctx.request.body || {};
+    const safeMessage = String(message || "").trim();
+    if (!safeMessage) {
+        ctx.body = { code: 400, message: "内容不能为空" };
+        return;
+    }
+    const safeType = String(type || "反馈").trim() || "反馈";
+    const safeNickname = String(nickname || "").trim();
+    const safePage = String(page || "").trim();
+    const now = new Date();
+    const user = ctx.state.user || {};
+    const payload = {
+        userId: user._id,
+        username: String(user.username || "").trim(),
+        userNickname: String(user.nickname || "").trim(),
+        nickname: safeNickname,
+        type: safeType,
+        message: safeMessage,
+        page: safePage,
+        userAgent: ctx.headers["user-agent"] || "",
+        replies: [],
+        createdAt: now,
+        updatedAt: now,
+    };
+    const db = await getDb();
+    const result = await db.collection("user_feedback").insertOne(payload);
+    ctx.body = { code: 200, message: "提交成功", data: { id: result.insertedId } };
+});
+
+// 用户反馈列表（管理员）
+userRouter.get("/user/feedback", authMiddleware, requireAdmin, async (ctx) => {
+    const page = Math.max(1, Number(ctx.query.page || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(ctx.query.pageSize || 20)));
+    const skip = (page - 1) * pageSize;
+    const keyword = String(ctx.query.keyword || "").trim();
+    const filter = {};
+    if (keyword) {
+        const reg = new RegExp(escapeRegex(keyword), "i");
+        filter.$or = [
+            { message: reg },
+            { username: reg },
+            { nickname: reg },
+            { userNickname: reg },
+            { type: reg },
+        ];
+    }
+    const db = await getDb();
+    const total = await db.collection("user_feedback").countDocuments(filter);
+    const list = await db
+        .collection("user_feedback")
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: list.map((item) => ({
+            id: item._id,
+            userId: item.userId ? String(item.userId) : "",
+            username: item.username || "",
+            userNickname: item.userNickname || "",
+            nickname: item.nickname || "",
+            type: item.type || "",
+            message: item.message || "",
+            page: item.page || "",
+            userAgent: item.userAgent || "",
+            replies: Array.isArray(item.replies)
+                ? item.replies.map((reply) => ({
+                    id: reply.id || "",
+                    role: reply.role || "",
+                    userId: reply.userId ? String(reply.userId) : "",
+                    nickname: reply.nickname || "",
+                    message: reply.message || "",
+                    createdAt: reply.createdAt ? reply.createdAt.getTime() : 0,
+                }))
+                : [],
+            createdAt: item.createdAt ? item.createdAt.getTime() : 0,
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : 0,
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+    };
+});
+
+// 删除用户反馈（管理员）
+userRouter.delete("/user/feedback/:id", authMiddleware, requireAdmin, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "反馈ID不合法" };
+        return;
+    }
+    const db = await getDb();
+    await db.collection("user_feedback").deleteOne({ _id: new ObjectId(id) });
+    ctx.body = { code: 200, message: "已删除" };
+});
+
+// 获取自己的反馈（登录用户）
+userRouter.get("/user/feedback/self", authMiddleware, async (ctx) => {
+    const page = Math.max(1, Number(ctx.query.page || 1));
+    const pageSize = Math.min(100, Math.max(1, Number(ctx.query.pageSize || 20)));
+    const skip = (page - 1) * pageSize;
+    const db = await getDb();
+    const filter = { userId: ctx.state.user._id };
+    const total = await db.collection("user_feedback").countDocuments(filter);
+    const list = await db
+        .collection("user_feedback")
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .toArray();
+    ctx.body = {
+        code: 200,
+        message: "获取成功",
+        data: list.map((item) => ({
+            id: item._id,
+            type: item.type || "",
+            message: item.message || "",
+            page: item.page || "",
+            replies: Array.isArray(item.replies)
+                ? item.replies.map((reply) => ({
+                    id: reply.id || "",
+                    role: reply.role || "",
+                    userId: reply.userId ? String(reply.userId) : "",
+                    nickname: reply.nickname || "",
+                    message: reply.message || "",
+                    createdAt: reply.createdAt ? reply.createdAt.getTime() : 0,
+                }))
+                : [],
+            createdAt: item.createdAt ? item.createdAt.getTime() : 0,
+            updatedAt: item.updatedAt ? item.updatedAt.getTime() : 0,
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+    };
+});
+
+// 回复反馈（登录用户/管理员）
+userRouter.post("/user/feedback/:id/reply", authMiddleware, async (ctx) => {
+    const { id } = ctx.params;
+    if (!ObjectId.isValid(id)) {
+        ctx.body = { code: 400, message: "反馈ID不合法" };
+        return;
+    }
+    const { message } = ctx.request.body || {};
+    const safeMessage = String(message || "").trim();
+    if (!safeMessage) {
+        ctx.body = { code: 400, message: "回复内容不能为空" };
+        return;
+    }
+    const db = await getDb();
+    const feedback = await db.collection("user_feedback").findOne({ _id: new ObjectId(id) });
+    if (!feedback) {
+        ctx.body = { code: 404, message: "反馈不存在" };
+        return;
+    }
+    const user = ctx.state.user || {};
+    const isAdmin = user.role === "admin";
+    if (!isAdmin && String(feedback.userId) !== String(user._id)) {
+        ctx.body = { code: 403, message: "无权限回复" };
+        return;
+    }
+    if (!isAdmin && String(feedback.userId) === String(user._id)) {
+        const replies = Array.isArray(feedback.replies) ? feedback.replies : [];
+        const hasAdminReply = replies.some((reply) => reply && reply.role === "admin");
+        if (!hasAdminReply) {
+            ctx.body = { code: 403, message: "不能回复自己的消息" };
+            return;
+        }
+    }
+    const now = new Date();
+    const reply = {
+        id: crypto.randomBytes(8).toString("hex"),
+        role: isAdmin ? "admin" : "user",
+        userId: user._id,
+        nickname: String(user.nickname || user.username || "").trim(),
+        message: safeMessage,
+        createdAt: now,
+    };
+    await db.collection("user_feedback").updateOne(
+        { _id: feedback._id },
+        {
+            $push: { replies: reply },
+            $set: { updatedAt: now },
+        }
+    );
+    ctx.body = { code: 200, message: "回复成功" };
+});
+
 const parseExpireSeconds = (value) => {
     const seconds = Number(value || 0);
     if (!Number.isFinite(seconds) || seconds < 0) return 0;
     return Math.floor(seconds);
+};
+
+const toBase64Url = (buf) =>
+    buf
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+
+const generateShareId = async (db, attempts = 6) => {
+    for (let i = 0; i < attempts; i += 1) {
+        const candidate = `s_${toBase64Url(crypto.randomBytes(6))}`;
+        const exists = await db.collection("user_shares").findOne({ shareId: candidate });
+        if (!exists) return candidate;
+    }
+    return `s_${toBase64Url(crypto.randomBytes(9))}`;
 };
 
 const buildExpiresAt = (seconds, fallbackMs) => {
@@ -1033,13 +1290,16 @@ userRouter.delete("/user/:id/shares", authMiddleware, requireAdmin, async (ctx) 
 // 保存分享（登录用户）
 userRouter.post("/user/shares", authMiddleware, async (ctx) => {
     const { shareId, url, title, pic, source, expireSeconds, expiresAt } = ctx.request.body || {};
-    const safeShareId = String(shareId || "").trim();
+    let safeShareId = String(shareId || "").trim();
     const safeUrl = String(url || "").trim();
-    if (!safeShareId || !safeUrl) {
-        ctx.body = { code: 400, message: "分享ID或视频地址不能为空" };
+    if (!safeUrl) {
+        ctx.body = { code: 400, message: "视频地址不能为空" };
         return;
     }
     const db = await getDb();
+    if (!safeShareId) {
+        safeShareId = await generateShareId(db);
+    }
     const now = new Date();
     const seconds = parseExpireSeconds(expireSeconds);
     const expiry = buildExpiresAt(seconds, expiresAt);
@@ -1063,7 +1323,7 @@ userRouter.post("/user/shares", authMiddleware, async (ctx) => {
         },
         { upsert: true }
     );
-    ctx.body = { code: 200, message: "分享已保存" };
+    ctx.body = { code: 200, message: "分享已保存", data: { shareId: safeShareId } };
 });
 
 // 更新分享有效期（登录用户）
@@ -1261,7 +1521,7 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
         ctx.body = { code: 403, message: "无权限" };
         return;
     }
-    const { nickname, password, role, profileNote, avatar, adminNote } = ctx.request.body || {};
+    const { nickname, password, role, profileNote, avatar, adminNote, visitHistory, apiAccess } = ctx.request.body || {};
     const update = { updatedAt: new Date() };
     if (nickname !== undefined) update.nickname = String(nickname || "").trim();
     if (profileNote !== undefined) update.profileNote = String(profileNote || "").trim();
@@ -1278,9 +1538,31 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
         }
         update.note = String(adminNote || "").trim();
     }
+    if (visitHistory !== undefined) {
+        const raw = Array.isArray(visitHistory) ? visitHistory : [];
+        const sanitized = raw
+            .map((v) => Number(v))
+            .filter((v) => Number.isFinite(v))
+            .slice(0, 5);
+        update.visitHistory = sanitized;
+    }
     if (user.role === "admin" && role) update.role = String(role);
 
     const db = await getDb();
+    const targetUser = await db.collection("users").findOne({ _id: new ObjectId(id) });
+    if (apiAccess !== undefined) {
+        if (user.role !== "admin") {
+            ctx.status = 403;
+            ctx.body = { code: 403, message: "需要管理员权限" };
+            return;
+        }
+        const allowed = new Set(["adult", "normal", "all"]);
+        const safeAccess = allowed.has(String(apiAccess)) ? String(apiAccess) : "normal";
+        update.apiAccess = safeAccess;
+    }
+    if (targetUser && targetUser.role === "admin") {
+        update.apiAccess = "all";
+    }
     await db.collection("users").updateOne({ _id: new ObjectId(id) }, { $set: update });
     const updated = await db.collection("users").findOne({ _id: new ObjectId(id) });
     ctx.body = { code: 200, message: "更新成功", data: sanitizeUser(updated) };

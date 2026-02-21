@@ -133,13 +133,6 @@
             opacity: 0;
         }
 
-        .dplayer-notice,
-        .dplayer-notice * {
-            writing-mode: horizontal-tb;
-            text-orientation: mixed;
-            white-space: nowrap;
-        }
-
     </style>
 
 </head>
@@ -377,18 +370,26 @@
         <div id="userInfoContent" class="flex-1 overflow-y-auto scrollbar-hide p-4 space-y-4">
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-3">
                 <div class="flex items-center space-x-3">
-                    <button id="userAvatarButton" onclick="handleAvatarTripleClick()" class="w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200 focus:outline-none" title="连续点击3次随机头像">
+                    <div class="w-14 h-14 rounded-full overflow-hidden bg-gray-100 border border-gray-200">
                         <img id="userAvatarPreview" src="" alt="avatar" class="w-full h-full object-cover hidden">
-                    </button>
+                    </div>
                     <div class="flex-1">
-                        <div class="text-xs text-gray-500 mb-1">昵称</div>
-                        <button id="userNicknameButton" onclick="showNicknameEditor()" class="text-left text-sm font-semibold text-gray-800 hover:text-primary">
-                            加载中...
+                        <div class="text-xs text-gray-500 mb-2">头像</div>
+                        <button onclick="randomizeAvatar()" class="btn-secondary text-xs px-3 py-1">
+                            <i class="fa fa-random mr-1"></i> 随机头像
                         </button>
                     </div>
-                    <div class="text-xs text-gray-400">连点头像3次随机</div>
                 </div>
-                <div id="userNicknameEditor" class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2 hidden">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-500">用户</span>
+                    <span id="userNicknameDisplay" class="font-medium text-gray-800">
+                        <span class="inline-flex items-center space-x-2 text-gray-500">
+                            <span class="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+                            <span>加载中...</span>
+                        </span>
+                    </span>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                     <input 
                         id="userNicknameInput" 
                         type="text" 
@@ -410,24 +411,14 @@
                     >
                         随机
                     </button>
-                    <button 
-                        type="button"
-                        onclick="hideNicknameEditor()"
-                        class="btn-secondary text-xs px-3 py-2 w-full sm:w-auto"
-                    >
-                        取消
-                    </button>
                 </div>
                 <div class="space-y-2">
                     <div class="text-xs text-gray-500">备注</div>
-                    <button id="userNoteDisplay" onclick="showNoteEditor()" class="w-full text-left text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md px-3 py-2 min-h-[36px]">
-                        -
-                    </button>
                     <textarea
                         id="userNoteInput"
                         rows="2"
                         placeholder="填写备注..."
-                        class="input-primary w-full text-sm hidden"
+                        class="input-primary w-full text-sm"
                         maxlength="200"
                     ></textarea>
                 </div>
@@ -548,32 +539,7 @@
                         <option value="0">永久</option>
                     </select>
                 </div>
-                <div id="shareEpisodeSection" class="w-full mt-4 hidden">
-                    <label class="block text-xs text-gray-500 mb-2">选集分享</label>
-                    <div class="space-y-2 text-sm">
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="shareEpisodeMode" value="all" checked>
-                            <span>全部</span>
-                        </label>
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="shareEpisodeMode" value="current">
-                            <span>仅当前集</span>
-                        </label>
-                        <label class="flex items-center space-x-2">
-                            <input type="radio" name="shareEpisodeMode" value="custom">
-                            <span>自定义选集</span>
-                        </label>
-                    </div>
-                    <div id="shareEpisodeList" class="mt-2 hidden max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2"></div>
-                    <div id="shareEpisodeActions" class="mt-2 hidden flex items-center justify-between text-xs text-gray-500">
-                        <button type="button" data-action="select-all" class="text-blue-600 hover:underline">全选</button>
-                        <button type="button" data-action="clear-all" class="text-gray-500 hover:underline">全不选</button>
-                    </div>
-                </div>
-                <button id="shareConfirmButton" onclick="confirmShareSelection()" class="btn-primary w-full mt-4">
-                    <i class="fa fa-check mr-1"></i> 确认生成分享
-                </button>
-                <button onclick="copyShareUrl()" class="btn-secondary w-full mt-2">
+                <button onclick="copyShareUrl()" class="btn-primary w-full mt-4">
                     <i class="fa fa-copy mr-1"></i> 点击复制地址
                 </button>
             </div>
@@ -659,7 +625,7 @@
         id="videoPlayerModal" 
         class="fixed inset-0 z-50 hidden flex items-center justify-center p-4"
     >
-        <div class="relative w-full max-w-4xl h-[70vh] bg-black rounded-lg overflow-hidden flex flex-col">
+        <div class="relative w-full max-w-4xl h-[70vh] bg-black rounded-lg overflow-hidden">
             <div 
                 id="playerTitle"
                 class="absolute top-4 left-4 z-10 px-3 py-1.5 bg-black/60 text-white text-sm rounded-full max-w-[70%] truncate"
@@ -714,11 +680,7 @@
                 <i class="fa fa-heart-o"></i>
             </button>
             
-            <div id="dplayer" class="w-full flex-1 min-h-0"></div>
-            <div id="episodePanel" class="hidden bg-black/70 px-4 py-3 border-t border-white/10">
-                <div class="text-xs text-white/70 mb-2">选集播放</div>
-                <div id="episodeList" class="flex flex-wrap gap-2 max-h-28 overflow-y-auto"></div>
-            </div>
+            <div id="dplayer" class="w-full h-full"></div>
         </div>
     </div>
 
@@ -787,24 +749,14 @@
                         <button onclick="clearAggregateApis()" class="btn-secondary text-xs flex-1">全不选</button>
                         <button onclick="resetAggregateApis()" class="btn-secondary text-xs flex-1">恢复默认</button>
                     </div>
-                    <div class="flex items-center justify-between">
-                        <div class="text-xs text-gray-500">
-                            官方推荐（总数 <span id="officialApiCount">0</span>）
-                        </div>
-                    </div>
-                    <div class="flex items-center bg-gray-100 rounded-lg p-1 text-xs">
-                        <button id="aggregateTabAdult" type="button" onclick="switchAggregateTab('adult')" class="flex-1 px-2 py-1 rounded-md bg-white shadow text-gray-800">摩西（<span id="officialApiCountAdult">0</span>）</button>
-                        <button id="aggregateTabNormal" type="button" onclick="switchAggregateTab('normal')" class="flex-1 px-2 py-1 rounded-md text-gray-600">普通（<span id="officialApiCountNormal">0</span>）</button>
-                    </div>
-                    <div id="aggregateApiListAdult" class="space-y-2"></div>
-                    <div id="aggregateApiListNormal" class="space-y-2 hidden"></div>
+                    <div id="aggregateApiList" class="space-y-2"></div>
                     <button onclick="confirmAggregateSelection()" class="btn-primary text-xs w-full">
                         确认并关闭
                     </button>
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">官方推荐</label>
+                    <label class="block text-sm font-medium">官方推荐（🌈数量 <span id="officialApiCount">0</span>）</label>
                     <button 
                         type="button"
                         onclick="toggleOfficialApiSection(); fetchOfficialApis(false)"
@@ -815,12 +767,7 @@
                     </button>
                 </div>
                 <div id="officialApiSection" class="hidden space-y-2">
-                    <div class="flex items-center bg-gray-100 rounded-lg p-1 text-xs">
-                        <button id="officialTabAdult" type="button" onclick="switchOfficialTab('adult')" class="flex-1 px-2 py-1 rounded-md bg-white shadow text-gray-800">摩西（<span id="officialApiCountAdult2">0</span>）</button>
-                        <button id="officialTabNormal" type="button" onclick="switchOfficialTab('normal')" class="flex-1 px-2 py-1 rounded-md text-gray-600">普通（<span id="officialApiCountNormal2">0</span>）</button>
-                    </div>
-                    <div id="officialApiListAdult" class="space-y-2"></div>
-                    <div id="officialApiListNormal" class="space-y-2 hidden"></div>
+                    <div id="officialApiList" class="space-y-2"></div>
                 </div>
 
                 <div class="flex items-center justify-between">
@@ -884,9 +831,6 @@
         let currentVideoTitle = '';
         let currentVideoPic = '';
         let currentVideoSource = '';
-        let currentVideoRawUrl = '';
-        let currentEpisodeList = [];
-        let currentEpisodeIndex = 0;
         let lastVisitAtStart = null;
         let aggregateNoMore = new Set();
         let renderedVideos = [];
@@ -925,10 +869,8 @@
         const hostNameDisplay = document.getElementById('hostNameDisplay');
         const hostHistoryWrap = document.getElementById('hostHistoryWrap');
         const hostHistoryList = document.getElementById('hostHistoryList');
-        const officialApiListAdult = document.getElementById('officialApiListAdult');
-        const officialApiListNormal = document.getElementById('officialApiListNormal');
-        const aggregateApiListAdult = document.getElementById('aggregateApiListAdult');
-        const aggregateApiListNormal = document.getElementById('aggregateApiListNormal');
+        const officialApiList = document.getElementById('officialApiList');
+        const aggregateApiList = document.getElementById('aggregateApiList');
         const aggregateSwitch = document.getElementById('aggregateSwitch');
         const aggregateApiSection = document.getElementById('aggregateApiSection');
         const officialApiSection = document.getElementById('officialApiSection');
@@ -937,10 +879,6 @@
         const hostHistoryToggleButton = document.getElementById('hostHistoryToggleButton');
         const aggregateSelectedCount = document.getElementById('aggregateSelectedCount');
         const officialApiCount = document.getElementById('officialApiCount');
-        const officialApiCountAdult = document.getElementById('officialApiCountAdult');
-        const officialApiCountNormal = document.getElementById('officialApiCountNormal');
-        const officialApiCountAdult2 = document.getElementById('officialApiCountAdult2');
-        const officialApiCountNormal2 = document.getElementById('officialApiCountNormal2');
         const privacySwitch = document.getElementById('privacySwitch');
         const searchInput = document.getElementById('searchInput');
         const searchInputMobile = document.getElementById('searchInputMobile');
@@ -953,15 +891,9 @@
         const loadingText = document.getElementById('loadingText');
         const shareModal = document.getElementById('shareModal');
         const shareExpireSelect = document.getElementById('shareExpireSelect');
-        const shareEpisodeSection = document.getElementById('shareEpisodeSection');
-        const shareEpisodeList = document.getElementById('shareEpisodeList');
-        const shareConfirmButton = document.getElementById('shareConfirmButton');
         let currentShareUrl = '';
         let currentSharePayload = null;
         let currentShareId = '';
-        let pendingShareEpisodes = [];
-        let pendingShareCurrentIndex = 0;
-        let isShareEditing = false;
         let shareListLoaded = false;
         const userAvatarImg = document.getElementById('userAvatarImg');
         const userAvatarText = document.getElementById('userAvatarText');
@@ -1251,34 +1183,6 @@
             refreshLocalStatsDisplay();
             updateUserStats();
         }
-
-        let visitHistoryFetched = false;
-        let visitHistoryFetchPromise = null;
-        async function fetchVisitHistoryOnce() {
-            if (visitHistoryFetched) return null;
-            if (visitHistoryFetchPromise) return visitHistoryFetchPromise;
-            const token = getUserToken ? getUserToken() : '';
-            if (!token) return null;
-            visitHistoryFetchPromise = (async () => {
-                try {
-                    const res = await fetch('/user/visit-history', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const data = await res.json();
-                    if (data && data.code === 200 && Array.isArray(data.data)) {
-                        localStorage.setItem('visitHistory', JSON.stringify(data.data));
-                        visitHistoryFetched = true;
-                        return data.data;
-                    }
-                } catch (e) {
-                    // ignore
-                } finally {
-                    visitHistoryFetchPromise = null;
-                }
-                return null;
-            })();
-            return visitHistoryFetchPromise;
-        }
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -1324,8 +1228,6 @@
             if (officialApiToggleButton) {
                 officialApiToggleButton.textContent = officialApiSection && officialApiSection.classList.contains('hidden') ? '展开' : '收起';
             }
-            switchAggregateTab('adult');
-            switchOfficialTab('adult');
             if (hostHistoryToggleButton) {
                 hostHistoryToggleButton.textContent = hostHistoryWrap && hostHistoryWrap.classList.contains('hidden') ? '展开' : '收起';
             }
@@ -1409,33 +1311,6 @@
             if (shareExpireSelect) {
                 shareExpireSelect.addEventListener('change', () => {
                     refreshShareUrlFromSelection();
-                });
-            }
-            document.addEventListener('change', (e) => {
-                const target = e.target;
-                if (!(target instanceof HTMLInputElement)) return;
-                if (target.name === 'shareEpisodeMode') {
-                    toggleShareEpisodeList(target.value === 'custom');
-                    if (target.value === 'custom') {
-                        setShareEpisodeChecks(false);
-                    }
-                    setShareConfirmState('ready');
-                    currentShareUrl = '';
-                    return;
-                }
-                if (target.closest('#shareEpisodeList')) {
-                    setShareConfirmState('ready');
-                    currentShareUrl = '';
-                }
-            });
-            if (shareEpisodeSection) {
-                shareEpisodeSection.addEventListener('click', (e) => {
-                    const target = e.target;
-                    if (!(target instanceof HTMLElement)) return;
-                    const action = target.getAttribute('data-action');
-                    if (!action) return;
-                    if (action === 'select-all') setShareEpisodeChecks(true);
-                    if (action === 'clear-all') setShareEpisodeChecks(false);
                 });
             }
 
@@ -1569,30 +1444,6 @@
             }
         }
 
-        let avatarClickCount = 0;
-        let avatarClickTimer = null;
-        function handleAvatarTripleClick() {
-            avatarClickCount += 1;
-            if (avatarClickCount === 1) {
-                showToast('连续点击头像3次可随机头像');
-            }
-            if (avatarClickTimer) {
-                clearTimeout(avatarClickTimer);
-            }
-            avatarClickTimer = setTimeout(() => {
-                avatarClickCount = 0;
-                avatarClickTimer = null;
-            }, 700);
-            if (avatarClickCount >= 3) {
-                avatarClickCount = 0;
-                if (avatarClickTimer) {
-                    clearTimeout(avatarClickTimer);
-                    avatarClickTimer = null;
-                }
-                randomizeAvatar();
-            }
-        }
-
         function getOfficialApiUrl() {
             return '/apis/official';
         }
@@ -1662,23 +1513,19 @@
                     return [];
                 }
                 
-                const isNormalHost = normalizeCategory(getCurrentHostCategory()) === 'normal';
-                // 普通接口不去重
-                const deduped = isNormalHost ? data.list : (() => {
-                    const seenTitles = new Set();
-                    const filtered = [];
-                    data.list.forEach(video => {
-                        const title = (video.vod_name || '').trim();
-                        if (!title) {
-                            filtered.push(video);
-                            return;
-                        }
-                        if (seenTitles.has(title)) return;
-                        seenTitles.add(title);
-                        filtered.push(video);
-                    });
-                    return filtered;
-                })();
+                // 普通搜索去重：相同标题只保留一条
+                const seenTitles = new Set();
+                const deduped = [];
+                data.list.forEach(video => {
+                    const title = (video.vod_name || '').trim();
+                    if (!title) {
+                        deduped.push(video);
+                        return;
+                    }
+                    if (seenTitles.has(title)) return;
+                    seenTitles.add(title);
+                    deduped.push(video);
+                });
                 
                 // 渲染数据
                 if (page === 1) {
@@ -1721,7 +1568,7 @@
                 }
                 await ensureFavoritesLoaded();
                 const apis = await getOfficialApis();
-                const selectedUrls = resolveAggregateSelection(apis);
+                const selectedUrls = getAggregateApiSelection();
                 const targetApis = selectedUrls.length > 0
                     ? apis.filter(item => selectedUrls.includes(item.url))
                     : apis;
@@ -1772,21 +1619,15 @@
                     list.forEach(video => {
                         merged.push({
                             ...video,
-                            _sourceLabel: label,
-                            _sourceCategory: item && item.category ? item.category : ''
+                            _sourceLabel: label
                         });
                     });
                 });
 
-                // 普通接口不去重
+                // 去重：相同标题只保留一条
                 const seenTitles = new Set();
                 const deduped = [];
                 merged.forEach(video => {
-                    const category = normalizeCategory(video._sourceCategory || '');
-                    if (category === 'normal') {
-                        deduped.push(video);
-                        return;
-                    }
                     const title = (video.vod_name || '').trim();
                     if (!title) {
                         deduped.push(video);
@@ -1854,43 +1695,10 @@
         }
         
         // 渲染视频卡片
-        function updateVideoGridLayout(category) {
-            if (!videoList) return;
-            const isNormal = category === 'normal';
-            const gridClasses = [
-                'grid',
-                'grid-cols-1',
-                'sm:grid-cols-2',
-                'md:grid-cols-3',
-                'lg:grid-cols-4',
-                'xl:grid-cols-5'
-            ];
-            const normalGridClasses = [
-                'grid',
-                'grid-cols-2',
-                'sm:grid-cols-3',
-                'md:grid-cols-4',
-                'lg:grid-cols-5',
-                'xl:grid-cols-6'
-            ];
-            gridClasses.concat(normalGridClasses).forEach((cls) => videoList.classList.remove(cls));
-            (isNormal ? normalGridClasses : gridClasses).forEach((cls) => videoList.classList.add(cls));
-        }
-
         function renderVideos(videos) {
-            const categories = new Set(
-                (videos || []).map((video) =>
-                    normalizeCategory(video._sourceCategory || getCurrentHostCategory())
-                )
-            );
-            const layoutCategory = categories.size === 1 ? Array.from(categories)[0] : 'adult';
-            updateVideoGridLayout(layoutCategory);
-
             videos.forEach(video => {
                 const favorited = isFavorited(video.vod_play_url);
                 const sourceLabel = video._sourceLabel || getHostLabel();
-                const category = normalizeCategory(video._sourceCategory || getCurrentHostCategory());
-                const isNormal = category === 'normal';
                 if (video.vod_play_url) {
                     renderedVideos.push({
                         url: video.vod_play_url,
@@ -1900,42 +1708,10 @@
                     });
                 }
                 const card = document.createElement('div');
-                card.className = `bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset video-card ${isNormal ? 'video-card--normal max-w-[220px] w-full mx-auto' : 'video-card--adult'}`;
+                card.className = 'bg-white rounded-lg overflow-hidden shadow-md card-hover scroll-offset video-card';
                 card.setAttribute('data-video-url', video.vod_play_url || '');
-                const thumbClass = isNormal
-                    ? 'video-thumb relative aspect-[474/670] overflow-hidden cursor-pointer'
-                    : 'video-thumb relative aspect-video overflow-hidden cursor-pointer';
-                const titleClass = isNormal
-                    ? 'font-semibold mb-2 line-clamp-1 text-sm'
-                    : 'font-semibold mb-2 line-clamp-1';
-                const actionClass = isNormal ? 'text-xs' : 'text-sm';
-                const yearBadge = isNormal && video.vod_year
-                    ? `<span class="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">${video.vod_year}</span>`
-                    : '';
-                const classText = isNormal && video.vod_class
-                    ? String(video.vod_class).split(',').map(s => s.trim()).filter(Boolean).slice(0, 3).join(' / ')
-                    : '';
-                const actorText = isNormal && video.vod_actor
-                    ? String(video.vod_actor).split(',').map(s => s.trim()).filter(Boolean).slice(0, 2).join(' / ')
-                    : '未知';
-                const cleanText = (value) => {
-                    const raw = String(value || '');
-                    if (!raw) return '';
-                    return raw
-                        .replace(/<[^>]+>/g, ' ')
-                        .replace(/&nbsp;/gi, ' ')
-                        .replace(/&amp;/gi, '&')
-                        .replace(/&lt;/gi, '<')
-                        .replace(/&gt;/gi, '>')
-                        .replace(/&quot;/gi, '"')
-                        .replace(/&#39;/gi, "'")
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                };
-                const contentText = isNormal ? cleanText(video.vod_content) : '';
-                const buttonClass = isNormal ? 'btn-primary text-xs' : 'btn-primary text-sm';
                 card.innerHTML = `
-                    <div class="${thumbClass}" data-preview-group="video" data-preview-url="${video.vod_pic || FALLBACK_IMAGE}" data-preview-title="${video.vod_name || ''}" data-preview-video-url="${video.vod_play_url || ''}" data-preview-source="${sourceLabel || ''}" data-preview-category="${category}" onclick="openPreviewFromGroup(this)">
+                    <div class="video-thumb relative aspect-video overflow-hidden cursor-pointer" data-preview-group="video" data-preview-url="${video.vod_pic || FALLBACK_IMAGE}" data-preview-title="${video.vod_name || ''}" data-preview-video-url="${video.vod_play_url || ''}" data-preview-source="${sourceLabel || ''}" onclick="openPreviewFromGroup(this)">
                         <img 
                             src="${FALLBACK_IMAGE}" 
                             data-src="${video.vod_pic}" 
@@ -1944,37 +1720,23 @@
                             loading="lazy"
                             class="w-full h-full object-cover lazy-image"
                         >
-                        ${isNormal && video.vod_remarks ? `<div class="absolute top-2 left-2 bg-black/70 text-white text-[11px] px-2 py-1 rounded-full max-w-[85%] truncate">${video.vod_remarks}</div>` : ''}
                         <div class="privacy-mask"></div>
                         <div class="count-badge hidden absolute top-2 right-2 bg-black/70 text-white text-[11px] px-2 py-1 rounded-full"></div>
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end">
                             <div class="p-3 w-full">
                                 <h3 class="text-white font-medium line-clamp-2">${video.vod_name}</h3>
-                                ${isNormal && contentText ? `<p class="text-white/80 text-[11px] mt-1 line-clamp-3">${contentText}</p>` : ''}
                             </div>
                         </div>
                     </div>
                     <div class="p-4">
-                        ${isNormal ? `
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">${sourceLabel}</span>
-                                ${yearBadge}
-                            </div>
-                        ` : ''}
-                        <h3 class="${titleClass}">
-                            ${!isNormal ? `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-2">${sourceLabel}</span>` : ''}
+                        <h3 class="font-semibold mb-2 line-clamp-1">
+                            <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded mr-2">${sourceLabel}</span>
                             ${video.vod_name}
                         </h3>
-                        ${isNormal && (classText || actorText) ? `
-                            <div class="text-[11px] text-gray-500 space-y-0.5 mb-2">
-                                ${classText ? `<div>类型：${classText}</div>` : ''}
-                                ${actorText ? `<div class="line-clamp-1">演员：${actorText}</div>` : ''}
-                            </div>
-                        ` : ''}
                         <div class="flex justify-between items-center">
                             <button 
-                                onclick="openVideoPlayer('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}', '${category}')"
-                                class="${buttonClass}"
+                                onclick="openVideoPlayer('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}')"
+                                class="btn-primary text-sm"
                             >
                                 <i class="fa fa-play mr-1"></i> 播放
                             </button>
@@ -1982,14 +1744,14 @@
                                 <button 
                                     onclick="toggleFavorite('${video.vod_name}', '${video.vod_play_url}', '${video.vod_pic}', this, '${sourceLabel}')"
                                     data-action="favorite"
-                                    class="${actionClass} ${favorited ? 'text-red-500' : 'text-gray-500'} hover:text-red-500"
+                                    class="text-sm ${favorited ? 'text-red-500' : 'text-gray-500'} hover:text-red-500"
                                     title="喜欢"
                                 >
                                     <i class="fa ${favorited ? 'fa-heart' : 'fa-heart-o'} mr-1"></i> 喜欢
                                 </button>
                                 <button 
-                                    onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}', 0)"
-                                    class="${actionClass} text-gray-500 hover:text-blue-500"
+                                    onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}')"
+                                    class="text-sm text-gray-500 hover:text-blue-500"
                                     title="分享视频"
                                 >
                                     <i class="fa fa-share-alt mr-1"></i> 分享
@@ -2361,15 +2123,13 @@
                     url: String(node.dataset.previewUrl || ''),
                     title: String(node.dataset.previewTitle || ''),
                     videoUrl: String(node.dataset.previewVideoUrl || ''),
-                    source: String(node.dataset.previewSource || ''),
-                    category: String(node.dataset.previewCategory || '')
+                    source: String(node.dataset.previewSource || '')
                 })).filter(item => item.url)
                 : [{
                     url: String(el.dataset.previewUrl || ''),
                     title: String(el.dataset.previewTitle || ''),
                     videoUrl: String(el.dataset.previewVideoUrl || ''),
-                    source: String(el.dataset.previewSource || ''),
-                    category: String(el.dataset.previewCategory || '')
+                    source: String(el.dataset.previewSource || '')
                 }];
             const index = nodes.length > 0 ? Math.max(0, nodes.indexOf(el)) : 0;
             const current = list[index] || list[0];
@@ -2383,7 +2143,6 @@
                 ? list
                 : [{ url: imageUrl, title }];
             let currentIndex = Math.min(Math.max(Number(startIndex) || 0, 0), items.length - 1);
-            let currentEpisodeIndex = 0;
             let scale = 1;
             let translateX = 0;
             let translateY = 0;
@@ -2435,10 +2194,6 @@
                         >
                         <div class="preview-meta text-white/80 text-xs mt-2"></div>
                         <p class="preview-caption text-white text-center mt-2"></p>
-                        <div class="preview-episodes hidden mt-3 w-full max-w-2xl">
-                            <div class="text-xs text-white/70 mb-2">选集播放</div>
-                            <div class="preview-episode-list flex flex-wrap gap-2"></div>
-                        </div>
                     </div>
                 </div>
             `;
@@ -2449,55 +2204,10 @@
             const img = overlay.querySelector('img');
             const caption = overlay.querySelector('.preview-caption');
             const meta = overlay.querySelector('.preview-meta');
-            const episodeWrap = overlay.querySelector('.preview-episodes');
-            const episodeList = overlay.querySelector('.preview-episode-list');
             const prevBtn = overlay.querySelector('[data-action="prev"]');
             const nextBtn = overlay.querySelector('[data-action="next"]');
             const closeBtn = overlay.querySelector('[data-action="close"]');
             const playBtn = overlay.querySelector('[data-action="play"]');
-
-            const parseEpisodes = (rawUrl) => {
-                const text = String(rawUrl || '');
-                if (!text) return [];
-                const parts = text.split('#').map(part => part.trim()).filter(Boolean);
-                return parts.map((part, index) => {
-                    const splitIndex = part.indexOf('$');
-                    if (splitIndex === -1) {
-                        return { name: `第${index + 1}集`, url: part };
-                    }
-                    const name = part.slice(0, splitIndex).trim() || `第${index + 1}集`;
-                    const url = part.slice(splitIndex + 1).trim();
-                    return { name, url };
-                }).filter(item => item.url);
-            };
-
-            const renderEpisodes = (item) => {
-                if (!episodeWrap || !episodeList) return;
-                const category = normalizeCategory(item.category || '');
-                if (category !== 'normal') {
-                    episodeWrap.classList.add('hidden');
-                    episodeList.innerHTML = '';
-                    currentEpisodeIndex = 0;
-                    return;
-                }
-                const episodes = parseEpisodes(item.videoUrl);
-                if (episodes.length <= 1) {
-                    episodeWrap.classList.add('hidden');
-                    episodeList.innerHTML = '';
-                    currentEpisodeIndex = 0;
-                    return;
-                }
-                episodeWrap.classList.remove('hidden');
-                episodeList.innerHTML = episodes.map((ep, idx) => `
-                    <button 
-                        type="button"
-                        class="px-3 py-1 rounded-full text-xs border ${idx === currentEpisodeIndex ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
-                        data-episode-index="${idx}"
-                        data-episode-url="${ep.url}"
-                        data-episode-name="${ep.name}"
-                    >${ep.name}</button>
-                `).join('');
-            };
 
             const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
             const applyTransform = () => {
@@ -2520,8 +2230,6 @@
                 if (playBtn) {
                     playBtn.classList.toggle('hidden', !item.videoUrl);
                 }
-                currentEpisodeIndex = 0;
-                renderEpisodes(item);
                 resetTransform();
             };
             const gotoIndex = (nextIndex) => {
@@ -2550,46 +2258,8 @@
                 playBtn.addEventListener('click', () => {
                     const item = items[currentIndex] || items[0];
                     if (!item || !item.videoUrl) return;
-                    const episodes = parseEpisodes(item.videoUrl);
-                    const selected = episodes[currentEpisodeIndex];
                     handleClose();
-                    openVideoPlayer(
-                        selected ? selected.url : item.videoUrl,
-                        selected ? selected.name : (item.title || ''),
-                        item.url || '',
-                        item.source || '',
-                        item.category || ''
-                    );
-                });
-            }
-
-            if (episodeList) {
-                episodeList.addEventListener('click', (e) => {
-                    const target = e.target;
-                    if (!(target instanceof HTMLElement)) return;
-                    const idx = Number(target.getAttribute('data-episode-index'));
-                    const url = String(target.getAttribute('data-episode-url') || '');
-                    const name = String(target.getAttribute('data-episode-name') || '');
-                    if (!Number.isFinite(idx) || !url) return;
-                    currentEpisodeIndex = idx;
-                    const buttons = episodeList.querySelectorAll('button[data-episode-index]');
-                    buttons.forEach((btn) => {
-                        const isActive = Number(btn.getAttribute('data-episode-index')) === idx;
-                        btn.classList.toggle('bg-blue-600', isActive);
-                        btn.classList.toggle('text-white', isActive);
-                        btn.classList.toggle('border-blue-600', isActive);
-                        btn.classList.toggle('bg-white/10', !isActive);
-                        btn.classList.toggle('text-white', !isActive);
-                        btn.classList.toggle('border-white/20', !isActive);
-                    });
-                    handleClose();
-                    openVideoPlayer(
-                        url,
-                        name || (items[currentIndex]?.title || ''),
-                        items[currentIndex]?.url || '',
-                        items[currentIndex]?.source || '',
-                        items[currentIndex]?.category || ''
-                    );
+                    openVideoPlayer(item.videoUrl, item.title || '', item.url || '', item.source || '');
                 });
             }
 
@@ -2700,30 +2370,7 @@
         }
         
         // 打开视频播放器
-        function parsePlayUrls(rawUrl) {
-            const text = String(rawUrl || '');
-            if (!text) return [];
-            const segments = text.split('$$$').map(part => part.trim()).filter(Boolean);
-            const preferredSegment = segments.find(seg => seg.toLowerCase().includes('m3u8')) || segments[0] || '';
-            const parts = preferredSegment.split('#').map(part => part.trim()).filter(Boolean);
-            return parts.map((part, index) => {
-                const splitIndex = part.indexOf('$');
-                if (splitIndex === -1) {
-                    return { name: `第${index + 1}集`, url: part };
-                }
-                const name = part.slice(0, splitIndex).trim() || `第${index + 1}集`;
-                const url = part.slice(splitIndex + 1).trim();
-                return { name, url };
-            }).filter(item => item.url);
-        }
-
-        function isM3u8Url(url) {
-            if (!url) return false;
-            const cleaned = String(url).split('?')[0].split('#')[0].toLowerCase();
-            return cleaned.endsWith('.m3u8');
-        }
-
-        function openVideoPlayer(videoUrl, videoTitle, imageUrl = '', sourceLabel = '', category = '', preferredEpisodeIndex = null) {
+        function openVideoPlayer(videoUrl, videoTitle, imageUrl = '', sourceLabel = '') {
             if (!host) {
                 if (!isAggregateSearchEnabled()) {
                     showToast('请先设置API Host');
@@ -2735,63 +2382,21 @@
             showLoading('正在加载视频...');
             
             try {
-                const resolvedCategory = normalizeCategory(category || getOfficialCategoryByName(sourceLabel) || getCurrentHostCategory());
-                const baseTitle = String(videoTitle || '').trim();
-                const episodes = parsePlayUrls(videoUrl);
-                const hasEpisodeList = episodes.length > 1;
-                const normalizedPreferred = Number.isFinite(Number(preferredEpisodeIndex)) ? Number(preferredEpisodeIndex) : null;
-                const initialIndex = hasEpisodeList && normalizedPreferred !== null && normalizedPreferred >= 0 && normalizedPreferred < episodes.length
-                    ? normalizedPreferred
-                    : 0;
-                const initialEpisode = episodes[initialIndex];
-                const initialUrl = initialEpisode ? initialEpisode.url : (videoUrl.split('$')[1] || videoUrl);
-                if (!isM3u8Url(initialUrl)) {
-                    hideLoading();
-                    showToast('仅支持 .m3u8 视频地址');
-                    return;
-                }
-                const episodeTitle = hasEpisodeList && initialEpisode && initialEpisode.name ? initialEpisode.name : '';
-                const displayTitle = baseTitle
-                    ? (episodeTitle ? `${baseTitle} ${episodeTitle}` : baseTitle)
-                    : (episodeTitle || '视频播放');
-                currentVideoRawUrl = videoUrl;
-                currentEpisodeList = episodes;
-                currentEpisodeIndex = initialIndex;
-                currentVideoUrl = initialUrl;
-                currentVideoTitle = displayTitle || '视频播放';
+                // 解析真实视频URL
+                const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
+                currentVideoUrl = realVideoUrl;
+                currentVideoTitle = videoTitle || '视频播放';
                 currentVideoPic = imageUrl || '';
                 currentVideoSource = sourceLabel || getHostLabel();
-                const episodePanel = document.getElementById('episodePanel');
-                const episodeList = document.getElementById('episodeList');
-                let activeEpisodeIndex = initialIndex;
-                const renderEpisodePanel = () => {
-                    if (!episodePanel || !episodeList) return;
-                    if (resolvedCategory !== 'normal' || !hasEpisodeList) {
-                        episodePanel.classList.add('hidden');
-                        episodeList.innerHTML = '';
-                        return;
-                    }
-                    episodePanel.classList.remove('hidden');
-                    episodeList.innerHTML = episodes.map((ep, idx) => `
-                        <button 
-                            type="button"
-                            class="px-3 py-1 rounded-full text-xs border ${idx === activeEpisodeIndex ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
-                            data-episode-index="${idx}"
-                        >${ep.name}</button>
-                    `).join('');
-                };
-                const updatePlayerTitle = (title) => {
-                    const playerTitle = document.getElementById('playerTitle');
-                    if (playerTitle) {
-                        const label = currentVideoSource || '未知来源';
-                        playerTitle.innerHTML = `<span class="bg-white/20 text-white/90 text-[10px] px-2 py-0.5 rounded mr-2">${label}</span>${title || ''}`;
-                    }
-                };
-                updatePlayerLikeButtons(isFavorited(initialUrl));
-                updatePlayerTitle(currentVideoTitle);
+                updatePlayerLikeButtons(isFavorited(realVideoUrl));
+                const playerTitle = document.getElementById('playerTitle');
+                if (playerTitle) {
+                    const label = currentVideoSource || '未知来源';
+                    playerTitle.innerHTML = `<span class="bg-white/20 text-white/90 text-[10px] px-2 py-0.5 rounded mr-2">${label}</span>${currentVideoTitle}`;
+                }
                 
                 // 保存播放历史
-                saveToHistory(currentVideoTitle, initialUrl, imageUrl, currentVideoSource, episodeTitle || '', hasEpisodeList ? initialIndex : null);
+                saveToHistory(videoTitle, realVideoUrl, imageUrl, currentVideoSource);
                 
                 // 显示播放器
                 setModalScrollLock(true);
@@ -2802,17 +2407,17 @@
                     dplayer.destroy();
                 }
                 
-                const resumeTarget = loadResumeTime(initialUrl);
+                const resumeTarget = loadResumeTime(realVideoUrl);
                 let resumeApplied = false;
 
                 dplayer = new DPlayer({
                     container: document.getElementById('dplayer'),
                     video: {
-                        url: initialUrl,
+                        url: realVideoUrl,
                         type: 'hls',
                         pic: '',
                         thumbnails: '',
-                        title: currentVideoTitle || '视频播放'
+                        title: videoTitle || '视频播放'
                     },
                     autoplay: true,
                     theme: '#3b82f6',
@@ -2823,11 +2428,11 @@
                     contextmenu: [
                         {
                             text: '在新窗口打开',
-                            link: initialUrl,
+                            link: realVideoUrl,
                         }
                     ]
                 });
-
+                
                 // 添加窗口播放按钮到控制栏
                 setTimeout(() => {
                     const controller = document.querySelector('.dplayer-controller');
@@ -2836,7 +2441,7 @@
                         windowButton.className = 'dplayer-button dplayer-window-button';
                         windowButton.innerHTML = '<i class="fa fa-window-restore"></i>';
                         windowButton.title = '窗口播放';
-                        windowButton.onclick = () => window.open(currentVideoUrl, '_blank');
+                        windowButton.onclick = () => window.open(realVideoUrl, '_blank');
                         
                         // 插入到全屏按钮之前
                         const fullscreenButton = controller.querySelector('.dplayer-fullscreen-toggle');
@@ -2866,8 +2471,8 @@
                 dplayer.on('timeupdate', () => {
                     if (!dplayer || !dplayer.video) return;
                     const current = dplayer.video.currentTime || 0;
-                    if (lastWatchUrl !== currentVideoUrl) {
-                        lastWatchUrl = currentVideoUrl;
+                    if (lastWatchUrl !== realVideoUrl) {
+                        lastWatchUrl = realVideoUrl;
                         lastWatchTime = current;
                     }
                     const delta = current - lastWatchTime;
@@ -2875,56 +2480,22 @@
                         addWatchTime(delta);
                     }
                     lastWatchTime = current;
-                    saveResumeTime(currentVideoUrl, dplayer.video.currentTime, dplayer.video.duration);
+                    saveResumeTime(realVideoUrl, dplayer.video.currentTime, dplayer.video.duration);
                 });
 
                 dplayer.on('pause', () => {
-                    saveResumeNow(currentVideoUrl);
+                    saveResumeNow(realVideoUrl);
                 });
 
                 dplayer.on('seeked', () => {
-                    saveResumeNow(currentVideoUrl);
+                    saveResumeNow(realVideoUrl);
                 });
 
                 dplayer.on('ended', () => {
-                    clearResumeTime(currentVideoUrl);
+                    clearResumeTime(realVideoUrl);
                     lastWatchTime = 0;
                     lastWatchUrl = '';
                 });
-
-                renderEpisodePanel();
-
-                if (episodeList) {
-                    episodeList.onclick = (e) => {
-                        const target = e.target;
-                        if (!(target instanceof HTMLElement)) return;
-                        const idx = Number(target.getAttribute('data-episode-index'));
-                        if (!Number.isFinite(idx) || !episodes[idx]) return;
-                        activeEpisodeIndex = idx;
-                        const ep = episodes[idx];
-                        if (!isM3u8Url(ep.url)) {
-                            showToast('仅支持 .m3u8 视频地址');
-                            return;
-                        }
-                        const title = baseTitle
-                            ? (ep.name ? `${baseTitle} ${ep.name}` : baseTitle)
-                            : (ep.name || '视频播放');
-                        currentVideoUrl = ep.url;
-                        currentVideoTitle = title;
-                        currentEpisodeIndex = idx;
-                        updatePlayerTitle(title);
-                        updatePlayerLikeButtons(isFavorited(ep.url));
-                        saveToHistory(title, ep.url, imageUrl, currentVideoSource, ep.name || '', idx);
-                        if (dplayer && typeof dplayer.switchVideo === 'function') {
-                            dplayer.switchVideo({ url: ep.url, type: 'hls', pic: '', thumbnails: '', title });
-                            dplayer.play();
-                        } else if (dplayer && dplayer.video) {
-                            dplayer.video.src = ep.url;
-                            dplayer.video.play();
-                        }
-                        renderEpisodePanel();
-                    };
-                }
                 
                 dplayer.on('error', (e) => {
                     // 只有在加载过程中发生错误才显示提示
@@ -3007,7 +2578,7 @@
         }
         
         // 保存到播放历史
-        function saveToHistory(title, url, pic, source, episodeName = '', episodeIndex = null) {
+        function saveToHistory(title, url, pic, source) {
             try {
                 const history = JSON.parse(localStorage.getItem('videoPlayHistory') || '[]');
                 
@@ -3019,8 +2590,6 @@
                     url,
                     pic: pic || '',
                     source: source || '',
-                    episodeName: episodeName || '',
-                    episodeIndex: Number.isFinite(episodeIndex) ? Number(episodeIndex) : (existingIndex >= 0 ? (history[existingIndex].episodeIndex ?? null) : null),
                     timestamp: Date.now(),
                     playCount: existingIndex >= 0 ? (history[existingIndex].playCount || 0) + 1 : 1,
                     lastPosition: existingIndex >= 0 ? (history[existingIndex].lastPosition || 0) : 0,
@@ -3068,7 +2637,7 @@
                     return `
                     <div class="bg-white rounded-lg p-3 mb-3 shadow-sm">
                         <div class="flex space-x-3">
-                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 cursor-pointer" data-preview-group="history" data-preview-url="${item.pic || FALLBACK_IMAGE}" data-preview-title="${item.title || ''}" data-preview-video-url="${item.url || ''}" data-preview-source="${item.source || ''}" data-preview-category="${normalizeCategory(getOfficialCategoryByName(item.source) || '')}" onclick="openPreviewFromGroup(this)">
+                            <div class="w-20 h-12 rounded-md overflow-hidden bg-gray-200 flex-shrink-0 cursor-pointer" data-preview-group="history" data-preview-url="${item.pic || FALLBACK_IMAGE}" data-preview-title="${item.title || ''}" data-preview-video-url="${item.url || ''}" data-preview-source="${item.source || ''}" onclick="openPreviewFromGroup(this)">
                                 ${
                                     item.pic
                                         ? `<img src="${item.pic}" alt="${item.title}" onerror="this.onerror=null;this.src='${FALLBACK_IMAGE}';" loading="lazy" class="w-full h-full object-cover">`
@@ -3080,7 +2649,6 @@
                                     <span class="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded mr-1">${item.source || '未知来源'}</span>
                                     ${item.title}
                                 </h4>
-                                ${item.episodeName ? `<div class="text-[11px] text-gray-500 mb-1">选集：${item.episodeName}</div>` : ''}
                                 <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                                     <span>播放次数: ${item.playCount}</span>
                                     ${resumeLabel ? `<span>${resumeLabel}</span>` : ''}
@@ -3090,7 +2658,7 @@
                         </div>
                         <div class="mt-3 flex space-x-2">
                             <button 
-                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}', '', ${Number.isFinite(item.episodeIndex) ? item.episodeIndex : 'null'})"
+                                onclick="openVideoPlayer('${item.url}', '${item.title}', '${item.pic || ''}', '${item.source || ''}')"
                                 class="btn-primary text-xs py-1 px-2 flex-1"
                             >
                                 <i class="fa fa-play mr-1"></i> 播放
@@ -3115,7 +2683,6 @@
 
         // 喜欢功能
         let favoritesCache = null;
-        let favoritesLoadingPromise = null;
         const FAVORITES_REMOTE_LOADED_KEY = 'videoFavoritesRemoteLoaded';
 
         function getFavorites() {
@@ -3139,7 +2706,6 @@
         }
 
         async function loadFavorites(force = false) {
-            if (favoritesLoadingPromise) return favoritesLoadingPromise;
             const token = getUserToken ? getUserToken() : '';
             const alreadyLoaded = localStorage.getItem(FAVORITES_REMOTE_LOADED_KEY) === '1';
             if (!force && (alreadyLoaded || !token)) {
@@ -3147,24 +2713,19 @@
                 refreshLocalStatsDisplay();
                 return;
             }
-            favoritesLoadingPromise = (async () => {
-                try {
-                    const res = await fetch('/user/favorites', {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const data = await res.json();
-                    if (data && data.code === 200 && Array.isArray(data.data)) {
-                        setFavoritesCache(data.data);
-                        localStorage.setItem(FAVORITES_REMOTE_LOADED_KEY, '1');
-                        refreshLocalStatsDisplay();
-                    }
-                } catch (e) {
-                    // ignore
-                } finally {
-                    favoritesLoadingPromise = null;
+            try {
+                const res = await fetch('/user/favorites', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data && data.code === 200 && Array.isArray(data.data)) {
+                    setFavoritesCache(data.data);
+                    localStorage.setItem(FAVORITES_REMOTE_LOADED_KEY, '1');
+                    refreshLocalStatsDisplay();
                 }
-            })();
-            return favoritesLoadingPromise;
+            } catch (e) {
+                // ignore
+            }
         }
 
         async function mergeLocalFavoritesToMongo() {
@@ -3605,49 +3166,11 @@
             }
         }
 
-        function switchAggregateTab(type) {
-            const adultTab = document.getElementById('aggregateTabAdult');
-            const normalTab = document.getElementById('aggregateTabNormal');
-            if (aggregateApiListAdult) aggregateApiListAdult.classList.toggle('hidden', type !== 'adult');
-            if (aggregateApiListNormal) aggregateApiListNormal.classList.toggle('hidden', type !== 'normal');
-            if (adultTab) {
-                adultTab.classList.toggle('bg-white', type === 'adult');
-                adultTab.classList.toggle('shadow', type === 'adult');
-                adultTab.classList.toggle('text-gray-800', type === 'adult');
-                adultTab.classList.toggle('text-gray-600', type !== 'adult');
-            }
-            if (normalTab) {
-                normalTab.classList.toggle('bg-white', type === 'normal');
-                normalTab.classList.toggle('shadow', type === 'normal');
-                normalTab.classList.toggle('text-gray-800', type === 'normal');
-                normalTab.classList.toggle('text-gray-600', type !== 'normal');
-            }
-        }
-
         function toggleOfficialApiSection() {
             if (!officialApiSection) return;
             officialApiSection.classList.toggle('hidden');
             if (officialApiToggleButton) {
                 officialApiToggleButton.textContent = officialApiSection.classList.contains('hidden') ? '展开' : '收起';
-            }
-        }
-
-        function switchOfficialTab(type) {
-            const adultTab = document.getElementById('officialTabAdult');
-            const normalTab = document.getElementById('officialTabNormal');
-            if (officialApiListAdult) officialApiListAdult.classList.toggle('hidden', type !== 'adult');
-            if (officialApiListNormal) officialApiListNormal.classList.toggle('hidden', type !== 'normal');
-            if (adultTab) {
-                adultTab.classList.toggle('bg-white', type === 'adult');
-                adultTab.classList.toggle('shadow', type === 'adult');
-                adultTab.classList.toggle('text-gray-800', type === 'adult');
-                adultTab.classList.toggle('text-gray-600', type !== 'adult');
-            }
-            if (normalTab) {
-                normalTab.classList.toggle('bg-white', type === 'normal');
-                normalTab.classList.toggle('shadow', type === 'normal');
-                normalTab.classList.toggle('text-gray-800', type === 'normal');
-                normalTab.classList.toggle('text-gray-600', type !== 'normal');
             }
         }
 
@@ -3886,9 +3409,6 @@
                 const data = await res.json();
                 if (data && data.code === 200 && data.data) {
                     currentUserProfile = data.data;
-                    if (Array.isArray(currentUserProfile.visitHistory)) {
-                        localStorage.setItem('visitHistory', JSON.stringify(currentUserProfile.visitHistory));
-                    }
                     return currentUserProfile;
                 }
             } catch (e) {
@@ -3918,10 +3438,7 @@
         async function renderUserInfo(options = {}) {
             if (!userInfoContent) return;
             const nicknameDisplay = document.getElementById('userNicknameDisplay');
-            const nicknameButton = document.getElementById('userNicknameButton');
             const nicknameInput = document.getElementById('userNicknameInput');
-            const nicknameEditor = document.getElementById('userNicknameEditor');
-            const noteDisplay = document.getElementById('userNoteDisplay');
             const noteInput = document.getElementById('userNoteInput');
             const logoutBtn = document.querySelector('[data-action="logout"]');
             const skipStatsFetch = !!options.skipStatsFetch;
@@ -3932,12 +3449,6 @@
                         <span>加载中...</span>
                     </span>
                 `;
-            }
-            if (nicknameButton) {
-                nicknameButton.textContent = '加载中...';
-            }
-            if (nicknameEditor) {
-                nicknameEditor.classList.add('hidden');
             }
             if (nicknameInput) {
                 nicknameInput.disabled = true;
@@ -3959,12 +3470,12 @@
                     }
                 }
             }
-            const nicknameText = profile ? (profile.nickname || profile.username || '未登录') : '未登录';
             if (nicknameDisplay) {
-                nicknameDisplay.textContent = nicknameText;
-            }
-            if (nicknameButton) {
-                nicknameButton.textContent = nicknameText;
+                if (profile) {
+                    nicknameDisplay.textContent = profile.nickname || profile.username || '未登录';
+                } else {
+                    nicknameDisplay.textContent = '未登录';
+                }
             }
             if (profile && profile.avatar) {
                 localStorage.setItem(USER_AVATAR_KEY, String(profile.avatar));
@@ -3974,13 +3485,10 @@
                 nicknameInput.value = profile ? (profile.nickname || profile.username || '') : '';
                 nicknameInput.disabled = false;
             }
-            const noteValue = profile ? (profile.profileNote || profile.note || '') : '';
             if (noteInput) {
+                const noteValue = profile ? (profile.profileNote || profile.note || '') : '';
                 noteInput.value = noteValue;
                 noteInput.disabled = false;
-            }
-            if (noteDisplay) {
-                noteDisplay.textContent = noteValue || '点击填写备注';
             }
             if (logoutBtn) {
                 logoutBtn.disabled = !profile;
@@ -3995,20 +3503,6 @@
             let historyCount = Math.max(0, Number(stats?.historyCount || 0));
             let searchCount = Math.max(0, Number(stats?.searchCount || 0));
             let watchSeconds = Math.max(0, Number(stats?.watchSeconds || 0));
-            const lastVisitEl = document.getElementById('userLastVisit');
-            if (lastVisitEl) {
-                const historyList = Array.isArray(profile?.visitHistory) && profile.visitHistory.length > 0
-                    ? profile.visitHistory
-                    : JSON.parse(localStorage.getItem('visitHistory') || '[]');
-                if (!historyList || historyList.length === 0) {
-                    lastVisitEl.textContent = '首次访问';
-                } else {
-                    lastVisitEl.innerHTML = historyList
-                        .slice(0, 5)
-                        .map((timestamp) => `<div>${formatDate(Number(timestamp))}</div>`)
-                        .join('');
-                }
-            }
             if (skipStatsFetch) {
                 refreshLocalStatsDisplay();
                 return;
@@ -4018,12 +3512,24 @@
             if (historyCountEl) historyCountEl.textContent = String(historyCount);
             if (searchCountEl) searchCountEl.textContent = String(searchCount);
             if (watchTodayEl) watchTodayEl.textContent = formatDuration(watchSeconds);
+
+            const lastVisitEl = document.getElementById('userLastVisit');
+            if (lastVisitEl) {
+                const historyList = JSON.parse(localStorage.getItem('visitHistory') || '[]');
+                if (!historyList || historyList.length === 0) {
+                    lastVisitEl.textContent = '首次访问';
+                } else {
+                    lastVisitEl.innerHTML = historyList
+                        .slice(0, 5)
+                        .map((timestamp) => `<div>${formatDate(Number(timestamp))}</div>`)
+                        .join('');
+                }
+            }
         }
 
         async function saveUserNickname() {
             const nicknameInput = document.getElementById('userNicknameInput');
             const saveButton = document.getElementById('userNicknameSave');
-            const nicknameEditor = document.getElementById('userNicknameEditor');
             if (!nicknameInput) return;
             const value = nicknameInput.value.trim();
             const token = getUserToken ? getUserToken() : '';
@@ -4048,42 +3554,21 @@
                 saveButton.innerHTML = '<span class="inline-flex items-center space-x-2"><span class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span><span>保存中...</span></span>';
                 saveButton.disabled = true;
             }
-            let success = false;
-            try {
-                const res = await fetch(`/user/${currentUserProfile._id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify({ nickname: value })
-                });
-                const data = await res.json();
-                if (data && data.code === 200) {
-                    success = true;
-                }
-            } catch (e) {
-                success = false;
-            }
-            if (success) {
-                if (currentUserProfile) {
-                    currentUserProfile.nickname = value;
-                }
-                await renderUserInfo({ skipStatsFetch: true });
-                showToast('昵称已保存');
-            } else {
-                nicknameInput.value = currentName || '';
-                showToast('保存失败，请重试');
-            }
+            await fetch(`/user/${currentUserProfile._id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ nickname: value })
+            });
+            await renderUserInfo({ skipStatsFetch: true });
+            showToast('昵称已保存');
             if (saveButton) {
                 saveButton.disabled = false;
                 saveButton.textContent = originalText || '保存';
-            }
-            if (nicknameEditor) {
-                nicknameEditor.classList.add('hidden');
             }
         }
 
         async function saveUserNote() {
             const noteInput = document.getElementById('userNoteInput');
-            const noteDisplay = document.getElementById('userNoteDisplay');
             if (!noteInput) return;
             const value = noteInput.value.trim();
             const token = getUserToken ? getUserToken() : '';
@@ -4120,8 +3605,6 @@
             if (noteInput) noteInput.value = value;
             await renderUserInfo({ skipStatsFetch: true });
             showToast('备注已保存');
-            if (noteInput) noteInput.classList.add('hidden');
-            if (noteDisplay) noteDisplay.classList.remove('hidden');
         }
 
         function generateRandomNickname() {
@@ -4145,19 +3628,6 @@
         const handleUserNoteBlur = () => {
             if (noteSaveTimer) clearTimeout(noteSaveTimer);
             noteSaveTimer = setTimeout(() => {
-                const noteInput = document.getElementById('userNoteInput');
-                const noteDisplay = document.getElementById('userNoteDisplay');
-                if (!noteInput) return;
-                const value = noteInput.value.trim();
-                const currentNote = String(currentUserProfile?.profileNote || currentUserProfile?.note || '').trim();
-                if (value === currentNote) {
-                    noteInput.classList.add('hidden');
-                    if (noteDisplay) {
-                        noteDisplay.textContent = value || '点击填写备注';
-                        noteDisplay.classList.remove('hidden');
-                    }
-                    return;
-                }
                 saveUserNote();
             }, 200);
         };
@@ -4168,39 +3638,6 @@
             noteInput.addEventListener('blur', handleUserNoteBlur);
             noteInput.dataset.bound = '1';
         };
-
-        const bindUserNicknameAutoSave = () => {
-            const nicknameInput = document.getElementById('userNicknameInput');
-            if (!nicknameInput || nicknameInput.dataset.bound === '1') return;
-            nicknameInput.addEventListener('blur', () => {
-                const value = nicknameInput.value.trim();
-                const currentName = String(currentUserProfile?.nickname || currentUserProfile?.username || '').trim();
-                if (value === currentName) {
-                    hideNicknameEditor();
-                    return;
-                }
-                saveUserNickname();
-            });
-            nicknameInput.dataset.bound = '1';
-        };
-
-        function showNicknameEditor() {
-            const nicknameEditor = document.getElementById('userNicknameEditor');
-            if (nicknameEditor) nicknameEditor.classList.remove('hidden');
-        }
-
-        function hideNicknameEditor() {
-            const nicknameEditor = document.getElementById('userNicknameEditor');
-            if (nicknameEditor) nicknameEditor.classList.add('hidden');
-        }
-
-        function showNoteEditor() {
-            const noteInput = document.getElementById('userNoteInput');
-            const noteDisplay = document.getElementById('userNoteDisplay');
-            if (noteInput) noteInput.classList.remove('hidden');
-            if (noteDisplay) noteDisplay.classList.add('hidden');
-            if (noteInput) noteInput.focus();
-        }
 
         async function logoutUser() {
             const logoutBtn = document.querySelector('[data-action="logout"]');
@@ -4236,14 +3673,10 @@
         }
 
         bindUserNoteAutoSave();
-        bindUserNicknameAutoSave();
 
         function toggleUserInfo() {
             if (!userPanel) return;
             renderUserInfo({ skipStatsFetch: true });
-            fetchVisitHistoryOnce().then(() => {
-                renderUserInfo({ skipStatsFetch: true });
-            });
             const willOpen = userPanel.classList.contains('translate-x-full');
             if (willOpen) closePanelsExcept(userPanel);
             userPanel.classList.toggle('translate-x-full');
@@ -4261,19 +3694,16 @@
         // 官方推荐接口
         let officialApiCache = null;
 
-        function setOfficialApiLoading(messageHtml) {
-            if (officialApiListAdult) officialApiListAdult.innerHTML = messageHtml;
-            if (officialApiListNormal) officialApiListNormal.innerHTML = messageHtml;
-        }
-
         function fetchOfficialApis(force) {
-            if (!officialApiListAdult && !officialApiListNormal) return;
+            if (!officialApiList) return;
             if (officialApiCache && !force) {
                 renderOfficialApis(officialApiCache);
                 return;
             }
             
-            setOfficialApiLoading(`<div class="text-xs text-gray-500">正在获取官方推荐...</div>`);
+            officialApiList.innerHTML = `
+                <div class="text-xs text-gray-500">正在获取官方推荐...</div>
+            `;
             
             const userToken = getUserToken ? getUserToken() : '';
             fetch(getOfficialApiUrl(), {
@@ -4281,7 +3711,9 @@
             })
                 .then(res => {
                     if (res.status === 401) {
-                        setOfficialApiLoading(`<div class="text-xs text-red-500">访问已过期，请重新验证</div>`);
+                        officialApiList.innerHTML = `
+                            <div class="text-xs text-red-500">访问已过期，请重新验证</div>
+                        `;
                         revokeAccess('访问已过期，请重新登录');
                         throw new Error('unauthorized');
                     }
@@ -4299,21 +3731,19 @@
                         return;
                     }
                     console.error('获取官方接口失败:', err);
-                    setOfficialApiLoading(`<div class="text-xs text-red-500">获取失败，请稍后再试</div>`);
+                    officialApiList.innerHTML = `
+                        <div class="text-xs text-red-500">获取失败，请稍后再试</div>
+                    `;
                 });
         }
 
         function renderOfficialApis(data) {
             if (!data || !Array.isArray(data.data)) {
-                setOfficialApiLoading(`<div class="text-xs text-gray-500">暂无官方推荐</div>`);
+                officialApiList.innerHTML = `
+                    <div class="text-xs text-gray-500">暂无官方推荐</div>
+                `;
                 if (officialApiCount) {
                     officialApiCount.textContent = '0';
-                }
-                if (officialApiCountAdult) {
-                    officialApiCountAdult.textContent = '0';
-                }
-                if (officialApiCountNormal) {
-                    officialApiCountNormal.textContent = '0';
                 }
                 if (aggregateApiList) {
                     aggregateApiList.innerHTML = `
@@ -4322,26 +3752,13 @@
                 }
                 return;
             }
-
-            try {
-                localStorage.setItem('officialApiList', JSON.stringify(data.data));
-            } catch (e) {
-                // ignore storage errors
-            }
             
             const metaText = [data.title, data.subtitle].filter(Boolean).join(' · ');
             const metaHtml = metaText
                 ? `<div class="text-xs text-gray-500 mb-2">${metaText}</div>`
                 : '';
-
-            const grouped = data.data.reduce((acc, item) => {
-                const category = normalizeCategory(item.category);
-                if (!acc[category]) acc[category] = [];
-                acc[category].push(item);
-                return acc;
-            }, {});
-
-            const renderItems = (list) => list.map(item => `
+            
+            const itemsHtml = data.data.map(item => `
                 <div class="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
                     <div class="min-w-0 mr-2">
                         <div class="text-xs text-gray-700 truncate">${item.name || '官方推荐'}</div>
@@ -4349,42 +3766,18 @@
                     </div>
                     <button 
                         onclick="selectHost('${item.url || ''}', '${item.name || ''}')"
-                        class="text-xs text-primary hover:underline whitespace-nowrap shrink-0 ml-2 inline-flex items-center"
+                        class="text-xs text-primary hover:underline"
                     >使用</button>
                 </div>
             `).join('');
 
-            const adultList = grouped.adult || [];
-            const normalList = grouped.normal || [];
-
             if (officialApiCount) {
                 officialApiCount.textContent = String(data.data.length);
             }
-                if (officialApiCountAdult) {
-                    officialApiCountAdult.textContent = String(adultList.length);
-                }
-                if (officialApiCountNormal) {
-                    officialApiCountNormal.textContent = String(normalList.length);
-                }
-                if (officialApiCountAdult2) {
-                    officialApiCountAdult2.textContent = String(adultList.length);
-                }
-                if (officialApiCountNormal2) {
-                    officialApiCountNormal2.textContent = String(normalList.length);
-                }
-
-            if (officialApiListAdult) {
-                officialApiListAdult.innerHTML = `
-                    ${metaHtml}
-                    ${adultList.length ? renderItems(adultList) : '<div class="text-xs text-gray-500">暂无摩西接口</div>'}
-                `;
-            }
-            if (officialApiListNormal) {
-                officialApiListNormal.innerHTML = `
-                    ${metaHtml}
-                    ${normalList.length ? renderItems(normalList) : '<div class="text-xs text-gray-500">暂无普通接口</div>'}
-                `;
-            }
+            officialApiList.innerHTML = `
+                ${metaHtml}
+                ${itemsHtml || '<div class="text-xs text-gray-500">暂无官方推荐</div>'}
+            `;
 
             renderAggregateApiSelection(data.data);
             updateHostNameDisplay(host);
@@ -4392,23 +3785,12 @@
 
         async function getOfficialApis() {
             if (officialApiCache && Array.isArray(officialApiCache.data)) {
-                const cached = officialApiCache.data.filter(item => item && item.url);
-                ensureDefaultAggregateSelection(cached);
-                return cached;
+                return officialApiCache.data.filter(item => item && item.url);
             }
-            const token = getUserToken ? getUserToken() : '';
-            const res = await fetch(getOfficialApiUrl(), {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
-            });
+            const res = await fetch(getOfficialApiUrl());
             const data = await res.json();
             if (data && data.code === 200 && Array.isArray(data.data)) {
                 officialApiCache = data;
-                try {
-                    localStorage.setItem('officialApiList', JSON.stringify(data.data));
-                } catch (e) {
-                    // ignore storage errors
-                }
-                ensureDefaultAggregateSelection(data.data);
                 renderAggregateApiSelection(data.data);
                 return data.data.filter(item => item && item.url);
             }
@@ -4431,16 +3813,6 @@
             }
         }
 
-        function getAggregateApiSelectionNames() {
-            try {
-                const raw = localStorage.getItem('aggregateApiSelectionNames');
-                const list = raw ? JSON.parse(raw) : [];
-                return Array.isArray(list) ? list : [];
-            } catch (e) {
-                return [];
-            }
-        }
-
         function setAggregateApiSelection(urls) {
             const unique = Array.from(new Set((urls || []).filter(Boolean)));
             localStorage.setItem('aggregateApiSelection', JSON.stringify(unique));
@@ -4449,69 +3821,27 @@
             }
         }
 
-        function setAggregateApiSelectionNames(names) {
-            const unique = Array.from(new Set((names || []).filter(Boolean)));
-            localStorage.setItem('aggregateApiSelectionNames', JSON.stringify(unique));
-        }
-
-        function resolveAggregateSelection(apis) {
-            const selectedUrls = getAggregateApiSelection();
-            const list = (apis || []).filter(item => item && item.url);
-            if (selectedUrls.length > 0) {
-                const urlSet = new Set(list.map(item => item.url));
-                const matched = selectedUrls.filter(url => urlSet.has(url));
-                if (matched.length > 0) {
-                    if (matched.length !== selectedUrls.length) {
-                        setAggregateApiSelection(matched);
-                    }
-                    return matched;
-                }
-            }
-            const names = getAggregateApiSelectionNames();
-            if (!names.length) return [];
-            if (list.length === 0) return [];
-            const nameMap = new Map(list.map(item => [item.name || '', item.url]));
-            const resolved = names.map(name => nameMap.get(name)).filter(Boolean);
-            if (resolved.length > 0) {
-                setAggregateApiSelection(resolved);
-            }
-            return resolved;
-        }
-
         function ensureDefaultAggregateSelection(apis) {
-            const current = resolveAggregateSelection(apis);
-            if (current.length > 0) return current;
-            const list = (apis || []).filter(item => item && item.url);
-            const defaults = list.slice(0, 3).map(item => item.url).filter(Boolean);
-            const defaultNames = list.slice(0, 3).map(item => item.name).filter(Boolean);
-            setAggregateApiSelection(defaults);
-            setAggregateApiSelectionNames(defaultNames);
-            return defaults;
+            return getAggregateApiSelection();
         }
 
         function renderAggregateApiSelection(apis) {
-            if (!aggregateApiListAdult || !aggregateApiListNormal) return;
+            if (!aggregateApiList) return;
             const list = (apis || []).filter(item => item && item.url);
             if (list.length === 0) {
-                const emptyHtml = `<div class="text-xs text-gray-500">暂无可选接口</div>`;
-                aggregateApiListAdult.innerHTML = emptyHtml;
-                aggregateApiListNormal.innerHTML = emptyHtml;
+                aggregateApiList.innerHTML = `
+                    <div class="text-xs text-gray-500">暂无可选接口</div>
+                `;
                 if (aggregateSelectedCount) {
                     aggregateSelectedCount.textContent = '0';
                 }
                 return;
             }
-            const selected = ensureDefaultAggregateSelection(list);
+            const selected = getAggregateApiSelection();
             if (aggregateSelectedCount) {
                 aggregateSelectedCount.textContent = String(selected.length);
             }
-            const grouped = list.reduce((acc, item) => {
-                const category = normalizeCategory(item.category);
-                if (!acc[category]) acc[category] = [];
-                acc[category].push(item);
-                return acc;
-            }, {});
-            const renderItems = (items) => items.map(item => {
+            aggregateApiList.innerHTML = list.map(item => {
                 const checked = selected.includes(item.url) ? 'checked' : '';
                 return `
                     <label class="flex items-center justify-between bg-white/70 rounded-lg px-3 py-2">
@@ -4523,45 +3853,33 @@
                             type="checkbox" 
                             class="w-4 h-4"
                             ${checked}
-                            onchange="toggleAggregateApi('${item.url}', '${item.name || ''}')"
+                            onchange="toggleAggregateApi('${item.url}')"
                         >
                     </label>
                 `;
             }).join('');
-            const adultList = grouped.adult || [];
-            const normalList = grouped.normal || [];
-            aggregateApiListAdult.innerHTML = adultList.length ? renderItems(adultList) : `<div class="text-xs text-gray-500">暂无摩西接口</div>`;
-            aggregateApiListNormal.innerHTML = normalList.length ? renderItems(normalList) : `<div class="text-xs text-gray-500">暂无普通接口</div>`;
         }
 
-        function toggleAggregateApi(url, name = '') {
+        function toggleAggregateApi(url) {
             const selected = getAggregateApiSelection();
-            const selectedNames = getAggregateApiSelectionNames();
             const index = selected.indexOf(url);
             if (index >= 0) {
                 selected.splice(index, 1);
-                const nameIndex = selectedNames.indexOf(name);
-                if (nameIndex >= 0) selectedNames.splice(nameIndex, 1);
             } else {
                 selected.push(url);
-                if (name) selectedNames.push(name);
             }
             setAggregateApiSelection(selected);
-            setAggregateApiSelectionNames(selectedNames);
         }
 
         function selectAllAggregateApis() {
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
             const urls = list.map(item => item.url).filter(Boolean);
-            const names = list.map(item => item.name).filter(Boolean);
             setAggregateApiSelection(urls);
-            setAggregateApiSelectionNames(names);
             renderAggregateApiSelection(list);
         }
 
         function clearAggregateApis() {
             setAggregateApiSelection([]);
-            setAggregateApiSelectionNames([]);
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
             renderAggregateApiSelection(list);
         }
@@ -4569,9 +3887,7 @@
         function resetAggregateApis() {
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
             const defaults = list.slice(0, 3).map(item => item.url).filter(Boolean);
-            const defaultNames = list.slice(0, 3).map(item => item.name).filter(Boolean);
             setAggregateApiSelection(defaults);
-            setAggregateApiSelectionNames(defaultNames);
             renderAggregateApiSelection(list);
         }
 
@@ -4672,50 +3988,6 @@
             return name || '未知来源';
         }
 
-        function normalizeCategory(value) {
-            const raw = String(value || '').toLowerCase();
-            if (!raw) return 'adult';
-            if (raw.includes('normal') || raw.includes('common') || raw.includes('普通')) return 'normal';
-            if (raw.includes('adult') || raw.includes('18') || raw.includes('sex') || raw.includes('成人')) return 'adult';
-            return raw === 'vod' ? 'adult' : raw;
-        }
-
-        function getOfficialCategoryByUrl(url) {
-            if (!url) return '';
-            const list = officialApiCache && Array.isArray(officialApiCache.data)
-                ? officialApiCache.data
-                : (() => {
-                    try {
-                        const raw = localStorage.getItem('officialApiList');
-                        return raw ? JSON.parse(raw) : [];
-                    } catch (e) {
-                        return [];
-                    }
-                })();
-            const match = (list || []).find(item => item && item.url === url);
-            return match && match.category ? match.category : '';
-        }
-
-        function getOfficialCategoryByName(name) {
-            if (!name) return '';
-            const list = officialApiCache && Array.isArray(officialApiCache.data)
-                ? officialApiCache.data
-                : (() => {
-                    try {
-                        const raw = localStorage.getItem('officialApiList');
-                        return raw ? JSON.parse(raw) : [];
-                    } catch (e) {
-                        return [];
-                    }
-                })();
-            const match = (list || []).find(item => item && item.name === name);
-            return match && match.category ? match.category : '';
-        }
-
-        function getCurrentHostCategory() {
-            return normalizeCategory(getOfficialCategoryByUrl(host));
-        }
-
         function getOfficialNameByUrl(url) {
             if (!url) return '';
             const list = officialApiCache && Array.isArray(officialApiCache.data)
@@ -4807,8 +4079,8 @@
             }
         }
 
-        function getShareId(url, title, source = '') {
-            return `s_${base64Url(`${title || ''}|${source || ''}`)}`;
+        function getShareId(url, title) {
+            return `s_${base64Url(`${url || ''}|${title || ''}`)}`;
         }
 
         function normalizeShareItem(item) {
@@ -4818,7 +4090,7 @@
             const title = String(item.title || '未命名').trim();
             const pic = String(item.pic || '').trim();
             const source = String(item.source || '').trim();
-            const id = item.id || getShareId(url, title, source);
+            const id = item.id || getShareId(url, title);
             const createdAt = Number(item.createdAt || item.timestamp || Date.now());
             const expireSeconds = Number.isFinite(item.expireSeconds) ? item.expireSeconds : 0;
             const expiresAt = Number.isFinite(item.expiresAt)
@@ -4845,11 +4117,10 @@
             };
         }
 
-        function saveShareItem(payload, options = {}) {
+        function saveShareItem(payload) {
             const item = normalizeShareItem(payload);
             if (!item) return;
-            let list = getShareList().map(normalizeShareItem).filter(Boolean);
-            list = list.filter(entry => entry.id !== item.id && entry.url !== item.url);
+            const list = getShareList().map(normalizeShareItem).filter(Boolean);
             const index = list.findIndex(entry => entry.id === item.id);
             if (index >= 0) {
                 list[index] = { ...list[index], ...item, updatedAt: Date.now() };
@@ -4864,7 +4135,7 @@
                 renderShareContent(list);
             }
             const token = getUserToken ? getUserToken() : '';
-            if (token && !options.skipRemote) {
+            if (token) {
                 fetch('/user/shares', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -4897,6 +4168,7 @@
         function buildShareUrl(videoUrl, videoTitle, videoPic, sourceLabel, expireSeconds, shareId = '') {
             const now = Date.now();
             const expiresAt = expireSeconds > 0 ? now + expireSeconds * 1000 : 0;
+            const payload = encodeSharePayload([videoUrl, videoTitle, videoPic, sourceLabel, String(expiresAt), String(shareId || '')]);
             const pathname = window.location.pathname || '/';
             const isFilePath = pathname.split('/').pop().includes('.');
             const basePath = pathname.endsWith('/')
@@ -4904,115 +4176,8 @@
                 : (isFilePath ? pathname.replace(/[^/]*$/, '') : `${pathname}/`);
             const url = new URL(window.location.origin);
             url.pathname = `${basePath}play.html`;
-            if (shareId) {
-                url.searchParams.set('sid', shareId);
-            }
+            url.searchParams.set('key', payload);
             return url.toString();
-        }
-
-        function setShareCopyLabel(label) {
-            const btn = shareModal ? shareModal.querySelector('button[onclick="copyShareUrl()"]') : null;
-            if (btn) {
-                btn.innerHTML = `<i class="fa fa-${label.includes('复制') ? 'copy' : 'link'} mr-1"></i> ${label}`;
-            }
-        }
-
-        function setShareConfirmState(state) {
-            if (!shareConfirmButton) return;
-            if (state === 'ready') {
-                shareConfirmButton.disabled = false;
-                shareConfirmButton.classList.remove('opacity-60');
-                shareConfirmButton.innerHTML = '<i class="fa fa-check mr-1"></i> 确认生成分享';
-            } else if (state === 'done') {
-                shareConfirmButton.disabled = true;
-                shareConfirmButton.classList.add('opacity-60');
-                shareConfirmButton.innerHTML = '<i class="fa fa-check mr-1"></i> 已生成';
-            } else if (state === 'loading') {
-                shareConfirmButton.disabled = true;
-                shareConfirmButton.classList.add('opacity-60');
-                shareConfirmButton.innerHTML = '<i class="fa fa-spinner fa-spin mr-1"></i> 生成中...';
-            }
-        }
-
-        function getShareEpisodeMode() {
-            const radios = document.querySelectorAll('input[name="shareEpisodeMode"]');
-            for (const radio of radios) {
-                if (radio.checked) return radio.value;
-            }
-            return 'all';
-        }
-
-        function renderShareEpisodeList(episodes) {
-            if (!shareEpisodeList) return;
-            shareEpisodeList.innerHTML = episodes.map((ep, idx) => `
-                <label class="flex items-center space-x-2 text-xs">
-                    <input type="checkbox" value="${idx}">
-                    <span>${ep.name || `第${idx + 1}集`}</span>
-                </label>
-            `).join('');
-        }
-
-        function toggleShareEpisodeList(show) {
-            if (!shareEpisodeList) return;
-            shareEpisodeList.classList.toggle('hidden', !show);
-            const actions = document.getElementById('shareEpisodeActions');
-            if (actions) actions.classList.toggle('hidden', !show);
-        }
-
-        function setShareEpisodeChecks(checked) {
-            if (!shareEpisodeList) return;
-            shareEpisodeList.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-                input.checked = !!checked;
-            });
-        }
-
-        function prepareShareSelection(episodes, currentIndex) {
-            if (!shareEpisodeSection || !shareEpisodeList) return;
-            pendingShareEpisodes = episodes || [];
-            pendingShareCurrentIndex = Number.isFinite(currentIndex) ? currentIndex : 0;
-            if (pendingShareEpisodes.length <= 1) {
-                shareEpisodeSection.classList.add('hidden');
-                shareEpisodeList.innerHTML = '';
-                return;
-            }
-            shareEpisodeSection.classList.remove('hidden');
-            renderShareEpisodeList(pendingShareEpisodes);
-            toggleShareEpisodeList(false);
-            const radios = document.querySelectorAll('input[name="shareEpisodeMode"]');
-            radios.forEach((radio) => {
-                if (radio.value === 'all') radio.checked = true;
-            });
-            setShareConfirmState('ready');
-            currentShareUrl = '';
-        }
-
-        function setShareMode(value) {
-            const radios = document.querySelectorAll('input[name="shareEpisodeMode"]');
-            radios.forEach((radio) => {
-                radio.checked = radio.value === value;
-            });
-            toggleShareEpisodeList(value === 'custom');
-        }
-
-        function collectSelectedEpisodes() {
-            const mode = getShareEpisodeMode();
-            if (pendingShareEpisodes.length <= 1) return pendingShareEpisodes;
-            if (mode === 'current') {
-                return pendingShareEpisodes[pendingShareCurrentIndex] ? [pendingShareEpisodes[pendingShareCurrentIndex]] : [];
-            }
-            if (mode === 'custom') {
-                if (!shareEpisodeList) return [];
-                const checks = Array.from(shareEpisodeList.querySelectorAll('input[type="checkbox"]'));
-                const indices = checks.filter(c => c.checked).map(c => Number(c.value));
-                return indices.map(idx => pendingShareEpisodes[idx]).filter(Boolean);
-            }
-            return pendingShareEpisodes;
-        }
-
-        function buildEpisodeUrl(episodes) {
-            if (!episodes || episodes.length === 0) return '';
-            if (episodes.length === 1) return episodes[0].url || '';
-            return episodes.map(ep => `${ep.name || ''}$${ep.url || ''}`).join('#');
         }
 
         function openShareModal(shareUrl) {
@@ -5020,8 +4185,6 @@
             currentShareUrl = shareUrl;
             shareModal.classList.remove('hidden');
             shareModal.classList.add('flex');
-            setShareCopyLabel(currentShareUrl ? '点击复制地址' : '生成分享链接');
-            setShareConfirmState(currentShareUrl ? 'done' : 'ready');
             showToast('分享面板已打开');
         }
 
@@ -5031,11 +4194,8 @@
             shareModal.classList.remove('flex');
         }
 
-        async function copyShareUrl() {
-            if (!currentShareUrl) {
-                showToast('请先点击“确认生成分享”');
-                return;
-            }
+        function copyShareUrl() {
+            if (!currentShareUrl) return;
             try {
                 navigator.clipboard.writeText(currentShareUrl).then(() => {
                     showToast('分享链接已复制到剪贴板');
@@ -5047,107 +4207,33 @@
             }
         }
 
-        async function createShortShare(payload) {
-            const token = getUserToken ? getUserToken() : '';
-            if (!token) return '';
-            try {
-                const res = await fetch('/user/shares', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                if (data && data.code === 200 && data.data && data.data.shareId) {
-                    return String(data.data.shareId);
-                }
-            } catch (e) {
-                // ignore
-            }
-            return '';
-        }
-
-        async function createShareFromSelection() {
-            if (!currentSharePayload) return false;
-            const expireSeconds = getShareExpireSeconds();
-            const selected = collectSelectedEpisodes();
-            if (pendingShareEpisodes.length > 1 && selected.length === 0) {
-                showToast('请选择要分享的集数');
-                return false;
-            }
-            const url = selected.length > 0 ? buildEpisodeUrl(selected) : currentSharePayload.url;
-            const baseTitle = String(currentSharePayload.title || '').trim();
-            const singleEp = selected.length === 1 ? selected[0] : null;
-            const shouldAppendEpisode = pendingShareEpisodes.length > 1;
-            const title = singleEp && singleEp.name && shouldAppendEpisode
-                ? (baseTitle ? `${baseTitle} ${singleEp.name}` : singleEp.name)
-                : baseTitle || '分享视频';
-            setShareConfirmState('loading');
-            const shareId = currentShareId || getShareId(url, title, currentSharePayload.source || '');
-            const shortId = await createShortShare({
-                shareId,
-                url,
-                title,
-                pic: currentSharePayload.pic || '',
-                source: currentSharePayload.source || '',
-                expireSeconds,
-                expiresAt: expireSeconds > 0 ? Date.now() + expireSeconds * 1000 : 0
-            });
-            if (!shortId) {
-                showToast('生成短链失败，请稍后重试');
-                setShareConfirmState('ready');
-                return false;
-            }
-            currentShareId = shortId;
-            currentShareUrl = buildShareUrl(url, title, currentSharePayload.pic || '', currentSharePayload.source || '', expireSeconds, shortId);
-            saveShareItem({
-                id: currentShareId,
-                url,
-                title,
-                pic: currentSharePayload.pic || '',
-                source: currentSharePayload.source || '',
-                expireSeconds,
-                expiresAt: expireSeconds > 0 ? Date.now() + expireSeconds * 1000 : 0,
-                shareUrl: currentShareUrl,
-                createdAt: Date.now()
-            }, { skipRemote: true });
-            setShareCopyLabel('点击复制地址');
-            setShareConfirmState('done');
-            return true;
-        }
-
-        async function confirmShareSelection() {
-            if (currentShareUrl) {
-                showToast('已生成分享链接');
-                return;
-            }
-            await createShareFromSelection();
-        }
-
-        async function shareVideo(videoUrl, videoTitle, videoPic = '', sourceLabel = '', currentIndex = 0) {
+        function shareVideo(videoUrl, videoTitle, videoPic = '', sourceLabel = '') {
             const realVideoUrl = videoUrl.split('$')[1] || videoUrl;
             const expireSeconds = getShareExpireSeconds();
-            const token = getUserToken ? getUserToken() : '';
-            if (!token) {
-                showToast('分享需登录后使用');
-                openAuthModal();
-                return;
-            }
             currentSharePayload = {
                 url: realVideoUrl,
                 title: videoTitle,
                 pic: videoPic || '',
                 source: sourceLabel || ''
             };
-            const episodes = parsePlayUrls(videoUrl);
-            prepareShareSelection(episodes, currentIndex);
-            currentShareUrl = '';
-            currentShareId = '';
-            isShareEditing = false;
-            openShareModal('');
+            currentShareId = getShareId(realVideoUrl, videoTitle);
+            const shareUrl = buildShareUrl(realVideoUrl, videoTitle, videoPic, sourceLabel, expireSeconds, currentShareId);
+            saveShareItem({
+                id: currentShareId,
+                url: realVideoUrl,
+                title: videoTitle,
+                pic: videoPic || '',
+                source: sourceLabel || '',
+                expireSeconds,
+                expiresAt: expireSeconds > 0 ? Date.now() + expireSeconds * 1000 : 0,
+                shareUrl,
+                createdAt: Date.now()
+            });
+            openShareModal(shareUrl);
         }
 
         function refreshShareUrlFromSelection() {
-            if (!currentSharePayload || !currentShareId) return;
+            if (!currentSharePayload) return;
             const expireSeconds = getShareExpireSeconds();
             currentShareUrl = buildShareUrl(
                 currentSharePayload.url,
@@ -5162,45 +4248,13 @@
             }
         }
 
-        function openShareEditModal(itemId) {
-            const list = getShareList().map(normalizeShareItem).filter(Boolean);
-            const item = list.find(entry => entry.id === itemId);
-            if (!item) {
-                showToast('分享记录不存在');
-                return;
-            }
-            currentSharePayload = {
-                url: item.url,
-                title: item.title,
-                pic: item.pic || '',
-                source: item.source || ''
-            };
-            currentShareId = item.id;
-            currentShareUrl = '';
-            isShareEditing = true;
-            if (shareExpireSelect) {
-                const value = String(item.expireSeconds || 0);
-                Array.from(shareExpireSelect.options).forEach(opt => {
-                    opt.selected = opt.value === value;
-                });
-            }
-            const episodes = parsePlayUrls(item.url);
-            prepareShareSelection(episodes, 0);
-            if (episodes.length > 1) {
-                setShareMode('custom');
-                setShareEpisodeChecks(true);
-            }
-            openShareModal('');
-        }
-
         // 播放器内分享当前视频
-        async function shareCurrentVideo() {
+        function shareCurrentVideo() {
             if (!currentVideoUrl) {
                 showToast('暂无可分享的视频');
                 return;
             }
-            const rawUrl = currentVideoRawUrl || currentVideoUrl;
-            await shareVideo(rawUrl, currentVideoTitle || '视频播放', currentVideoPic || '', currentVideoSource || getHostLabel(), currentEpisodeIndex);
+            shareVideo(currentVideoUrl, currentVideoTitle || '视频播放', currentVideoPic || '', currentVideoSource || getHostLabel());
         }
 
         // 播放器内喜欢/取消喜欢
@@ -5326,8 +4380,6 @@
         }
         
         // 滚动处理
-        let loadMoreDelayTimer = null;
-        let loadMoreCountdownTimer = null;
         function handleScroll() {
             // 显示/隐藏回到顶部按钮
             if (window.scrollY > 300) {
@@ -5339,40 +4391,8 @@
             // 无限滚动加载更多
             if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 200) {
                 if (hasMore && !isLoading) {
-                    showLoadMoreButton();
-                    if (loadMoreDelayTimer) return;
-                    let countdown = 3;
-                    setLoadMoreButtonCountdown(countdown);
-                    loadMoreCountdownTimer = setInterval(() => {
-                        countdown -= 1;
-                        if (countdown > 0) {
-                            setLoadMoreButtonCountdown(countdown);
-                        }
-                    }, 1000);
-                    loadMoreDelayTimer = setTimeout(() => {
-                        loadMoreDelayTimer = null;
-                        if (loadMoreCountdownTimer) {
-                            clearInterval(loadMoreCountdownTimer);
-                            loadMoreCountdownTimer = null;
-                        }
-                        loadMoreButton.innerHTML = `
-                            <span>加载中...</span>
-                            <i class="fa fa-refresh fa-spin"></i>
-                        `;
-                        if (!hasMore || isLoading) return;
-                        if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 200) {
-                            loadMoreData();
-                        }
-                    }, 3000);
+                    loadMoreData();
                 }
-            } else if (loadMoreDelayTimer) {
-                clearTimeout(loadMoreDelayTimer);
-                loadMoreDelayTimer = null;
-                if (loadMoreCountdownTimer) {
-                    clearInterval(loadMoreCountdownTimer);
-                    loadMoreCountdownTimer = null;
-                }
-                setLoadMoreButtonCountdown(0);
             }
         }
         
@@ -5427,21 +4447,6 @@
         // 显示加载更多按钮
         function showLoadMoreButton() {
             loadMoreButton.classList.remove('hidden');
-        }
-
-        function setLoadMoreButtonCountdown(seconds) {
-            if (!loadMoreButton) return;
-            if (!Number.isFinite(seconds) || seconds <= 0) {
-                loadMoreButton.innerHTML = `
-                    <span>加载更多</span>
-                    <i class="fa fa-refresh"></i>
-                `;
-                return;
-            }
-            loadMoreButton.innerHTML = `
-                <span>倒计时 ${seconds}s</span>
-                <i class="fa fa-refresh fa-spin"></i>
-            `;
         }
         
         // 隐藏加载更多按钮
@@ -5529,7 +4534,7 @@
                         <div class="mt-3 space-y-2">
                             <label class="block text-xs text-gray-500">有效时间</label>
                             <div class="flex items-center space-x-2">
-                                <select class="input-primary flex-[2] text-xs" onchange="updateShareExpire('${item.id}', this.value)">
+                                <select class="input-primary flex-[4] text-xs" onchange="updateShareExpire('${item.id}', this.value)">
                                     <option value="1800" ${Number(item.expireSeconds) === 1800 ? 'selected' : ''}>30分钟</option>
                                     <option value="7200" ${Number(item.expireSeconds) === 7200 ? 'selected' : ''}>2小时</option>
                                     <option value="86400" ${Number(item.expireSeconds) === 86400 ? 'selected' : ''}>1天</option>
@@ -5538,9 +4543,6 @@
                                 </select>
                                 <button onclick="copyShareLink('${item.id}')" class="btn-secondary text-xs px-3 flex-[1]">
                                     <i class="fa fa-copy mr-1"></i> 复制
-                                </button>
-                                <button onclick="openShareEditModal('${item.id}')" class="btn-secondary text-xs px-3 flex-[1]">
-                                    <i class="fa fa-edit mr-1"></i> 修改
                                 </button>
                             </div>
                             <div class="flex justify-between items-center">

@@ -7,6 +7,14 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/dplayer/dist/DPlayer.min.css">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+  <style>
+    html {
+      scrollbar-gutter: stable;
+    }
+    body {
+      overflow-y: scroll;
+    }
+  </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
   <div class="min-h-screen flex flex-col">
@@ -23,6 +31,8 @@
       <aside class="w-52 bg-white border-r p-3 space-y-2 fixed top-14 bottom-0 left-0 overflow-y-auto">
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-800 text-white" data-module-target="profile">我的信息</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="users">用户</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="userAccess">用户权限</button>
+        <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="feedback">用户反馈</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="online">在线</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="official">接口</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="routeAccess">访问控制</button>
@@ -90,6 +100,65 @@
       </div>
     </section>
 
+    <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="userAccess">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold">用户权限（API 访问）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="loadUserAccessBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">刷新</button>
+        </div>
+      </div>
+      <div id="userAccessMeta" class="text-sm text-slate-500"></div>
+      <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500">
+            <tr>
+              <th class="py-2">ID</th>
+              <th>用户名</th>
+              <th>昵称</th>
+              <th>角色</th>
+              <th>权限</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="userAccessTbody" class="divide-y"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="feedback">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-semibold">用户反馈（管理员）</h2>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="loadFeedbackBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">刷新</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div id="feedbackMeta" class="text-slate-500"></div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-slate-500">每页</span>
+          <input id="feedbackPageSize" type="number" min="1" max="100" class="w-20 border rounded px-2 py-1" value="20">
+          <button id="feedbackPrevBtn" class="px-2 py-1 rounded border text-slate-600">上一页</button>
+          <button id="feedbackNextBtn" class="px-2 py-1 rounded border text-slate-600">下一页</button>
+        </div>
+      </div>
+      <div class="overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500">
+            <tr>
+              <th class="py-2">时间</th>
+              <th>用户</th>
+              <th>类型</th>
+              <th>内容</th>
+              <th>页面</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="feedbackTbody" class="divide-y"></tbody>
+        </table>
+      </div>
+      <div id="feedbackPageInfo" class="text-sm text-slate-500"></div>
+    </section>
+
     <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="online">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="font-semibold">在线用户（管理员）</h2>
@@ -121,40 +190,63 @@
 
     <section class="module-section bg-white rounded-xl shadow p-4 space-y-4 hidden" data-module="official">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 class="font-semibold">官方推荐接口（管理员）</h2>
-        <div class="flex flex-wrap items-center gap-2">
-          <button id="officialEnableAllBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white text-sm">全部启用</button>
-          <button id="officialDisableAllBtn" class="hidden px-3 py-1.5 rounded bg-slate-600 text-white text-sm">全部停用</button>
-          <button id="officialSaveSortBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">保存排序</button>
-          <button id="loadOfficialApisBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
-        </div>
+        <h2 class="font-semibold">接口管理（管理员）</h2>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
-        <input id="officialNameInput" class="border rounded px-3 py-2" placeholder="名称">
-        <input id="officialUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="接口 URL">
-        <input id="officialTypeInput" class="border rounded px-3 py-2" placeholder="类型(默认 vod)">
-        <button id="addOfficialBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
-      </div>
-      <div id="officialMeta" class="text-sm text-slate-500"></div>
-      <div class="overflow-auto">
-        <table class="min-w-full text-sm">
-          <thead class="text-left text-slate-500">
-            <tr>
-              <th class="py-2">排序</th>
-              <th class="py-2">名称</th>
-              <th>URL</th>
-              <th>类型</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="officialTbody" class="divide-y"></tbody>
-        </table>
+      <div class="flex items-center bg-slate-100 rounded-lg p-1 text-xs">
+        <button id="adminTabOfficial" type="button" class="flex-1 px-2 py-1 rounded-md bg-white shadow text-slate-800">官方推荐接口</button>
+        <button id="adminTabParse" type="button" class="flex-1 px-2 py-1 rounded-md text-slate-600">视频解析接口</button>
       </div>
 
-      <div class="border-t pt-4 space-y-4">
+      <div id="adminOfficialSection" class="space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-6 gap-2 text-sm">
+          <input id="officialNameInput" class="border rounded px-3 py-2" placeholder="名称">
+          <input id="officialUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="接口 URL">
+          <input id="officialTypeInput" class="border rounded px-3 py-2" placeholder="类型(默认 vod)">
+          <select id="officialCategoryInput" class="border rounded px-3 py-2">
+            <option value="adult">18+</option>
+            <option value="normal">普通</option>
+          </select>
+          <button id="addOfficialBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
+        </div>
         <div class="flex flex-wrap items-center justify-between gap-3">
-          <h3 class="font-semibold text-slate-800">视频解析接口（管理员）</h3>
+          <div id="officialMeta" class="text-sm text-slate-500"></div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="officialEnableAllBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white text-sm">全部启用</button>
+            <button id="officialDisableAllBtn" class="hidden px-3 py-1.5 rounded bg-slate-600 text-white text-sm">全部停用</button>
+            <button id="officialSaveSortBtn" class="hidden px-3 py-1.5 rounded bg-blue-600 text-white text-sm">保存排序</button>
+            <button id="loadOfficialApisBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
+          </div>
+        </div>
+        <div class="flex items-center bg-slate-100 rounded-lg p-1 text-xs">
+          <button id="officialTabAdminAdult" type="button" class="flex-1 px-2 py-1 rounded-md bg-white shadow text-slate-800">18+（<span id="officialAdminCountAdult">0</span>）</button>
+          <button id="officialTabAdminNormal" type="button" class="flex-1 px-2 py-1 rounded-md text-slate-600">普通（<span id="officialAdminCountNormal">0</span>）</button>
+        </div>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500">
+              <tr>
+                <th class="py-2">排序</th>
+                <th class="py-2">名称</th>
+                <th>URL</th>
+                <th>类型</th>
+                <th>分类</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="officialTbody" class="divide-y"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="adminParseSection" class="space-y-4 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
+          <input id="parseNameInput" class="border rounded px-3 py-2" placeholder="名称">
+          <input id="parseUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="解析接口 URL">
+          <button id="addParseBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div id="parseMeta" class="text-sm text-slate-500"></div>
           <div class="flex flex-wrap items-center gap-2">
             <button id="parseEnableAllBtn" class="hidden px-3 py-1.5 rounded bg-emerald-600 text-white text-sm">全部启用</button>
             <button id="parseDisableAllBtn" class="hidden px-3 py-1.5 rounded bg-slate-600 text-white text-sm">全部停用</button>
@@ -162,12 +254,6 @@
             <button id="loadParseApisBtn" class="hidden px-3 py-1.5 rounded bg-indigo-600 text-white text-sm">刷新</button>
           </div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm">
-          <input id="parseNameInput" class="border rounded px-3 py-2" placeholder="名称">
-          <input id="parseUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="解析接口 URL">
-          <button id="addParseBtn" class="bg-emerald-600 text-white rounded px-3 py-2">新增</button>
-        </div>
-        <div id="parseMeta" class="text-sm text-slate-500"></div>
         <div class="overflow-auto">
           <table class="min-w-full text-sm">
             <thead class="text-left text-slate-500">
@@ -307,6 +393,22 @@
     </div>
   </div>
 
+  <div id="feedbackReplyPanel" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold">回复用户反馈</h2>
+        <button id="closeFeedbackReply" class="text-slate-500">✕</button>
+      </div>
+      <div id="feedbackReplyMeta" class="text-xs text-slate-500"></div>
+      <div id="feedbackReplyContent" class="text-xs text-slate-600 whitespace-pre-wrap bg-slate-50 border rounded px-2 py-2"></div>
+      <textarea id="feedbackReplyInput" rows="4" class="w-full border rounded px-3 py-2 text-sm" placeholder="输入回复内容..."></textarea>
+      <div class="flex items-center justify-end gap-2">
+        <button id="cancelFeedbackReply" class="text-slate-600 text-sm">取消</button>
+        <button id="submitFeedbackReply" class="bg-emerald-600 text-white rounded px-4 py-2 text-sm">发送回复</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const TOKEN_KEY = "userToken";
     const toast = (msg) => {
@@ -344,6 +446,10 @@
     let currentUsersPageSize = 20;
     let currentUsersTotalPages = 1;
     let currentUsersTotal = 0;
+    let currentFeedbackPage = 1;
+    let currentFeedbackPageSize = 20;
+    let currentFeedbackTotalPages = 1;
+    let currentFeedbackTotal = 0;
     let pendingPermissionUserId = null;
     let availablePages = null;
     let pageAliasMap = {};
@@ -354,6 +460,7 @@
     let routeAccessRulesCache = [];
     let routeAccessRoutesCache = [];
     let usersCache = [];
+    let feedbackReplyTargetId = "";
     const FALLBACK_IMAGE = "/video/loading.gif";
 
     const authHeaders = () => {
@@ -412,6 +519,33 @@
           </div>
         </div>
       `;
+    };
+
+    const openFeedbackReplyPanel = (id, summary, content) => {
+      feedbackReplyTargetId = id || "";
+      const panel = document.getElementById("feedbackReplyPanel");
+      const meta = document.getElementById("feedbackReplyMeta");
+      const contentBox = document.getElementById("feedbackReplyContent");
+      const input = document.getElementById("feedbackReplyInput");
+      if (!panel || !input) return;
+      if (meta) meta.textContent = summary || "";
+      if (contentBox) contentBox.textContent = content || "";
+      input.value = "";
+      panel.classList.remove("hidden");
+      panel.classList.add("flex");
+      input.focus();
+    };
+
+    const closeFeedbackReplyPanel = () => {
+      const panel = document.getElementById("feedbackReplyPanel");
+      const input = document.getElementById("feedbackReplyInput");
+      const contentBox = document.getElementById("feedbackReplyContent");
+      if (!panel) return;
+      panel.classList.add("hidden");
+      panel.classList.remove("flex");
+      if (input) input.value = "";
+      if (contentBox) contentBox.textContent = "";
+      feedbackReplyTargetId = "";
     };
 
     const saveProfileField = async (field, value) => {
@@ -502,6 +636,8 @@
     const moduleLoaded = {
       profile: true,
       users: false,
+      userAccess: false,
+      feedback: false,
       online: false,
       official: false,
       routeAccess: false,
@@ -524,6 +660,12 @@
       if (name === "users" && !moduleLoaded.users) {
         moduleLoaded.users = true;
         await loadUsers(currentUsersPage);
+      } else if (name === "userAccess" && !moduleLoaded.userAccess) {
+        moduleLoaded.userAccess = true;
+        await loadUserAccess();
+      } else if (name === "feedback" && !moduleLoaded.feedback) {
+        moduleLoaded.feedback = true;
+        await loadFeedback(currentFeedbackPage);
       } else if (name === "online" && !moduleLoaded.online) {
         moduleLoaded.online = true;
         await loadOnline();
@@ -531,6 +673,7 @@
         moduleLoaded.official = true;
         await loadOfficialApis();
         await loadParseApis();
+        switchAdminApiTab("official");
       } else if (name === "routeAccess" && !moduleLoaded.routeAccess) {
         moduleLoaded.routeAccess = true;
         await loadRouteAccess();
@@ -547,6 +690,8 @@
       const status = document.getElementById("authStatus");
       const logoutBtn = document.getElementById("logoutBtn");
       const loadUsersBtn = document.getElementById("loadUsersBtn");
+      const loadUserAccessBtn = document.getElementById("loadUserAccessBtn");
+      const loadFeedbackBtn = document.getElementById("loadFeedbackBtn");
       const loadOnlineBtn = document.getElementById("loadOnlineBtn");
       const loadOfficialApisBtn = document.getElementById("loadOfficialApisBtn");
       const officialEnableAllBtn = document.getElementById("officialEnableAllBtn");
@@ -556,14 +701,21 @@
       const parseDisableAllBtn = document.getElementById("parseDisableAllBtn");
       const parseSaveSortBtn = document.getElementById("parseSaveSortBtn");
       const loadParseApisBtn = document.getElementById("loadParseApisBtn");
+      const adminTabOfficial = document.getElementById("adminTabOfficial");
+      const adminTabParse = document.getElementById("adminTabParse");
+      const adminOfficialSection = document.getElementById("adminOfficialSection");
+      const adminParseSection = document.getElementById("adminParseSection");
       const token = getToken();
       if (!token) {
         status.textContent = isCheckingAuth ? "校验中..." : "未登录";
         logoutBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadUserAccessBtn) loadUserAccessBtn.classList.add("hidden");
+      if (loadFeedbackBtn) loadFeedbackBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
-      if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
-      const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
+        if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
+        if (loadParseApisBtn) loadParseApisBtn.classList.add("hidden");
+        const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
       if (loadRouteAccessBtn) loadRouteAccessBtn.classList.add("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
       const loadSharesBtn = document.getElementById("loadSharesBtn");
@@ -597,6 +749,7 @@
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadFeedbackBtn) loadFeedbackBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
       const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
@@ -627,6 +780,7 @@
         status.textContent = "未登录";
         logoutBtn.classList.add("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.add("hidden");
+      if (loadFeedbackBtn) loadFeedbackBtn.classList.add("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.add("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.add("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
@@ -653,8 +807,11 @@
       status.textContent = "已登录";
       logoutBtn.classList.remove("hidden");
       if (loadUsersBtn) loadUsersBtn.classList.remove("hidden");
+      if (loadUserAccessBtn) loadUserAccessBtn.classList.remove("hidden");
+      if (loadFeedbackBtn) loadFeedbackBtn.classList.remove("hidden");
       if (loadOnlineBtn) loadOnlineBtn.classList.remove("hidden");
       if (loadOfficialApisBtn) loadOfficialApisBtn.classList.remove("hidden");
+      if (loadParseApisBtn) loadParseApisBtn.classList.remove("hidden");
       const loadRouteAccessBtn = document.getElementById("loadRouteAccessBtn");
       if (loadRouteAccessBtn) loadRouteAccessBtn.classList.remove("hidden");
       const loadFavoritesBtn = document.getElementById("loadFavoritesBtn");
@@ -690,6 +847,28 @@
       if (data.data.role === "admin" && !hasAutoLoadedUsers) {
         hasAutoLoadedUsers = true;
         await setActiveModule("profile");
+      }
+    };
+
+    const switchAdminApiTab = (type) => {
+      const adminTabOfficial = document.getElementById("adminTabOfficial");
+      const adminTabParse = document.getElementById("adminTabParse");
+      const adminOfficialSection = document.getElementById("adminOfficialSection");
+      const adminParseSection = document.getElementById("adminParseSection");
+      const showOfficial = type === "official";
+      if (adminOfficialSection) adminOfficialSection.classList.toggle("hidden", !showOfficial);
+      if (adminParseSection) adminParseSection.classList.toggle("hidden", showOfficial);
+      if (adminTabOfficial) {
+        adminTabOfficial.classList.toggle("bg-white", showOfficial);
+        adminTabOfficial.classList.toggle("shadow", showOfficial);
+        adminTabOfficial.classList.toggle("text-slate-800", showOfficial);
+        adminTabOfficial.classList.toggle("text-slate-600", !showOfficial);
+      }
+      if (adminTabParse) {
+        adminTabParse.classList.toggle("bg-white", !showOfficial);
+        adminTabParse.classList.toggle("shadow", !showOfficial);
+        adminTabParse.classList.toggle("text-slate-800", !showOfficial);
+        adminTabParse.classList.toggle("text-slate-600", showOfficial);
       }
     };
 
@@ -866,6 +1045,8 @@
       const btn = document.getElementById("loadOfficialApisBtn");
       const tbody = document.getElementById("officialTbody");
       const meta = document.getElementById("officialMeta");
+      const countAdultEl = document.getElementById("officialAdminCountAdult");
+      const countNormalEl = document.getElementById("officialAdminCountNormal");
       setBtnLoading(btn, true, "加载中...");
       try {
         const res = await fetch("/user/official-apis", { headers: authHeaders() });
@@ -876,12 +1057,19 @@
         }
         officialApisCache = Array.isArray(data.data) ? data.data : [];
         if (meta) meta.textContent = `共 ${officialApisCache.length} 条`;
+        if (countAdultEl) {
+          countAdultEl.textContent = String(officialApisCache.filter(item => (item.category || "adult") === "adult").length);
+        }
+        if (countNormalEl) {
+          countNormalEl.textContent = String(officialApisCache.filter(item => (item.category || "adult") === "normal").length);
+        }
         if (tbody) {
           tbody.innerHTML = "";
           officialApisCache.forEach((item) => {
             const tr = document.createElement("tr");
             tr.setAttribute("data-id", item.id);
             tr.setAttribute("draggable", "true");
+            tr.setAttribute("data-category", String(item.category || "adult"));
             tr.innerHTML = `
               <td class="py-2">
                 <div class="inline-flex items-center gap-2 text-slate-400 cursor-move" data-action="drag-handle" title="拖拽排序">
@@ -899,6 +1087,12 @@
                 <input class="border rounded px-2 py-1 w-24" value="${item.type || "vod"}" data-field="type" data-id="${item.id}">
               </td>
               <td>
+                <select class="border rounded px-2 py-1 w-24" data-field="category" data-id="${item.id}">
+                  <option value="adult" ${String(item.category || "adult") === "adult" ? "selected" : ""}>18+</option>
+                  <option value="normal" ${String(item.category || "adult") === "normal" ? "selected" : ""}>普通</option>
+                </select>
+              </td>
+              <td>
                 <button class="px-2 py-1 rounded text-xs ${item.enabled ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"}" data-action="toggle" data-id="${item.id}" data-enabled="${item.enabled ? "1" : "0"}">
                   ${item.enabled ? "已启用" : "已停用"}
                 </button>
@@ -912,23 +1106,49 @@
           });
           if (officialApisCache.length === 0) {
             const tr = document.createElement("tr");
-            tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="6">暂无数据</td>';
+            tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="7">暂无数据</td>';
             tbody.appendChild(tr);
           }
           tbody.dataset.sortSignature = getOfficialSortSignature();
         }
+        applyOfficialAdminTab("adult");
       } finally {
         setBtnLoading(btn, false, "刷新");
       }
+    };
+
+    const applyOfficialAdminTab = (type) => {
+      const adultTab = document.getElementById("officialTabAdminAdult");
+      const normalTab = document.getElementById("officialTabAdminNormal");
+      const tbody = document.getElementById("officialTbody");
+      if (adultTab) {
+        adultTab.classList.toggle("bg-white", type === "adult");
+        adultTab.classList.toggle("shadow", type === "adult");
+        adultTab.classList.toggle("text-slate-800", type === "adult");
+        adultTab.classList.toggle("text-slate-600", type !== "adult");
+      }
+      if (normalTab) {
+        normalTab.classList.toggle("bg-white", type === "normal");
+        normalTab.classList.toggle("shadow", type === "normal");
+        normalTab.classList.toggle("text-slate-800", type === "normal");
+        normalTab.classList.toggle("text-slate-600", type !== "normal");
+      }
+      if (!tbody) return;
+      tbody.querySelectorAll("tr[data-id]").forEach((row) => {
+        const category = row.getAttribute("data-category") || "adult";
+        row.classList.toggle("hidden", category !== type);
+      });
     };
 
     const addOfficialApi = async () => {
       const nameInput = document.getElementById("officialNameInput");
       const urlInput = document.getElementById("officialUrlInput");
       const typeInput = document.getElementById("officialTypeInput");
+      const categoryInput = document.getElementById("officialCategoryInput");
       const name = (nameInput.value || "").trim();
       const url = (urlInput.value || "").trim();
       const type = (typeInput.value || "vod").trim();
+      const category = (categoryInput?.value || "adult").trim();
       if (!name || !url) {
         toast("名称或URL不能为空");
         return;
@@ -939,13 +1159,14 @@
         const res = await fetch("/user/official-apis", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ name, url, type, enabled: true })
+          body: JSON.stringify({ name, url, type, category, enabled: true })
         });
         const data = await res.json();
         if (data.code === 200) {
           nameInput.value = "";
           urlInput.value = "";
           typeInput.value = "";
+          if (categoryInput) categoryInput.value = "adult";
           toast("新增成功");
           await loadOfficialApis();
         } else {
@@ -1819,15 +2040,242 @@
       }
     };
 
+    const loadUserAccess = async () => {
+      const btn = document.getElementById("loadUserAccessBtn");
+      const tbody = document.getElementById("userAccessTbody");
+      const meta = document.getElementById("userAccessMeta");
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const res = await fetch("/user/list?page=1&pageSize=100", { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "加载失败");
+          return;
+        }
+        const list = Array.isArray(data.data) ? data.data : [];
+        if (meta) meta.textContent = `共 ${list.length} 条`;
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        list.forEach((u) => {
+          const apiAccess = u.role === "admin" ? "all" : (u.apiAccess || "normal");
+          const tr = document.createElement("tr");
+          tr.setAttribute("data-id", u._id);
+          tr.innerHTML = `
+            <td class="py-2">${u._id}</td>
+            <td>${u.username}</td>
+            <td>${u.nickname || ""}</td>
+            <td>${u.role || ""}</td>
+            <td>
+              <select class="border rounded px-2 py-1 text-sm w-28" data-field="apiAccess" ${u.role === "admin" ? "disabled" : ""}>
+                <option value="normal" ${apiAccess === "normal" ? "selected" : ""}>普通</option>
+                <option value="adult" ${apiAccess === "adult" ? "selected" : ""}>18+</option>
+                <option value="all" ${apiAccess === "all" ? "selected" : ""}>全部</option>
+              </select>
+            </td>
+            <td>
+              ${u.role === "admin" ? '<span class="text-xs text-slate-400">管理员固定全量</span>' : '<button class="text-xs text-blue-600" data-action="save-access" data-id="' + u._id + '">保存</button>'}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        if (list.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="6">暂无数据</td>';
+          tbody.appendChild(tr);
+        }
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
+    const loadFeedback = async (page = currentFeedbackPage) => {
+      const btn = document.getElementById("loadFeedbackBtn");
+      const tbody = document.getElementById("feedbackTbody");
+      const meta = document.getElementById("feedbackMeta");
+      const pageInfo = document.getElementById("feedbackPageInfo");
+      const pageSizeInput = document.getElementById("feedbackPageSize");
+      const pageSize = Math.min(100, Math.max(1, Number(pageSizeInput ? pageSizeInput.value : currentFeedbackPageSize) || 20));
+      currentFeedbackPageSize = pageSize;
+      if (pageSizeInput) pageSizeInput.value = String(pageSize);
+      setBtnLoading(btn, true, "加载中...");
+      try {
+        const res = await fetch(`/user/feedback?page=${page}&pageSize=${pageSize}`, { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code !== 200) {
+          toast(data.message || "获取反馈失败");
+          return;
+        }
+        currentFeedbackPage = Number(data.page || 1);
+        currentFeedbackTotalPages = Number(data.totalPages || 1);
+        currentFeedbackTotal = Number(data.total || 0);
+        if (meta) meta.textContent = `共 ${currentFeedbackTotal} 条`;
+        if (pageInfo) {
+          pageInfo.textContent = `第 ${currentFeedbackPage} 页 / 共 ${currentFeedbackTotalPages} 页`;
+        }
+        const prevBtn = document.getElementById("feedbackPrevBtn");
+        const nextBtn = document.getElementById("feedbackNextBtn");
+        if (prevBtn) {
+          prevBtn.disabled = currentFeedbackPage <= 1;
+          prevBtn.classList.toggle("opacity-50", prevBtn.disabled);
+          prevBtn.classList.toggle("cursor-not-allowed", prevBtn.disabled);
+        }
+        if (nextBtn) {
+          nextBtn.disabled = currentFeedbackPage >= currentFeedbackTotalPages;
+          nextBtn.classList.toggle("opacity-50", nextBtn.disabled);
+          nextBtn.classList.toggle("cursor-not-allowed", nextBtn.disabled);
+        }
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        const list = Array.isArray(data.data) ? data.data : [];
+        list.forEach((item) => {
+          const tr = document.createElement("tr");
+          const replies = Array.isArray(item.replies) ? item.replies : [];
+          const repliesHtml = replies.length
+            ? `<div class="mt-2">
+                <button class="text-xs text-blue-600" data-action="toggle-replies">回复 (${replies.length})</button>
+                <div class="mt-2 space-y-2 hidden" data-replies-box>
+                  ${replies.map((reply) => {
+                    const roleLabel = reply.role === "admin" ? "管理员" : "用户";
+                    return `
+                      <div class="rounded border px-2 py-1 text-xs ${reply.role === "admin" ? "bg-emerald-50 border-emerald-200" : "bg-slate-50 border-slate-200"}">
+                        <div class="text-slate-500">${roleLabel} · ${formatTime(reply.createdAt)}</div>
+                        <div class="text-slate-700 whitespace-pre-wrap mt-1">${reply.message || ""}</div>
+                      </div>
+                    `;
+                  }).join("")}
+                </div>
+              </div>`
+            : "";
+
+          const timeTd = document.createElement("td");
+          timeTd.className = "py-2 text-xs text-slate-500 whitespace-nowrap";
+          timeTd.textContent = formatTime(item.createdAt);
+
+          const userTd = document.createElement("td");
+          userTd.className = "text-sm";
+          const username = String(item.username || "-");
+          const nickname = String(item.userNickname || item.nickname || "").trim();
+          userTd.innerHTML = `
+            <div class="font-medium text-slate-700">${username}</div>
+            <div class="text-xs text-slate-500">${nickname || "-"}</div>
+          `;
+
+          const typeTd = document.createElement("td");
+          typeTd.className = "text-xs text-slate-600 whitespace-nowrap";
+          typeTd.textContent = item.type || "-";
+
+          const messageTd = document.createElement("td");
+          messageTd.className = "text-xs text-slate-600 max-w-[360px]";
+          messageTd.innerHTML = `
+            <div class="whitespace-pre-wrap">${item.message || ""}</div>
+            ${repliesHtml}
+          `;
+
+          const pageTd = document.createElement("td");
+          pageTd.className = "text-xs text-slate-500 max-w-[180px] break-all";
+          pageTd.textContent = item.page || "-";
+
+          const actionTd = document.createElement("td");
+          actionTd.className = "text-xs";
+          const replyBtn = document.createElement("button");
+          replyBtn.className = "text-blue-600 mr-2";
+          replyBtn.textContent = "回复";
+          replyBtn.setAttribute("data-action", "feedback-reply");
+          replyBtn.setAttribute("data-id", item.id || "");
+          replyBtn.setAttribute("data-user", item.username || "");
+          replyBtn.setAttribute("data-type", item.type || "");
+          replyBtn.setAttribute("data-message", item.message || "");
+          const delBtn = document.createElement("button");
+          delBtn.className = "text-red-600";
+          delBtn.textContent = "删除";
+          delBtn.setAttribute("data-action", "feedback-delete");
+          delBtn.setAttribute("data-id", item.id || "");
+          actionTd.appendChild(replyBtn);
+          actionTd.appendChild(delBtn);
+
+          tr.appendChild(timeTd);
+          tr.appendChild(userTd);
+          tr.appendChild(typeTd);
+          tr.appendChild(messageTd);
+          tr.appendChild(pageTd);
+          tr.appendChild(actionTd);
+          tbody.appendChild(tr);
+        });
+        if (list.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = '<td class="py-3 text-center text-slate-500" colspan="6">暂无反馈</td>';
+          tbody.appendChild(tr);
+        }
+      } finally {
+        setBtnLoading(btn, false, "刷新");
+      }
+    };
+
     document.getElementById("loadUsersBtn").addEventListener("click", async () => {
       await loadUsers(currentUsersPage);
     });
+    const loadUserAccessBtn = document.getElementById("loadUserAccessBtn");
+    if (loadUserAccessBtn) {
+      loadUserAccessBtn.addEventListener("click", async () => {
+        await loadUserAccess();
+      });
+    }
+    const loadFeedbackBtn = document.getElementById("loadFeedbackBtn");
+    if (loadFeedbackBtn) {
+      loadFeedbackBtn.addEventListener("click", async () => {
+        await loadFeedback(currentFeedbackPage);
+      });
+    }
+    const feedbackPrevBtn = document.getElementById("feedbackPrevBtn");
+    if (feedbackPrevBtn) {
+      feedbackPrevBtn.addEventListener("click", async () => {
+        if (currentFeedbackPage <= 1) return;
+        await loadFeedback(currentFeedbackPage - 1);
+      });
+    }
+    const feedbackNextBtn = document.getElementById("feedbackNextBtn");
+    if (feedbackNextBtn) {
+      feedbackNextBtn.addEventListener("click", async () => {
+        if (currentFeedbackPage >= currentFeedbackTotalPages) return;
+        await loadFeedback(currentFeedbackPage + 1);
+      });
+    }
+    const feedbackPageSize = document.getElementById("feedbackPageSize");
+    if (feedbackPageSize) {
+      feedbackPageSize.addEventListener("change", async () => {
+        currentFeedbackPage = 1;
+        await loadFeedback(1);
+      });
+      feedbackPageSize.addEventListener("keydown", async (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          currentFeedbackPage = 1;
+          await loadFeedback(1);
+        }
+      });
+    }
     document.getElementById("loadOnlineBtn").addEventListener("click", async () => {
       await loadOnline();
     });
     document.getElementById("loadOfficialApisBtn").addEventListener("click", async () => {
       await loadOfficialApis();
     });
+    const officialTabAdminAdult = document.getElementById("officialTabAdminAdult");
+    const officialTabAdminNormal = document.getElementById("officialTabAdminNormal");
+    if (officialTabAdminAdult) {
+      officialTabAdminAdult.addEventListener("click", () => applyOfficialAdminTab("adult"));
+    }
+    if (officialTabAdminNormal) {
+      officialTabAdminNormal.addEventListener("click", () => applyOfficialAdminTab("normal"));
+    }
+    const adminTabOfficial = document.getElementById("adminTabOfficial");
+    const adminTabParse = document.getElementById("adminTabParse");
+    if (adminTabOfficial) {
+      adminTabOfficial.addEventListener("click", () => switchAdminApiTab("official"));
+    }
+    if (adminTabParse) {
+      adminTabParse.addEventListener("click", () => switchAdminApiTab("parse"));
+    }
     document.getElementById("addOfficialBtn").addEventListener("click", async () => {
       await addOfficialApi();
     });
@@ -1912,6 +2360,91 @@
         });
       });
     }
+
+    const userAccessTbody = document.getElementById("userAccessTbody");
+    if (userAccessTbody) {
+      userAccessTbody.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        const id = target.getAttribute("data-id");
+        if (action !== "save-access" || !id) return;
+        const row = target.closest("tr");
+        if (!row) return;
+        const select = row.querySelector('select[data-field="apiAccess"]');
+        const value = select ? String(select.value || "normal") : "normal";
+        const originalText = target.textContent || "";
+        target.innerHTML = '<span class="inline-flex items-center"><span class="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></span></span>';
+        target.setAttribute("disabled", "disabled");
+        try {
+          const res = await fetch(`/user/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ apiAccess: value })
+          });
+          const data = await res.json();
+          if (data.code === 200) {
+            toast("权限已保存");
+          } else {
+            toast(data.message || "保存失败");
+          }
+        } catch (err) {
+          toast("保存失败");
+        } finally {
+          target.removeAttribute("disabled");
+          target.textContent = originalText || "保存";
+        }
+      });
+    }
+    const feedbackTbody = document.getElementById("feedbackTbody");
+    if (feedbackTbody) {
+      feedbackTbody.addEventListener("click", async (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.getAttribute("data-action") === "toggle-replies") {
+          const row = target.closest("tr");
+          if (!row) return;
+          const box = row.querySelector("[data-replies-box]");
+          if (!box) return;
+          const isHidden = box.classList.contains("hidden");
+          box.classList.toggle("hidden", !isHidden);
+          target.textContent = isHidden
+            ? target.textContent.replace("回复", "收起")
+            : target.textContent.replace("收起", "回复");
+          return;
+        }
+        const id = target.getAttribute("data-id");
+        if (!id) return;
+        if (action === "feedback-reply") {
+          const userLabel = target.getAttribute("data-user") || "";
+          const typeLabel = target.getAttribute("data-type") || "";
+          const message = target.getAttribute("data-message") || "";
+          const meta = [userLabel, typeLabel].filter(Boolean).join(" · ");
+          openFeedbackReplyPanel(id, meta, message);
+          return;
+        }
+        if (action !== "feedback-delete") return;
+        if (!confirm("确认删除这条反馈？")) return;
+        setBtnLoading(target, true, "");
+        try {
+          const res = await fetch(`/user/feedback/${id}`, {
+            method: "DELETE",
+            headers: authHeaders(),
+          });
+          const data = await res.json();
+          if (data.code !== 200) {
+            toast(data.message || "删除失败");
+            return;
+          }
+          toast("已删除");
+          await loadFeedback(currentFeedbackPage);
+        } catch (err) {
+          toast("删除失败");
+        } finally {
+          setBtnLoading(target, false, "删除");
+        }
+      });
+    }
     const profileBox = document.getElementById("profileBox");
     if (profileBox) {
       profileBox.addEventListener("click", (e) => {
@@ -1946,6 +2479,46 @@
     document.getElementById("closeSharesBtn").addEventListener("click", () => {
       closeModal("sharesModal");
     });
+    const closeFeedbackReply = document.getElementById("closeFeedbackReply");
+    if (closeFeedbackReply) {
+      closeFeedbackReply.addEventListener("click", () => closeFeedbackReplyPanel());
+    }
+    const cancelFeedbackReply = document.getElementById("cancelFeedbackReply");
+    if (cancelFeedbackReply) {
+      cancelFeedbackReply.addEventListener("click", () => closeFeedbackReplyPanel());
+    }
+    const submitFeedbackReply = document.getElementById("submitFeedbackReply");
+    if (submitFeedbackReply) {
+      submitFeedbackReply.addEventListener("click", async () => {
+        if (!feedbackReplyTargetId) return;
+        const input = document.getElementById("feedbackReplyInput");
+        const message = input ? String(input.value || "").trim() : "";
+        if (!message) {
+          toast("请输入回复内容");
+          return;
+        }
+        setBtnLoading(submitFeedbackReply, true, "发送中...");
+        try {
+          const res = await fetch(`/user/feedback/${feedbackReplyTargetId}/reply`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ message })
+          });
+          const data = await res.json();
+          if (data.code !== 200) {
+            toast(data.message || "回复失败");
+            return;
+          }
+          toast("已回复");
+          closeFeedbackReplyPanel();
+          await loadFeedback(currentFeedbackPage);
+        } catch (err) {
+          toast("回复失败");
+        } finally {
+          setBtnLoading(submitFeedbackReply, false, "发送回复");
+        }
+      });
+    }
     const adminPlayerCloseBtn = document.getElementById("closeAdminPlayer");
     if (adminPlayerCloseBtn) {
       adminPlayerCloseBtn.addEventListener("click", () => closeAdminPlayer());

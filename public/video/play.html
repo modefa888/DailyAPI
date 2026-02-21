@@ -96,6 +96,10 @@
             <div class="w-full aspect-video rounded-lg overflow-hidden bg-black">
                 <div id="dplayer" class="w-full h-full"></div>
             </div>
+            <div id="episodePanel" class="hidden mt-3 bg-slate-800/60 rounded-lg p-3">
+                <div class="text-xs text-slate-300 mb-2">选集播放</div>
+                <div id="episodeList" class="flex flex-wrap gap-2 max-h-28 overflow-y-auto"></div>
+            </div>
         </div>
 
         <div class="bg-slate-900/70 rounded-xl p-4">
@@ -159,6 +163,29 @@
             }
         }
 
+        function parsePlayUrls(rawUrl) {
+            const text = String(rawUrl || '');
+            if (!text) return [];
+            const segments = text.split('$$$').map(part => part.trim()).filter(Boolean);
+            const preferredSegment = segments.find(seg => seg.toLowerCase().includes('m3u8')) || segments[0] || '';
+            const parts = preferredSegment.split('#').map(part => part.trim()).filter(Boolean);
+            return parts.map((part, index) => {
+                const splitIndex = part.indexOf('$');
+                if (splitIndex === -1) {
+                    return { name: `第${index + 1}集`, url: part };
+                }
+                const name = part.slice(0, splitIndex).trim() || `第${index + 1}集`;
+                const url = part.slice(splitIndex + 1).trim();
+                return { name, url };
+            }).filter(item => item.url);
+        }
+
+        function isM3u8Url(url) {
+            if (!url) return false;
+            const cleaned = String(url).split('?')[0].split('#')[0].toLowerCase();
+            return cleaned.endsWith('.m3u8');
+        }
+
         function getShareId(url, title) {
             const raw = `${url || ''}|${title || ''}`;
             const encoded = base64Url(raw);
@@ -189,6 +216,11 @@
                 expiresAt,
                 shareId: String(shareIdRaw || '').trim()
             };
+        }
+
+        function getShareIdFromQuery() {
+            const params = new URLSearchParams(window.location.search);
+            return String(params.get('sid') || params.get('shareId') || '').trim();
         }
 
         function showError(message) {
@@ -312,8 +344,22 @@
             const sourceEl = document.getElementById('shareSource');
             const urlEl = document.getElementById('shareUrl');
             const posterEl = document.getElementById('sharePoster');
+            const episodePanel = document.getElementById('episodePanel');
+            const episodeList = document.getElementById('episodeList');
 
-            if (titleEl) titleEl.textContent = payload.title;
+            const episodes = parsePlayUrls(payload.url);
+            const hasEpisodeList = episodes.length > 1;
+            const initialEpisode = episodes[0];
+            const initialUrl = initialEpisode ? initialEpisode.url : payload.url;
+            const initialTitle = hasEpisodeList && initialEpisode?.name
+                ? `${payload.title} ${initialEpisode.name}`
+                : payload.title;
+            if (!isM3u8Url(initialUrl)) {
+                showError('仅支持 .m3u8 视频地址');
+                return;
+            }
+
+            if (titleEl) titleEl.textContent = initialTitle;
             if (sourceEl) sourceEl.textContent = `来源：${payload.source || '未知来源'}`;
             if (urlEl) urlEl.textContent = payload.url;
             if (posterEl) {
@@ -326,10 +372,10 @@
             const player = new DPlayer({
                 container: document.getElementById('dplayer'),
                 video: {
-                    url: payload.url,
+                    url: initialUrl,
                     type: 'hls',
                     pic: payload.pic || '',
-                    title: payload.title
+                    title: initialTitle
                 },
                 autoplay: true,
                 theme: '#3b82f6',
@@ -342,45 +388,75 @@
             player.on('error', () => {
                 showError('视频加载失败，请检查链接是否有效');
             });
+
+            if (episodePanel && episodeList) {
+                if (!hasEpisodeList) {
+                    episodePanel.classList.add('hidden');
+                    return;
+                }
+                episodePanel.classList.remove('hidden');
+                let activeIndex = 0;
+                const renderEpisodes = () => {
+                    episodeList.innerHTML = episodes.map((ep, idx) => `
+                        <button
+                            type="button"
+                            class="px-3 py-1 rounded-full text-xs border ${idx === activeIndex ? 'bg-blue-500 text-white border-blue-500' : 'bg-white/10 text-white border-white/20 hover:bg-white/20'}"
+                            data-episode-index="${idx}"
+                        >${ep.name || `第${idx + 1}集`}</button>
+                    `).join('');
+                };
+                renderEpisodes();
+                episodeList.addEventListener('click', (e) => {
+                    const target = e.target;
+                    if (!(target instanceof HTMLElement)) return;
+                    const idx = Number(target.getAttribute('data-episode-index'));
+                    if (!Number.isFinite(idx) || !episodes[idx]) return;
+                    const ep = episodes[idx];
+                    if (!isM3u8Url(ep.url)) {
+                        showError('仅支持 .m3u8 视频地址');
+                        return;
+                    }
+                    activeIndex = idx;
+                    const nextTitle = `${payload.title} ${ep.name || `第${idx + 1}集`}`;
+                    if (titleEl) titleEl.textContent = nextTitle;
+                    if (player && typeof player.switchVideo === 'function') {
+                        player.switchVideo({ url: ep.url, type: 'hls', pic: payload.pic || '', title: nextTitle });
+                        player.play();
+                    } else if (player && player.video) {
+                        player.video.src = ep.url;
+                        player.video.play();
+                    }
+                    renderEpisodes();
+                });
+            }
         }
 
         (async () => {
             showLoading();
-            const payload = parseShareKey();
-            if (!payload) {
-                showError('分享链接无效或已过期');
-                showExpiredOverlay();
-                hideLoading();
-                return;
-            }
-            let resolved = { ...payload };
-            const shareId = payload.shareId || getShareId(payload.url, payload.title);
-            if (shareId) {
-                const remote = await fetchShareDetail(shareId);
+            const sid = getShareIdFromQuery();
+            if (sid) {
+                const remote = await fetchShareDetail(sid);
                 if (!remote) {
                     showError('分享已取消或不存在');
                     showExpiredOverlay();
                     hideLoading();
                     return;
                 }
-                resolved = {
-                    ...resolved,
-                    url: remote.url || resolved.url,
-                    title: remote.title || resolved.title,
-                    pic: remote.pic || resolved.pic,
-                    source: remote.source || resolved.source,
-                    expiresAt: Number(remote.expiresAt || 0)
-                };
-            }
-            if (resolved.expiresAt && Date.now() > resolved.expiresAt) {
-                showError('分享链接已过期');
-                showExpiredOverlay();
-                startCountdown(resolved.expiresAt);
+                if (remote.expiresAt && Date.now() > remote.expiresAt) {
+                    showError('分享链接已过期');
+                    showExpiredOverlay();
+                    startCountdown(remote.expiresAt);
+                    hideLoading();
+                    return;
+                }
+                initPlayer(remote);
+                startCountdown(remote.expiresAt);
                 hideLoading();
                 return;
             }
-            initPlayer(resolved);
-            startCountdown(resolved.expiresAt);
+
+            showError('分享链接无效或已过期');
+            showExpiredOverlay();
             hideLoading();
         })();
 

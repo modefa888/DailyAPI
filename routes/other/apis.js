@@ -53,18 +53,18 @@ function getAccessTokenFromRequest(ctx) {
     return match ? match[1].trim() : "";
 }
 
-async function isUserTokenValid(token) {
-    if (!token) return false;
+async function getUserByToken(token) {
+    if (!token) return null;
     try {
         await client.connect();
         const db = DB_NAME ? client.db(DB_NAME) : client.db();
         const session = await db.collection("user_sessions").findOne({ token });
-        if (!session || session.expiresAt <= new Date()) return false;
+        if (!session || session.expiresAt <= new Date()) return null;
         const user = await db.collection("users").findOne({ _id: session.userId });
-        if (!user || user.isDisabled) return false;
-        return true;
+        if (!user || user.isDisabled) return null;
+        return user;
     } catch (err) {
-        return false;
+        return null;
     }
 }
 
@@ -75,7 +75,8 @@ async function isUserTokenValid(token) {
 // 官方推荐 API
 apisRouter.get("/apis/official", async (ctx) => {
     const token = getAccessTokenFromRequest(ctx);
-    const hasAccess = isAccessTokenValid(token) || (await isUserTokenValid(token));
+    const user = isAccessTokenValid(token) ? null : await getUserByToken(token);
+    const hasAccess = isAccessTokenValid(token) || !!user;
     if (!hasAccess) {
         ctx.status = 401;
         ctx.body = {
@@ -94,6 +95,7 @@ apisRouter.get("/apis/official", async (ctx) => {
             name: api.name,
             url: api.url,
             type: api.type || "vod",
+            category: api.category || "adult",
             enabled: true,
             sort: index + 1,
             createdAt: now,
@@ -103,14 +105,45 @@ apisRouter.get("/apis/official", async (ctx) => {
             await db.collection("official_apis").insertMany(payload, { ordered: false });
         }
         list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+    } else {
+        const existingUrls = new Set(list.map((api) => api && api.url).filter(Boolean));
+        const now = new Date();
+        const missing = DEFAULT_OFFICIAL_APIS.filter((api) => api && api.url && !existingUrls.has(api.url));
+        if (missing.length > 0) {
+            const baseSort = list.length;
+            const payload = missing.map((api, index) => ({
+                name: api.name,
+                url: api.url,
+                type: api.type || "vod",
+                category: api.category || "adult",
+                enabled: true,
+                sort: baseSort + index + 1,
+                createdAt: now,
+                updatedAt: now,
+            }));
+            await db.collection("official_apis").insertMany(payload, { ordered: false });
+            list = await db.collection("official_apis").find().sort({ sort: 1, createdAt: -1 }).toArray();
+        }
     }
-    const data = list
+    let data = list
         .filter((api) => api && api.enabled)
         .map((api) => ({
             name: api.name,
             url: encryptUrl(api.url),
             type: api.type || "vod",
+            category: api.category || "adult",
         }));
+    if (!isAccessTokenValid(token) && user) {
+        const access =
+            user.role === "admin"
+                ? "all"
+                : String(user.apiAccess || "normal").toLowerCase();
+        if (access !== "all") {
+            data = data.filter((api) =>
+                access === "adult" ? api.category === "adult" : api.category === "normal"
+            );
+        }
+    }
     ctx.body = {
         code: 200,
         message: "获取成功",
