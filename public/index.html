@@ -91,6 +91,44 @@
       .control button i {
         margin-right: 6px;
       }
+      .apps {
+        width: 100%;
+        max-width: 900px;
+        padding: 0 16px 24px;
+      }
+      .apps-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin: 0 0 12px;
+        color: var(--text-color);
+      }
+      .app-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .app-card {
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        border-radius: 10px;
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.6);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+      .app-card i {
+        font-size: 18px;
+        color: var(--icon-color);
+      }
+      .app-card span {
+        font-size: 14px;
+        color: var(--text-color);
+      }
+      .app-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      }
       footer {
         line-height: 1.75rem;
         display: flex;
@@ -117,6 +155,37 @@
       .icp {
         font-size: 14px;
       }
+      @media (max-width: 900px) {
+        main {
+          justify-content: flex-start;
+          padding-top: 24px;
+        }
+        .ico {
+          margin: 1.5rem 1rem;
+          font-size: 4rem;
+        }
+        .title {
+          font-size: 1.5rem;
+        }
+        .text {
+          margin: 0.5rem 0 1rem;
+        }
+        .control {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+        .apps {
+          padding: 0 16px 16px;
+        }
+        .app-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        footer {
+          height: auto;
+          padding: 12px 0 20px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -137,6 +206,19 @@
         </button>
       </div>
     </main>
+    <section class="apps">
+      <div class="apps-title">全部功能入口</div>
+      <div class="app-grid">
+        <a class="app-card" href="/world"><i class="fa-solid fa-globe"></i><span>世界</span></a>
+        <a class="app-card" href="/video/"><i class="fa-solid fa-film"></i><span>视频</span></a>
+        <a class="app-card" href="/play/"><i class="fa-solid fa-play"></i><span>解析</span></a>
+        <a class="app-card" href="/user/"><i class="fa-solid fa-user-gear"></i><span>用户中心</span></a>
+        <a class="app-card" href="/chat/"><i class="fa-solid fa-comments"></i><span>聊天室</span></a>
+        <a class="app-card" href="/cg/"><i class="fa-solid fa-image"></i><span>CG</span></a>
+        <a class="app-card" href="/J1/"><i class="fa-solid fa-link"></i><span>J1</span></a>
+        <a class="app-card" href="/Zlive/"><i class="fa-solid fa-broadcast-tower"></i><span>Zlive</span></a>
+      </div>
+    </section>
     <footer>
       <div class="social">
         <i class="fa-brands fa-github" onclick="socialJump('github')"></i>

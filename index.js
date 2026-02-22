@@ -9,6 +9,7 @@ const routeAccess = require("./middlewares/routeAccess");
 const app = new Koa();
 const net = require("net");
 const router = require("./routes");
+const http = require("http");
 
 // 配置信息
 let domain = process.env.ALLOWED_DOMAIN || "*";
@@ -96,7 +97,10 @@ if (isVercel) {
 } else {
     // 启动应用程序并监听端口（本地开发）
     const startApp = (port) => {
-        app.listen(port, () => {
+        const server = http.createServer(app.callback());
+        const { initChatWSS } = require("./utils/chatServer");
+        initChatWSS(server);
+        server.listen(port, () => {
             console.info(`成功在 ${port} 端口上运行`);
             console.info(`地址：http://127.0.0.1:${port}`)
         });

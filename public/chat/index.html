@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>公共聊天室</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    html {
+      scrollbar-gutter: stable;
+    }
+    body {
+      overflow-y: scroll;
+    }
+    :root {
+      --bg: #0f172a;
+      --panel: #f8fafc;
+      --panel-strong: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+    }
+    body {
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(59, 130, 246, 0.25), transparent 60%),
+        radial-gradient(900px 500px at 90% -10%, rgba(34, 197, 94, 0.18), transparent 60%),
+        linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .chat-app {
+      min-height: 100vh;
+      color: var(--ink);
+    }
+    .glass {
+      background: rgba(255, 255, 255, 0.86);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+    }
+    .chat-shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 16px 32px;
+      min-height: 100vh;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+    }
+    .chat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: 16px;
+    }
+    .group-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(37, 99, 235, 0.1);
+      color: var(--accent);
+      font-size: 12px;
+    }
+    .chat-card {
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-height: none;
+    }
+    .chat-body {
+      display: grid;
+      grid-template-columns: 1fr 280px;
+      gap: 16px;
+      flex: 1;
+      min-height: 0;
+      max-height: 100%;
+    }
+    .chat-card {
+      overflow: hidden;
+    }
+    .chat-panel {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    #chatList {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 18px 6px;
+      min-height: 0;
+    }
+    .msg {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .msg.self {
+      flex-direction: row-reverse;
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #93c5fd, #22c55e);
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .msg-bubble {
+      max-width: 70%;
+      background: var(--panel-strong);
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+    .msg.self .msg-bubble {
+      background: #e0f2fe;
+    }
+    .msg-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    .msg-text {
+      font-size: 14px;
+      color: #0f172a;
+      white-space: pre-wrap;
+    }
+    .msg-media {
+      line-height: 0;
+    }
+    .video-native {
+      display: block;
+      width: 100%;
+      max-width: 360px;
+      height: 200px;
+      border-radius: 10px;
+      background: #020617;
+      object-fit: contain;
+    }
+    .msg-tools {
+      margin-top: 6px;
+      display: flex;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .msg-tools button {
+      color: var(--muted);
+    }
+    .chat-input {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      display: grid;
+      gap: 10px;
+      background: rgba(248, 250, 252, 0.95);
+      position: sticky;
+      bottom: 0;
+    }
+    .input {
+      background: #fff;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    .btn {
+      border-radius: 10px;
+      padding: 8px 14px;
+      font-size: 13px;
+      color: white;
+      background: var(--accent);
+    }
+    .btn-outline {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+    }
+    #emojiPanel {
+      transform: translateY(-6px);
+    }
+    #emojiTabs {
+      flex-wrap: wrap;
+    }
+    .side-box {
+      padding: 14px 16px;
+      border-radius: 16px;
+      height: 100%;
+      max-height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    .side-box h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: #0f172a;
+    }
+    .msg-text {
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    #messageInput {
+      height: 56px;
+      min-height: 56px;
+      max-height: 56px;
+      resize: none;
+      overflow-y: auto;
+    }
+    .popover {
+      position: fixed;
+      z-index: 60;
+      min-width: 220px;
+      max-width: 220px;
+      padding: 10px;
+      border-radius: 12px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    }
+    #adminMenu {
+      min-width: 160px;
+      max-width: 160px;
+      padding: 6px;
+    }
+    .popover button {
+      font-size: 12px;
+    }
+    .popover-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .popover-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .menu-item {
+      width: 100%;
+      text-align: left;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      color: #0f172a;
+      background: transparent;
+    }
+    .menu-item:hover {
+      background: #f1f5f9;
+    }
+    .announcement {
+      border: 1px dashed #cbd5f5;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin: 8px 16px 0 16px;
+      font-size: 12px;
+      color: #334155;
+    }
+    .announcement strong {
+      color: #0f172a;
+      margin-right: 6px;
+    }
+    @media (max-width: 900px) {
+      .chat-body {
+        grid-template-columns: 1fr;
+      }
+      .side-box {
+        order: 2;
+        height: auto;
+        max-height: none;
+      }
+      .chat-shell {
+        height: 100vh;
+        padding: 12px 12px 16px;
+      }
+      .chat-card {
+        height: calc(100vh - 140px);
+      }
+    }
+</style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+  <div class="chat-app">
+    <div class="chat-shell">
+      <div class="chat-header glass">
+        <div>
+          <h1 class="text-xl font-semibold mt-1">公共聊天室</h1>
+          <div class="text-xs text-slate-500 mt-1">
+            <span id="loginStatus">校验登录中...</span>
+            <button id="loginBtn" class="ml-2 text-blue-600 hidden">去登录</button>
+            <button id="logoutBtn" class="ml-2 text-rose-600 hidden">退出登录</button>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="wsStatus" class="text-xs text-slate-500">未连接</span>
+          <button id="reconnectBtn" class="btn btn-outline">重连</button>
+        </div>
+      </div>
+
+      <div class="chat-body mt-4">
+        <div class="glass chat-card">
+          <div class="chat-panel">
+            <span id="serverMeta">历史消息：未加载</span>
+            <span>实时聊天室（<span id="chatOnlineCount">0</span>）</span>
+          </div>
+          <div id="announcementBox" class="announcement hidden">
+            <strong>公告</strong><span id="announcementText"></span>
+          </div>
+          <div id="chatList"></div>
+          <div class="chat-input relative">
+            <div id="globalMuteMask" class="hidden absolute inset-0 bg-slate-900/80 text-white text-sm font-medium flex items-center justify-center z-20">
+              禁言🀄...
+            </div>
+            <div class="flex items-center gap-2">
+      <textarea id="messageInput" rows="2" maxlength="200" class="input flex-1" placeholder="输入消息，Enter 发送"></textarea>
+              <div class="relative">
+                <button id="emojiBtn" class="btn btn-outline whitespace-nowrap" type="button">😊</button>
+                <div id="emojiPanel" class="hidden absolute right-0 bottom-12 bg-white border rounded-lg shadow p-2 text-lg z-50 w-64 overflow-hidden">
+                  <div id="emojiTabs" class="flex items-center gap-1 mb-2 text-xs"></div>
+                  <div id="emojiGrid" class="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto pr-1"></div>
+                </div>
+              </div>
+              <button id="sendBtn" class="btn whitespace-nowrap">发送</button>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500">
+              <span id="charRemain">还可输入 200 字</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="side-box glass">
+          <div class="flex items-center gap-2 text-xs mb-3">
+            <button id="tabOnlineBtn" class="btn">在线列表</button>
+            <button id="tabAdminBtn" class="btn btn-outline hidden">群聊管理</button>
+          </div>
+          <div id="onlinePanel">
+            <p class="text-xs text-slate-500">实时在线列表（<span id="onlineCount">0</span>人）</p>
+            <div id="onlineList" class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1 text-xs text-slate-700"></div>
+          </div>
+          <div id="adminPanel" class="mt-4 space-y-3 hidden">
+            <div class="flex items-center justify-between text-xs">
+              <span>在线用户列表</span>
+              <button id="adminMenuBtn" class="btn btn-outline">管理操作</button>
+            </div>
+            <div id="globalMuteRangeHint" class="text-[11px] text-slate-500"></div>
+            <div id="adminOnlineList" class="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs text-slate-700"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mutePopover" class="popover hidden">
+    <div class="popover-title">禁言时长</div>
+    <div class="popover-grid mb-2">
+      <button class="btn btn-outline" data-minutes="10">10分钟</button>
+      <button class="btn btn-outline" data-minutes="30">30分钟</button>
+      <button class="btn btn-outline" data-minutes="60">60分钟</button>
+      <button class="btn btn-outline" data-minutes="120">2小时</button>
+      <button class="btn btn-outline" data-minutes="360">6小时</button>
+      <button class="btn btn-outline" data-minutes="1440">1天</button>
+    </div>
+    <div class="relative">
+      <input id="muteCustomInput" type="number" min="1" class="input w-32 pr-12" placeholder="自定义分钟">
+      <button id="muteConfirmBtn" class="btn btn-outline absolute right-1 top-1/2 -translate-y-1/2">确定</button>
+    </div>
+  </div>
+
+  <div id="globalMuteRangePanel" class="popover hidden">
+    <div class="popover-title">全局禁言区间</div>
+    <div class="space-y-2 text-xs">
+      <div>
+        <div class="text-slate-500 mb-1">开始时间</div>
+        <input id="globalMuteRangeStart" type="datetime-local" class="input w-full">
+      </div>
+      <div>
+        <div class="text-slate-500 mb-1">结束时间</div>
+        <input id="globalMuteRangeEnd" type="datetime-local" class="input w-full">
+      </div>
+    </div>
+    <div class="flex items-center justify-between mt-3 gap-2">
+      <button id="globalMuteRangeClear" class="btn btn-outline">清空区间</button>
+      <button id="globalMuteRangeSave" class="btn">保存区间</button>
+    </div>
+  </div>
+
+  <div id="adminMenu" class="popover hidden">
+    <button class="menu-item" data-action="announcement">公告</button>
+    <button class="menu-item" data-action="global-mute"><span id="globalMuteMenuLabel">全局禁言</span></button>
+    <button class="menu-item" data-action="global-mute-range">区间禁言</button>
+    <button class="menu-item" data-action="rules">规则</button>
+    <button class="menu-item" data-action="refresh">刷新</button>
+  </div>
+
+  <div id="announcementPanel" class="popover hidden">
+    <div class="popover-title">置顶公告</div>
+    <textarea id="announcementInput" rows="3" class="input w-full" placeholder="输入公告内容"></textarea>
+    <div class="flex items-center justify-between mt-3 gap-2">
+      <button id="announcementClear" class="btn btn-outline">清空公告</button>
+      <button id="announcementSave" class="btn">保存公告</button>
+    </div>
+  </div>
+
+  <div id="rulesPanel" class="popover hidden">
+    <div class="popover-title">发送规则</div>
+    <div class="space-y-2 text-xs">
+      <div class="grid grid-cols-1 gap-2">
+        <label class="flex items-center gap-2">
+          <span>频率(秒)</span>
+          <input id="ruleRateLimit" type="number" min="0" class="input w-32" placeholder="0为不限制">
+        </label>
+        <label class="flex items-center gap-2">
+          <span>长度(字)</span>
+          <input id="ruleMaxLength" type="number" min="0" class="input w-32" placeholder="0为不限制">
+        </label>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="flex items-center gap-2">
+          <input id="ruleAllowImage" type="checkbox">
+          <span>允许图片链接</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input id="ruleAllowLink" type="checkbox">
+          <span>允许链接</span>
+        </label>
+      </div>
+      <div>
+        <div class="text-slate-500 mb-1">敏感词（每行一个）</div>
+        <textarea id="ruleBlocked" rows="3" class="input w-full" placeholder="例：广告\n违规"></textarea>
+      </div>
+      <div>
+        <div class="text-slate-500 mb-1">替换规则（每行 词=>替换）</div>
+        <textarea id="ruleReplace" rows="3" class="input w-full" placeholder="例：坏词=>**"></textarea>
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-2 mt-3">
+      <button id="ruleSave" class="btn">保存规则</button>
+    </div>
+  </div>
+
+  <div id="adminMuteStatusPanel" class="popover hidden">
+    <div class="popover-title text-xs">禁言状态</div>
+    <div id="adminMuteStatusText" class="text-[11px] text-slate-600 mb-2"></div>
+    <div class="grid grid-cols-3 gap-1 text-[11px] mb-2">
+      <button class="btn btn-outline" data-action="mute-add" data-minutes="10">+10分</button>
+      <button class="btn btn-outline" data-action="mute-add" data-minutes="30">+30分</button>
+      <button class="btn btn-outline" data-action="mute-add" data-minutes="60">+1小时</button>
+      <button class="btn btn-outline" data-action="mute-sub" data-minutes="10">-10分</button>
+      <button class="btn btn-outline" data-action="mute-sub" data-minutes="30">-30分</button>
+    </div>
+    <div class="grid grid-cols-4 gap-2 text-[11px]">
+      <input id="adminMuteCustomInput" type="number" min="1" class="input w-full text-[11px] col-span-2" placeholder="自定义分钟">
+      <button id="adminMuteCustomAdd" class="btn btn-outline text-[11px] col-span-1">增加</button>
+      <button id="adminMuteCustomSub" class="btn btn-outline text-[11px] col-span-1">减少</button>
+      <button id="adminUnmuteBtn" class="btn text-[11px] col-span-4">解除</button>
+    </div>
+  </div>
+
+  <script>
+    const TOKEN_KEY = "userToken";
+    const chatList = document.getElementById("chatList");
+    const messageInput = document.getElementById("messageInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const loginStatus = document.getElementById("loginStatus");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const wsStatus = document.getElementById("wsStatus");
+    const serverMeta = document.getElementById("serverMeta");
+    const reconnectBtn = document.getElementById("reconnectBtn");
+    const onlineList = document.getElementById("onlineList");
+    const adminOnlineList = document.getElementById("adminOnlineList");
+    const tabOnlineBtn = document.getElementById("tabOnlineBtn");
+    const tabAdminBtn = document.getElementById("tabAdminBtn");
+    const onlinePanel = document.getElementById("onlinePanel");
+    const adminPanel = document.getElementById("adminPanel");
+    const onlineCount = document.getElementById("onlineCount");
+    const chatOnlineCount = document.getElementById("chatOnlineCount");
+    const adminMenuBtn = document.getElementById("adminMenuBtn");
+    const adminMenu = document.getElementById("adminMenu");
+    const globalMuteMenuLabel = document.getElementById("globalMuteMenuLabel");
+    const globalMuteRangePanel = document.getElementById("globalMuteRangePanel");
+    const globalMuteRangeStart = document.getElementById("globalMuteRangeStart");
+    const globalMuteRangeEnd = document.getElementById("globalMuteRangeEnd");
+    const globalMuteRangeSave = document.getElementById("globalMuteRangeSave");
+    const globalMuteRangeClear = document.getElementById("globalMuteRangeClear");
+    const globalMuteRangeHint = document.getElementById("globalMuteRangeHint");
+    const announcementPanel = document.getElementById("announcementPanel");
+    const announcementInput = document.getElementById("announcementInput");
+    const announcementSave = document.getElementById("announcementSave");
+    const announcementClear = document.getElementById("announcementClear");
+    const rulesPanel = document.getElementById("rulesPanel");
+    const ruleRateLimit = document.getElementById("ruleRateLimit");
+    const ruleMaxLength = document.getElementById("ruleMaxLength");
+    const ruleAllowImage = document.getElementById("ruleAllowImage");
+    const ruleAllowLink = document.getElementById("ruleAllowLink");
+    const ruleBlocked = document.getElementById("ruleBlocked");
+    const ruleReplace = document.getElementById("ruleReplace");
+    const ruleSave = document.getElementById("ruleSave");
+    const adminMuteStatusPanel = document.getElementById("adminMuteStatusPanel");
+    const adminMuteStatusText = document.getElementById("adminMuteStatusText");
+    const adminUnmuteBtn = document.getElementById("adminUnmuteBtn");
+    const adminMuteCustomInput = document.getElementById("adminMuteCustomInput");
+    const adminMuteCustomAdd = document.getElementById("adminMuteCustomAdd");
+    const adminMuteCustomSub = document.getElementById("adminMuteCustomSub");
+    const globalMuteMask = document.getElementById("globalMuteMask");
+    const mutePopover = document.getElementById("mutePopover");
+    const muteCustomInput = document.getElementById("muteCustomInput");
+    const muteConfirmBtn = document.getElementById("muteConfirmBtn");
+    const announcementBox = document.getElementById("announcementBox");
+    const announcementText = document.getElementById("announcementText");
+    const emojiBtn = document.getElementById("emojiBtn");
+    const emojiPanel = document.getElementById("emojiPanel");
+    const emojiTabs = document.getElementById("emojiTabs");
+    const emojiGrid = document.getElementById("emojiGrid");
+    const charRemain = document.getElementById("charRemain");
+
+    let ws = null;
+    let historyLoaded = false;
+    let currentRole = "user";
+    let currentUserId = "";
+    let globalMuteEnabled = false;
+    let globalMuteUntil = null;
+    let userMuteUntil = null;
+    let muteTimer = null;
+    let globalMuteTimer = null;
+    let muteTargetUserId = "";
+    let muteTargetBtn = null;
+    let currentAnnouncement = "";
+    let adminMuteTargetId = "";
+    let adminMuteInfoTimer = null;
+    const adminMuteMap = new Map();
+    let lastOnlineList = [];
+    let requestedMutes = false;
+    let currentRules = {
+      rateLimitSec: 0,
+      maxLength: 0,
+      allowImage: true,
+      allowLink: true,
+      blocked: [],
+      replace: [],
+    };
+    let adminMuteJustOpened = false;
+
+    const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
+    const authHeaders = () => {
+      const token = getToken();
+      return token ? { Authorization: "Bearer " + token } : {};
+    };
+    const redirectToLogin = () => {
+      const redirect = encodeURIComponent("/chat/index.html");
+      window.location.href = `/login/index.html?redirect=${redirect}`;
+    };
+
+    let toastTimer = null;
+    const showHint = (text) => {
+      const node = document.createElement("div");
+      node.className = "fixed top-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs px-3 py-2 rounded-lg shadow-lg z-[999]";
+      node.textContent = text;
+      document.body.appendChild(node);
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        node.remove();
+      }, 1400);
+    };
+
+    const escapeHtml = (value) => {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    };
+    const getInitial = (name) => {
+      const text = String(name || "").trim();
+      if (!text) return "匿";
+      return text.slice(0, 1);
+    };
+    const isImageUrl = (text) => {
+      const value = String(text || "").trim();
+      if (!value) return false;
+      if (!/^https?:\/\//i.test(value)) return false;
+      return /\.(png|jpe?g|gif|webp|bmp|svg)(\?.*)?$/i.test(value);
+    };
+
+    const isM3u8Url = (text) => {
+      const value = String(text || "").trim();
+      if (!value) return false;
+      if (!/^https?:\/\//i.test(value)) return false;
+      return /\.m3u8(\?.*)?$/i.test(value);
+    };
+
+    const renderMessageHtml = (item) => {
+      const title = item.nickname || item.username || "匿名";
+      const isSelf = currentUserId && String(item.userId || "") === String(currentUserId);
+      const canManage = currentRole === "admin";
+      const message = item.deleted ? "消息已删除" : item.message;
+      const avatar = item.avatar ? escapeHtml(item.avatar) : "";
+      const muteInfo = adminMuteMap.get(String(item.userId || ""));
+      const isMuted = !!(muteInfo && (!muteInfo.expiresAt || muteInfo.expiresAt > Date.now()));
+      const muteAction = isMuted ? "admin-mute-info" : "admin-mute";
+      const muteLabel = isMuted ? "已禁言" : "禁言";
+      const showImage = !item.deleted && isImageUrl(message);
+      const showM3u8 = !item.deleted && isM3u8Url(message);
+      const m3u8Id = showM3u8 ? `m3u8-${item._id || Math.random().toString(36).slice(2)}` : "";
+      return `
+        <div class="msg ${isSelf ? "self" : ""}" data-id="${item._id || ""}" data-user-id="${item.userId || ""}">
+          ${avatar
+            ? `<img class="avatar" src="${avatar}" alt="">`
+            : `<div class="avatar">${escapeHtml(getInitial(title))}</div>`
+          }
+          <div class="msg-bubble">
+            <div class="msg-meta">${escapeHtml(title)} · ${new Date(item.createdAt).toLocaleString()}</div>
+            ${showM3u8
+              ? `<div class="msg-text msg-media">
+                   <video id="${m3u8Id}" class="video-native" controls preload="metadata" src="${escapeHtml(message)}"></video>
+                 </div>`
+              : showImage
+                ? `<div class="msg-text"><img src="${escapeHtml(message)}" alt="" class="w-1/2 max-w-[240px] h-auto rounded-lg border border-slate-200"></div>`
+                : `<div class="msg-text">${escapeHtml(message)}</div>`
+            }
+            ${canManage ? `
+              <div class="msg-tools">
+                <button data-action="delete" ${item.deleted ? "disabled" : ""}>删除</button>
+                ${isSelf ? "" : `<button data-action="${muteAction}" data-user-id="${item.userId || ""}">${muteLabel}</button>`}
+              </div>` : ""}
+          </div>
+        </div>
+      `;
+    };
+    const renderMessages = (list) => {
+      if (!Array.isArray(list) || list.length === 0) {
+        chatList.innerHTML = '<div class="text-sm text-slate-500 text-center py-6">暂无消息</div>';
+        return;
+      }
+      chatList.innerHTML = list.map((item) => renderMessageHtml(item)).join("");
+      chatList.scrollTop = chatList.scrollHeight;
+      initHlsPlayers(chatList);
+    };
+
+    const setAnnouncement = (text) => {
+      const clean = String(text || "").trim();
+      currentAnnouncement = clean;
+      if (!announcementBox || !announcementText) return;
+      if (!clean) {
+        announcementBox.classList.add("hidden");
+        announcementText.textContent = "";
+        if (announcementInput) announcementInput.value = "";
+        return;
+      }
+      announcementBox.classList.remove("hidden");
+      announcementText.textContent = clean;
+      if (announcementInput) announcementInput.value = clean;
+    };
+
+    const setRules = (rules) => {
+      const data = rules || {};
+      currentRules = {
+        rateLimitSec: Number(data.rateLimitSec || 0),
+        maxLength: Number(data.maxLength || 0),
+        allowImage: data.allowImage !== false,
+        allowLink: data.allowLink !== false,
+        blocked: Array.isArray(data.blocked) ? data.blocked : [],
+        replace: Array.isArray(data.replace) ? data.replace : [],
+      };
+      if (ruleRateLimit) ruleRateLimit.value = String(currentRules.rateLimitSec || "");
+      if (ruleMaxLength) ruleMaxLength.value = String(currentRules.maxLength || "");
+      if (ruleAllowImage) ruleAllowImage.checked = !!currentRules.allowImage;
+      if (ruleAllowLink) ruleAllowLink.checked = !!currentRules.allowLink;
+      if (ruleBlocked) ruleBlocked.value = currentRules.blocked.join("\n");
+      if (ruleReplace) {
+        ruleReplace.value = currentRules.replace.map((item) => `${item.from || ""}=>${item.to || ""}`).join("\n");
+      }
+    };
+
+    const appendMessage = (item) => {
+      const node = document.createElement("div");
+      node.innerHTML = renderMessageHtml(item);
+      const msgNode = node.firstElementChild;
+      if (msgNode) chatList.appendChild(msgNode);
+      chatList.scrollTop = chatList.scrollHeight;
+      initHlsPlayers(msgNode || node);
+    };
+
+    const refreshMessageMuteButtons = () => {
+      if (!chatList) return;
+      chatList.querySelectorAll('.msg-tools button[data-action="admin-mute"], .msg-tools button[data-action="admin-mute-info"]').forEach((btn) => {
+        const userId = btn.getAttribute("data-user-id");
+        if (!userId) return;
+        const info = adminMuteMap.get(String(userId));
+        const muted = !!(info && (!info.expiresAt || info.expiresAt > Date.now()));
+        btn.textContent = muted ? "已禁言" : "禁言";
+        btn.setAttribute("data-action", muted ? "admin-mute-info" : "admin-mute");
+      });
+    };
+
+    const initHlsPlayers = (root) => {
+      if (typeof Hls === "undefined") return;
+      const videos = (root || document).querySelectorAll("video.video-native");
+      videos.forEach((video) => {
+        if (video.dataset.hlsInited) return;
+        const src = video.getAttribute("src") || "";
+        if (!src) return;
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.dataset.hlsInited = "1";
+          return;
+        }
+        const hls = new Hls();
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        video.dataset.hlsInited = "1";
+      });
+    };
+
+
+    const refreshLoginStatus = async () => {
+      const token = getToken();
+      if (!token) {
+        loginStatus.textContent = "未登录";
+        loginBtn.classList.remove("hidden");
+        if (logoutBtn) logoutBtn.classList.add("hidden");
+        sendBtn.disabled = true;
+        sendBtn.classList.add("opacity-60", "cursor-not-allowed");
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        return false;
+      }
+      try {
+        const res = await fetch("/user/profile", { headers: authHeaders() });
+        const data = await res.json();
+        if (data.code === 200) {
+          loginStatus.textContent = "已登录";
+          loginBtn.classList.add("hidden");
+          if (logoutBtn) logoutBtn.classList.remove("hidden");
+          sendBtn.disabled = false;
+          sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
+          if (sendTip) sendTip.remove();
+          return true;
+        }
+        if (data.code === 401 || data.code === 403) {
+          loginStatus.textContent = "登录失效";
+          loginBtn.classList.remove("hidden");
+          if (logoutBtn) logoutBtn.classList.add("hidden");
+          sendBtn.disabled = true;
+          sendBtn.classList.add("opacity-60", "cursor-not-allowed");
+          if (ws) {
+            ws.close();
+            ws = null;
+          }
+          return false;
+        }
+      } catch (e) {
+        // ignore
+      }
+      loginStatus.textContent = "已登录";
+      loginBtn.classList.add("hidden");
+      if (logoutBtn) logoutBtn.classList.remove("hidden");
+      sendBtn.disabled = false;
+      sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
+      return true;
+    };
+
+    const connectWs = () => {
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        showHint("连接中，请稍后");
+        return;
+      }
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      const token = getToken();
+      const url = `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/chat?token=${encodeURIComponent(token)}`;
+      ws = new WebSocket(url);
+      wsStatus.textContent = "连接中...";
+      reconnectBtn.disabled = true;
+      reconnectBtn.classList.add("opacity-60", "cursor-not-allowed");
+      ws.onopen = () => {
+        wsStatus.textContent = "已连接";
+        reconnectBtn.disabled = true;
+        reconnectBtn.classList.add("opacity-60", "cursor-not-allowed");
+        if (token) {
+          ws.send(JSON.stringify({ type: "auth", token }));
+        }
+      };
+      ws.onclose = () => {
+        wsStatus.textContent = "已断开";
+        reconnectBtn.disabled = false;
+        reconnectBtn.classList.remove("opacity-60", "cursor-not-allowed");
+        ws = null;
+      };
+      ws.onerror = () => {
+        wsStatus.textContent = "连接失败";
+        reconnectBtn.disabled = false;
+        reconnectBtn.classList.remove("opacity-60", "cursor-not-allowed");
+        ws = null;
+      };
+      ws.onmessage = (event) => {
+        let data = null;
+        try {
+          data = JSON.parse(event.data);
+        } catch (e) {
+          return;
+        }
+        if (!data) return;
+        if (data.type === "profile") {
+          currentRole = data.data?.role || "user";
+          currentUserId = data.data?.userId || "";
+          loginStatus.textContent = "已登录";
+          loginBtn.classList.add("hidden");
+          if (logoutBtn) logoutBtn.classList.remove("hidden");
+          if (tabAdminBtn) {
+            tabAdminBtn.classList.toggle("hidden", currentRole !== "admin");
+          }
+          if (adminPanel) {
+            adminPanel.classList.toggle("hidden", currentRole !== "admin");
+          }
+          if (onlinePanel && adminPanel && currentRole === "admin") {
+            onlinePanel.classList.remove("hidden");
+            adminPanel.classList.add("hidden");
+          }
+          if (currentRole === "admin" && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "list_mutes" }));
+          }
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "list_online" }));
+          }
+        }
+        if (data.type === "history") {
+          historyLoaded = true;
+          serverMeta.textContent = `历史消息：共 ${data.data.length} 条`;
+          renderMessages(data.data);
+        }
+        if (data.type === "message") {
+          if (!historyLoaded) return;
+          appendMessage(data.data || {});
+        }
+        if (data.type === "update") {
+          const node = chatList.querySelector(`[data-id="${data.data?._id}"]`);
+          if (node && data.data?.deleted) {
+            const msg = node.querySelector(".text-sm");
+            if (msg) msg.textContent = "消息已删除";
+            const delBtn = node.querySelector('[data-action="delete"]');
+            if (delBtn) delBtn.setAttribute("disabled", "true");
+          }
+        }
+        if (data.type === "mute") {
+          const minutes = Number(data.data?.minutes || 0);
+          showHint(minutes > 0 ? "已禁言" : "已解除禁言");
+          resetMuteButton(minutes > 0);
+          if (minutes > 0) {
+            adminMuteMap.set(String(data.data?.userId || ""), { expiresAt: data.data?.expiresAt || null });
+          } else {
+            adminMuteMap.delete(String(data.data?.userId || ""));
+          }
+          renderAdminOnlineList(lastOnlineList);
+          refreshMessageMuteButtons();
+          if (adminOnlineList) {
+            adminOnlineList.querySelectorAll('button[data-action="admin-mute"]').forEach((btn) => {
+              btn.disabled = false;
+              btn.textContent = "禁言";
+            });
+          }
+        }
+        if (data.type === "mutes") {
+          const list = Array.isArray(data.data) ? data.data : [];
+          adminMuteMap.clear();
+          list.forEach((item) => {
+            adminMuteMap.set(String(item.userId || ""), { expiresAt: item.expiresAt || null });
+          });
+          requestedMutes = true;
+          renderMuteList(list);
+          renderAdminOnlineList(lastOnlineList);
+          refreshMessageMuteButtons();
+        }
+        if (data.type === "online_users") {
+          lastOnlineList = Array.isArray(data.data) ? data.data : [];
+          renderOnlineList(lastOnlineList);
+          renderAdminOnlineList(lastOnlineList);
+          if (chatOnlineCount) chatOnlineCount.textContent = String(lastOnlineList.length);
+        }
+        if (data.type === "global_mute") {
+          setGlobalMuteUI(!!data.enabled, data.startAt || null, data.endAt || null);
+        }
+        if (data.type === "announcement") {
+          setAnnouncement(data.data?.text || "");
+        }
+        if (data.type === "rules") {
+          setRules(data.data || {});
+        }
+        if (data.type === "user_mute") {
+          if (data.muted) {
+            setUserMute(data.data?.expiresAt || null);
+            if (data.data?.userId && String(data.data.userId) === String(currentUserId)) {
+              showHint("已禁言");
+            }
+          } else {
+            setUserMute(null);
+            if (data.data?.userId && String(data.data.userId) === String(currentUserId)) {
+              showHint("已解除禁言");
+            }
+          }
+        }
+        if (data.type === "error") {
+          if (String(data.message || "").includes("未登录") || String(data.message || "").includes("过期")) {
+            loginStatus.textContent = "未登录";
+            loginBtn.classList.remove("hidden");
+            if (logoutBtn) logoutBtn.classList.add("hidden");
+          }
+          showHint(data.message || "连接失败");
+        }
+      };
+    };
+
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem(TOKEN_KEY);
+        if (ws) {
+          ws.close();
+          ws = null;
+        }
+        showHint("已退出登录");
+        refreshLoginStatus();
+        wsStatus.textContent = "未连接";
+      });
+    }
+
+    const setSideTab = (tab) => {
+      if (!onlinePanel || !adminPanel) return;
+      if (tab === "admin") {
+        onlinePanel.classList.add("hidden");
+        adminPanel.classList.remove("hidden");
+        tabAdminBtn?.classList.remove("btn-outline");
+        tabOnlineBtn?.classList.add("btn-outline");
+      } else {
+        adminPanel.classList.add("hidden");
+        onlinePanel.classList.remove("hidden");
+        tabOnlineBtn?.classList.remove("btn-outline");
+        tabAdminBtn?.classList.add("btn-outline");
+      }
+    };
+
+    const formatCountdown = (ms) => {
+      const total = Math.max(0, Math.floor(ms / 1000));
+      const m = Math.floor(total / 60);
+      const s = total % 60;
+      return `${m}分${String(s).padStart(2, "0")}秒`;
+    };
+
+    const toLocalInputValue = (ms) => {
+      if (!ms) return "";
+      const d = new Date(ms);
+      const tzOffset = d.getTimezoneOffset() * 60000;
+      return new Date(d.getTime() - tzOffset).toISOString().slice(0, 16);
+    };
+
+    const positionPopover = (panel, anchor) => {
+      if (!panel || !anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      const top = rect.bottom + 8;
+      const left = Math.min(window.innerWidth - panelRect.width - 12, Math.max(12, rect.left));
+      panel.style.top = `${Math.max(12, top)}px`;
+      panel.style.left = `${left}px`;
+    };
+
+    const applyMuteState = () => {
+      if (globalMuteMenuLabel) {
+        globalMuteMenuLabel.textContent = globalMuteEnabled ? "解除全局禁言" : "全局禁言";
+      }
+      if (currentRole === "admin") {
+        if (globalMuteMask) globalMuteMask.classList.add("hidden");
+        messageInput.removeAttribute("disabled");
+        messageInput.placeholder = "输入消息，Enter 发送";
+        sendBtn.removeAttribute("disabled");
+        sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
+        return;
+      }
+      const now = Date.now();
+      const userMuted = userMuteUntil && userMuteUntil > now;
+      const globalMuted = globalMuteEnabled;
+      if (userMuted || globalMuted) {
+        if (globalMuteMask) globalMuteMask.classList.remove("hidden");
+        if (userMuted && userMuteUntil) {
+          const remain = formatCountdown(userMuteUntil - now);
+          globalMuteMask.textContent = `禁言🀄...(${remain})`;
+        } else if (globalMuted && globalMuteUntil && globalMuteUntil > now) {
+          const remain = formatCountdown(globalMuteUntil - now);
+          globalMuteMask.textContent = `禁言🀄...(${remain})`;
+        } else {
+          globalMuteMask.textContent = "禁言🀄...";
+        }
+        messageInput.setAttribute("disabled", "true");
+        messageInput.placeholder = "禁言🀄...";
+        sendBtn.setAttribute("disabled", "true");
+        sendBtn.classList.add("opacity-60", "cursor-not-allowed");
+      } else {
+        if (globalMuteMask) globalMuteMask.classList.add("hidden");
+        messageInput.removeAttribute("disabled");
+        messageInput.placeholder = "输入消息，Enter 发送";
+        sendBtn.removeAttribute("disabled");
+        sendBtn.classList.remove("opacity-60", "cursor-not-allowed");
+      }
+    };
+
+    const setGlobalMuteUI = (enabled, startAt, endAt) => {
+      globalMuteEnabled = !!enabled;
+      globalMuteUntil = endAt ? Number(endAt) : null;
+      if (globalMuteTimer) {
+        clearInterval(globalMuteTimer);
+        globalMuteTimer = null;
+      }
+      if (globalMuteEnabled && globalMuteUntil && globalMuteUntil > Date.now()) {
+        globalMuteTimer = setInterval(() => {
+          if (!globalMuteUntil || globalMuteUntil <= Date.now()) {
+            clearInterval(globalMuteTimer);
+            globalMuteTimer = null;
+            applyMuteState();
+          } else {
+            applyMuteState();
+          }
+        }, 1000);
+      }
+      if (globalMuteRangeStart) globalMuteRangeStart.value = toLocalInputValue(startAt);
+      if (globalMuteRangeEnd) globalMuteRangeEnd.value = toLocalInputValue(endAt);
+      if (globalMuteRangeHint) {
+        if (startAt && endAt) {
+          globalMuteRangeHint.textContent = `区间禁言：${new Date(startAt).toLocaleString()} ~ ${new Date(endAt).toLocaleString()}`;
+        } else {
+          globalMuteRangeHint.textContent = "未设置区间禁言";
+        }
+      }
+      applyMuteState();
+    };
+
+    const setUserMute = (expiresAt) => {
+      userMuteUntil = expiresAt ? Number(expiresAt) : null;
+      if (muteTimer) {
+        clearInterval(muteTimer);
+        muteTimer = null;
+      }
+      if (userMuteUntil && userMuteUntil > Date.now()) {
+        muteTimer = setInterval(() => {
+          if (!userMuteUntil || userMuteUntil <= Date.now()) {
+            clearInterval(muteTimer);
+            muteTimer = null;
+            userMuteUntil = null;
+            applyMuteState();
+          } else {
+            applyMuteState();
+          }
+        }, 1000);
+      }
+      applyMuteState();
+    };
+
+    const formatMuteRemain = (expiresAt) => {
+      if (!expiresAt) return "永久禁言";
+      const remainMs = Number(expiresAt) - Date.now();
+      if (remainMs <= 0) return "已到期";
+      return `剩余 ${formatCountdown(remainMs)}`;
+    };
+
+    const adjustMuteMinutes = (deltaMinutes) => {
+      if (!adminMuteTargetId) return;
+      const info = adminMuteMap.get(adminMuteTargetId);
+      if (!info || !info.expiresAt) {
+        showHint("永久禁言无法调整");
+        return;
+      }
+      const remainMs = info.expiresAt - Date.now();
+      const remainMinutes = Math.max(0, Math.ceil(remainMs / 60000));
+      let nextMinutes = remainMinutes + deltaMinutes;
+      if (nextMinutes <= 0) {
+        ws.send(JSON.stringify({ type: "unmute", userId: adminMuteTargetId }));
+        ws.send(JSON.stringify({ type: "list_mutes" }));
+        closeAdminMuteStatus();
+        return;
+      }
+      ws.send(JSON.stringify({ type: "mute", userId: adminMuteTargetId, minutes: nextMinutes }));
+      ws.send(JSON.stringify({ type: "list_mutes" }));
+    };
+
+    const openAdminMuteStatus = (anchor, userId) => {
+      if (!adminMuteStatusPanel || !adminMuteStatusText) return;
+      const info = adminMuteMap.get(String(userId || ""));
+      if (!info) return;
+      adminMuteTargetId = String(userId || "");
+      adminMuteStatusText.textContent = formatMuteRemain(info.expiresAt);
+      adminMuteStatusPanel.classList.remove("hidden");
+      adminMuteJustOpened = true;
+      setTimeout(() => {
+        adminMuteJustOpened = false;
+      }, 0);
+      requestAnimationFrame(() => positionPopover(adminMuteStatusPanel, anchor));
+      if (adminMuteInfoTimer) {
+        clearInterval(adminMuteInfoTimer);
+      }
+      adminMuteInfoTimer = setInterval(() => {
+        const latest = adminMuteMap.get(adminMuteTargetId);
+        if (!latest) {
+          closeAdminMuteStatus();
+          return;
+        }
+        adminMuteStatusText.textContent = formatMuteRemain(latest.expiresAt);
+      }, 1000);
+    };
+
+    const closeAdminMuteStatus = () => {
+      if (!adminMuteStatusPanel) return;
+      adminMuteStatusPanel.classList.add("hidden");
+      adminMuteTargetId = "";
+      if (adminMuteInfoTimer) {
+        clearInterval(adminMuteInfoTimer);
+        adminMuteInfoTimer = null;
+      }
+    };
+
+    const openMutePopover = (anchor, userId) => {
+      if (!mutePopover || !anchor) return;
+      muteTargetUserId = String(userId || "");
+      muteTargetBtn = anchor;
+      mutePopover.classList.remove("hidden");
+      requestAnimationFrame(() => positionPopover(mutePopover, anchor));
+    };
+
+    const closeMutePopover = () => {
+      if (!mutePopover) return;
+      mutePopover.classList.add("hidden");
+      if (muteCustomInput) muteCustomInput.value = "";
+    };
+
+    const sendMuteMinutes = (minutes) => {
+      if (!muteTargetUserId) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showHint("未连接服务器");
+        return;
+      }
+      const num = Number(minutes || 0);
+      if (!num || num <= 0) {
+        showHint("请输入正确的禁言时长");
+        return;
+      }
+      if (muteTargetBtn) {
+        muteTargetBtn.disabled = true;
+        muteTargetBtn.innerHTML = '<span class="inline-flex items-center"><span class="w-3 h-3 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span></span>';
+      }
+      ws.send(JSON.stringify({ type: "mute", userId: muteTargetUserId, minutes: num }));
+      closeMutePopover();
+    };
+
+    const resetMuteButton = (muted) => {
+      if (!muteTargetBtn) return;
+      muteTargetBtn.disabled = false;
+      if (muted) {
+        muteTargetBtn.textContent = "已禁言";
+        muteTargetBtn.setAttribute("data-action", "admin-mute-info");
+      } else {
+        muteTargetBtn.textContent = "禁言";
+        muteTargetBtn.setAttribute("data-action", "admin-mute");
+      }
+      muteTargetBtn = null;
+      muteTargetUserId = "";
+    };
+
+    const renderMuteList = (list) => {
+      const box = document.getElementById("muteList");
+      if (!box) return;
+      if (!Array.isArray(list) || list.length === 0) {
+        box.innerHTML = '<div class="text-slate-500">暂无禁言</div>';
+        return;
+      }
+      box.innerHTML = list.map((item) => {
+        const name = item.nickname || item.username || item.userId;
+        const expireText = item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "永久";
+        return `
+          <div class="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
+            <div class="min-w-0 mr-2">
+              <div class="truncate">${name}</div>
+              <div class="text-[11px] text-slate-500">到期：${expireText}</div>
+            </div>
+            <button class="text-emerald-600" data-action="unmute" data-user-id="${item.userId}">解除</button>
+          </div>
+        `;
+      }).join("");
+    };
+
+    const renderOnlineList = (list) => {
+      if (!onlineList) return;
+      if (!Array.isArray(list) || list.length === 0) {
+        onlineList.innerHTML = '<div class="text-slate-500">暂无在线</div>';
+        if (onlineCount) onlineCount.textContent = "0";
+        return;
+      }
+      if (onlineCount) onlineCount.textContent = String(list.length);
+      onlineList.innerHTML = list.map((item) => {
+        const name = item.nickname || item.username || item.userId;
+        const isSelf = currentUserId && String(item.userId) === String(currentUserId);
+        return `
+          <div class="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
+            <span class="truncate">${name}</span>
+            ${isSelf ? '<span class="text-emerald-600">本人</span>' : ''}
+          </div>
+        `;
+      }).join('');
+    };
+
+    const renderAdminOnlineList = (list) => {
+      if (!adminOnlineList) return;
+      if (currentRole === "admin" && !requestedMutes && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "list_mutes" }));
+        requestedMutes = true;
+      }
+      if (!Array.isArray(list) || list.length === 0) {
+        adminOnlineList.innerHTML = '<div class="text-slate-500">暂无在线</div>';
+        return;
+      }
+      adminOnlineList.innerHTML = list.map((item) => {
+        const name = item.nickname || item.username || item.userId;
+        const isSelf = currentUserId && String(item.userId) === String(currentUserId);
+        const muteInfo = adminMuteMap.get(String(item.userId || ""));
+        const isMuted = !!(muteInfo && (!muteInfo.expiresAt || muteInfo.expiresAt > Date.now()));
+        if (muteInfo && muteInfo.expiresAt && muteInfo.expiresAt <= Date.now()) {
+          adminMuteMap.delete(String(item.userId || ""));
+        }
+        return `
+          <div class="flex items-center justify-between bg-slate-50 rounded px-2 py-1">
+            <span class="truncate">${name}</span>
+            ${isSelf
+              ? '<span class="text-emerald-600">本人</span>'
+              : `<button class="text-slate-600" data-action="${isMuted ? "admin-mute-info" : "admin-mute"}" data-user-id="${item.userId}">${isMuted ? "已禁言" : "禁言"}</button>`
+            }
+          </div>
+        `;
+      }).join('');
+    };
+
+    const emojiCategories = {
+      "常用": ["😀","😁","😂","🤣","😊","😍","😘","😎","🤔","😴","😭","😡","👍","👎","👏","🙏","🔥","🎉","💯","❤️","✅","⭐","🌟","⚡","🍀","☕","🍔","🍺","⚽","🎵"],
+      "表情": ["😃","😄","😆","😉","😇","🙂","🙃","😋","😛","😜","🤪","🤨","🫠","🥲","😌","😔","😪","😮","😯","😲","😳","🥵","🥶","😱","😤","😖","😣","😞","😓","😢","😥","🤗","🤭","🤫","🤐","🙄","😬","😷","🤒","🤕","🤮","🤧"],
+      "手势": ["👋","🤚","🖐️","✋","👌","✌️","🤞","🤟","🤘","🤙","🫶","👍","👎","👊","✊","🤛","🤜","👏","🙌","👐","🤲","🙏","🤝","💪","🫡","✍️"],
+      "人物": ["👶","🧒","👦","👧","👨","👩","🧑","👴","👵","🧔","👩‍🦰","👩‍🦱","👩‍🦳","👩‍🦲","👨‍🦰","👨‍🦱","👨‍🦳","👨‍🦲","🧑‍💻","🧑‍🎨","🧑‍🚀","🧑‍🍳"],
+      "动物": ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🐯","🦁","🐮","🐷","🐸","🐵","🐔","🐧","🐦","🐤","🐺","🦄","🐝","🦋","🐢","🐍","🦕","🦖"],
+      "食物": ["🍎","🍊","🍋","🍉","🍇","🍓","🍒","🍑","🥭","🍍","🥝","🍅","🥑","🍞","🥐","🥯","🥞","🧀","🍗","🍖","🍔","🍟","🍕","🌭","🌮","🌯","🍜","🍣","🍤","🍰","🎂","🍫","🍩","🍪","☕","🍵","🥤","🍺","🍷"],
+      "活动": ["⚽","🏀","🏈","⚾","🎾","🏐","🏓","🏸","🥊","🥋","🎮","🎲","🎯","🎹","🎸","🎺","🎻","🎤","🎧","🎬","🎨","🚴","🏃","🧗","🏊","⛷️","🏄"],
+      "符号": ["❤️","💛","💚","💙","💜","🖤","🤍","💔","❣️","💕","💞","💯","✅","❌","⚠️","❗","❓","♻️","✨","🌟","⚡","☀️","🌙","⭐","🔔"]
+    };
+
+    let activeEmojiCategory = "常用";
+    const renderEmojiTabs = () => {
+      if (!emojiTabs) return;
+      emojiTabs.innerHTML = Object.keys(emojiCategories).map((key) => {
+        const active = key === activeEmojiCategory;
+        return `<button type="button" data-cat="${key}" class="px-2 py-1 rounded ${active ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-600"}">${key}</button>`;
+      }).join("");
+    };
+
+    const renderEmojiGrid = () => {
+      if (!emojiGrid) return;
+      const list = emojiCategories[activeEmojiCategory] || [];
+      emojiGrid.innerHTML = list.map((e) => `<button type="button" class="hover:scale-110 transition">${e}</button>`).join("");
+    };
+
+    sendBtn.addEventListener("click", () => {
+      const message = (messageInput.value || "").trim();
+      if (!message) return;
+      if (messageInput.hasAttribute("disabled") || sendBtn.hasAttribute("disabled")) {
+        showHint("已被禁言");
+        return;
+      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showHint("未连接服务器");
+        return;
+      }
+      ws.send(JSON.stringify({
+        type: "message",
+        message,
+        nickname: ""
+      }));
+      messageInput.value = "";
+      if (charRemain) charRemain.textContent = "还可输入 200 字";
+      showHint("已发送");
+    });
+
+    messageInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+
+    messageInput.addEventListener("input", () => {
+      if (!charRemain) return;
+      const max = Number(messageInput.getAttribute("maxlength") || 200);
+      const len = (messageInput.value || "").length;
+      charRemain.textContent = `还可输入 ${Math.max(0, max - len)} 字`;
+    });
+
+    chatList.addEventListener("click", (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const action = target.getAttribute("data-action");
+      if (!action) return;
+      const card = target.closest("[data-id]");
+      if (!card) return;
+      const id = card.getAttribute("data-id");
+      const userId = card.getAttribute("data-user-id");
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        showHint("未连接服务器");
+        return;
+      }
+      if (action === "delete") {
+        if (!id) return;
+        if (!confirm("确认删除这条消息？")) return;
+        ws.send(JSON.stringify({ type: "soft_delete", id }));
+      }
+      if (action === "mute") {
+        if (!userId) return;
+        openMutePopover(target, userId);
+      }
+      if (action === "admin-mute") {
+        if (!userId) return;
+        openMutePopover(target, userId);
+      }
+      if (action === "admin-mute-info") {
+        if (!userId) return;
+        openAdminMuteStatus(target, userId);
+      }
+      if (action === "admin-mute-info") {
+        if (!userId) return;
+        openAdminMuteStatus(target, userId);
+      }
+      if (action === "unmute") {
+        if (!userId) return;
+        ws.send(JSON.stringify({ type: "unmute", userId }));
+        ws.send(JSON.stringify({ type: "list_mutes" }));
+      }
+    });
+
+    if (adminOnlineList) {
+      adminOnlineList.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        if (!action) return;
+        const userId = target.getAttribute("data-user-id");
+        if (!userId) return;
+        if (action === "admin-mute") {
+          openMutePopover(target, userId);
+        }
+        if (action === "admin-mute-info") {
+          openAdminMuteStatus(target, userId);
+        }
+      });
+    }
+
+    const unmuteBtn = document.getElementById("unmuteBtn");
+    if (unmuteBtn) {
+      unmuteBtn.addEventListener("click", () => {
+        const input = document.getElementById("unmuteInput");
+        const userId = input ? String(input.value || "").trim() : "";
+        if (!userId) return;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "unmute", userId }));
+          ws.send(JSON.stringify({ type: "list_mutes" }));
+          if (input) input.value = "";
+        }
+      });
+    }
+
+    loginBtn.addEventListener("click", () => redirectToLogin());
+    reconnectBtn.addEventListener("click", () => connectWs());
+    const openAnnouncementPanel = () => {
+      if (!announcementPanel || !adminMenuBtn) return;
+      announcementPanel.classList.toggle("hidden");
+      if (!announcementPanel.classList.contains("hidden")) {
+        if (announcementInput) announcementInput.value = currentAnnouncement || "";
+        requestAnimationFrame(() => positionPopover(announcementPanel, adminMenuBtn));
+      }
+    };
+    const openRulesPanel = () => {
+      if (!rulesPanel || !adminMenuBtn) return;
+      rulesPanel.classList.toggle("hidden");
+      if (!rulesPanel.classList.contains("hidden")) {
+        setRules(currentRules);
+        requestAnimationFrame(() => positionPopover(rulesPanel, adminMenuBtn));
+      }
+    };
+    const openGlobalMuteRangePanel = () => {
+      if (!globalMuteRangePanel || !adminMenuBtn) return;
+      globalMuteRangePanel.classList.toggle("hidden");
+      if (!globalMuteRangePanel.classList.contains("hidden")) {
+        requestAnimationFrame(() => positionPopover(globalMuteRangePanel, adminMenuBtn));
+      }
+    };
+    const refreshMuteList = () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "list_mutes" }));
+      }
+    };
+    const toggleGlobalMute = () => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const next = !globalMuteEnabled;
+      ws.send(JSON.stringify({ type: "set_global_mute", enabled: next }));
+    };
+
+    if (adminMenuBtn && adminMenu) {
+      adminMenuBtn.addEventListener("click", () => {
+        adminMenu.classList.toggle("hidden");
+        if (!adminMenu.classList.contains("hidden")) {
+          requestAnimationFrame(() => positionPopover(adminMenu, adminMenuBtn));
+        }
+      });
+      adminMenu.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const item = target.closest("[data-action]");
+        if (!(item instanceof HTMLElement)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const action = item.getAttribute("data-action");
+        if (!action) return;
+        if (action === "announcement") openAnnouncementPanel();
+        if (action === "global-mute") toggleGlobalMute();
+        if (action === "global-mute-range") openGlobalMuteRangePanel();
+        if (action === "rules") openRulesPanel();
+        if (action === "refresh") refreshMuteList();
+        adminMenu.classList.add("hidden");
+      });
+    }
+    if (announcementSave) {
+      announcementSave.addEventListener("click", () => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const text = announcementInput ? String(announcementInput.value || "") : "";
+        ws.send(JSON.stringify({ type: "set_announcement", text }));
+        if (announcementPanel) announcementPanel.classList.add("hidden");
+      });
+    }
+    if (announcementClear) {
+      announcementClear.addEventListener("click", () => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "set_announcement", text: "" }));
+        if (announcementPanel) announcementPanel.classList.add("hidden");
+      });
+    }
+    if (ruleSave) {
+      ruleSave.addEventListener("click", () => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const blocked = ruleBlocked ? ruleBlocked.value.split("\n").map((s) => s.trim()).filter(Boolean) : [];
+        const replaceLines = ruleReplace ? ruleReplace.value.split("\n") : [];
+        const replace = replaceLines.map((line) => {
+          const parts = line.split("=>");
+          return { from: (parts[0] || "").trim(), to: (parts[1] || "").trim() };
+        }).filter((item) => item.from);
+        const rules = {
+          rateLimitSec: Number(ruleRateLimit?.value || 0),
+          maxLength: Number(ruleMaxLength?.value || 0),
+          allowImage: !!ruleAllowImage?.checked,
+          allowLink: !!ruleAllowLink?.checked,
+          blocked,
+          replace,
+        };
+        ws.send(JSON.stringify({ type: "set_rules", rules }));
+        if (rulesPanel) rulesPanel.classList.add("hidden");
+      });
+    }
+    if (adminUnmuteBtn) {
+      adminUnmuteBtn.addEventListener("click", () => {
+        if (!adminMuteTargetId) return;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "unmute", userId: adminMuteTargetId }));
+        ws.send(JSON.stringify({ type: "list_mutes" }));
+        closeAdminMuteStatus();
+      });
+    }
+    if (adminMuteStatusPanel) {
+      adminMuteStatusPanel.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const action = target.getAttribute("data-action");
+        const minutes = Number(target.getAttribute("data-minutes") || 0);
+        if (action === "mute-add" && minutes) {
+          adjustMuteMinutes(minutes);
+        }
+        if (action === "mute-sub" && minutes) {
+          adjustMuteMinutes(-minutes);
+        }
+      });
+    }
+    if (adminMuteCustomAdd) {
+      adminMuteCustomAdd.addEventListener("click", () => {
+        const num = adminMuteCustomInput ? Number(adminMuteCustomInput.value || 0) : 0;
+        if (!num) return;
+        adjustMuteMinutes(num);
+      });
+    }
+    if (adminMuteCustomSub) {
+      adminMuteCustomSub.addEventListener("click", () => {
+        const num = adminMuteCustomInput ? Number(adminMuteCustomInput.value || 0) : 0;
+        if (!num) return;
+        adjustMuteMinutes(-num);
+      });
+    }
+    if (globalMuteRangeSave) {
+      globalMuteRangeSave.addEventListener("click", () => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        const startVal = globalMuteRangeStart?.value || "";
+        const endVal = globalMuteRangeEnd?.value || "";
+        if (!startVal || !endVal) {
+          showHint("请选择开始与结束时间");
+          return;
+        }
+        const startAt = new Date(startVal).getTime();
+        const endAt = new Date(endVal).getTime();
+        if (!startAt || !endAt || endAt <= startAt) {
+          showHint("结束时间需晚于开始时间");
+          return;
+        }
+        ws.send(JSON.stringify({ type: "set_global_mute_range", startAt, endAt }));
+        if (globalMuteRangePanel) globalMuteRangePanel.classList.add("hidden");
+      });
+    }
+    if (globalMuteRangeClear) {
+      globalMuteRangeClear.addEventListener("click", () => {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        ws.send(JSON.stringify({ type: "set_global_mute_range", startAt: null, endAt: null }));
+        if (globalMuteRangePanel) globalMuteRangePanel.classList.add("hidden");
+      });
+    }
+    if (emojiBtn && emojiPanel) {
+      renderEmojiTabs();
+      renderEmojiGrid();
+      emojiBtn.addEventListener("click", () => {
+        emojiPanel.classList.toggle("hidden");
+      });
+      emojiBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+      emojiPanel.addEventListener("click", (e) => {
+        e.stopPropagation();
+      });
+      if (emojiTabs) {
+        emojiTabs.addEventListener("click", (e) => {
+          const target = e.target;
+          if (!(target instanceof HTMLElement)) return;
+          const cat = target.getAttribute("data-cat");
+          if (!cat) return;
+          activeEmojiCategory = cat;
+          renderEmojiTabs();
+          renderEmojiGrid();
+        });
+      }
+      if (emojiGrid) {
+        emojiGrid.addEventListener("click", (e) => {
+          const target = e.target.closest("button");
+          if (!target) return;
+          const emoji = target.textContent || "";
+          if (!emoji) return;
+          const { selectionStart, selectionEnd } = messageInput;
+          const value = messageInput.value || "";
+          const start = Number.isFinite(selectionStart) ? selectionStart : value.length;
+          const end = Number.isFinite(selectionEnd) ? selectionEnd : value.length;
+          messageInput.value = `${value.slice(0, start)}${emoji}${value.slice(end)}`;
+          const cursor = start + emoji.length;
+          messageInput.setSelectionRange(cursor, cursor);
+          messageInput.focus();
+        });
+      }
+      document.addEventListener("click", (e) => {
+        if (!emojiPanel || emojiPanel.classList.contains("hidden")) return;
+        emojiPanel.classList.add("hidden");
+      });
+    }
+
+    if (mutePopover) {
+      mutePopover.addEventListener("click", (e) => {
+        const target = e.target;
+        if (!(target instanceof HTMLElement)) return;
+        const minutes = target.getAttribute("data-minutes");
+        if (minutes) {
+          sendMuteMinutes(Number(minutes));
+        }
+      });
+    }
+    if (muteConfirmBtn) {
+      muteConfirmBtn.addEventListener("click", () => {
+        const minutes = muteCustomInput ? Number(muteCustomInput.value || 0) : 0;
+        sendMuteMinutes(minutes);
+      });
+    }
+
+    document.addEventListener("click", (e) => {
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        const action = target.getAttribute("data-action");
+        if (action === "mute" || action === "admin-mute") {
+          return;
+        }
+        if (mutePopover && !mutePopover.contains(target)) {
+          closeMutePopover();
+        }
+        if (globalMuteRangePanel && adminMenuBtn) {
+          if (!globalMuteRangePanel.contains(target) && target !== adminMenuBtn) {
+            globalMuteRangePanel.classList.add("hidden");
+          }
+        }
+        if (announcementPanel && adminMenuBtn) {
+          if (!announcementPanel.contains(target) && target !== adminMenuBtn) {
+            announcementPanel.classList.add("hidden");
+          }
+        }
+        if (rulesPanel && adminMenuBtn) {
+          if (!rulesPanel.contains(target) && target !== adminMenuBtn) {
+            rulesPanel.classList.add("hidden");
+          }
+        }
+        if (adminMenu && adminMenuBtn) {
+          if (!adminMenu.contains(target) && target !== adminMenuBtn) {
+            adminMenu.classList.add("hidden");
+          }
+        }
+        if (adminMuteStatusPanel && !adminMuteJustOpened) {
+          if (!adminMuteStatusPanel.contains(target)) {
+            closeAdminMuteStatus();
+          }
+        }
+      }
+    });
+    if (tabOnlineBtn) {
+      tabOnlineBtn.addEventListener("click", () => setSideTab("online"));
+    }
+    if (tabAdminBtn) {
+      tabAdminBtn.addEventListener("click", () => setSideTab("admin"));
+    }
+
+    refreshLoginStatus().then((ok) => {
+      if (ok) connectWs();
+    });
+  </script>
+</body>
+</html>
