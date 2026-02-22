@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/video/favicon.ico">
+    <link rel="shortcut icon" href="/video/favicon.ico">
     <title>视频搜索</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -87,6 +89,10 @@
     </style>
 
     <style>
+        html {
+            scrollbar-gutter: stable;
+        }
+
         html.modal-open,
         body.modal-open {
             overflow: hidden;
@@ -458,9 +464,16 @@
                 </div>
             </div>
             <div class="bg-white rounded-lg p-4 shadow-sm space-y-2 text-sm">
-                <div class="flex items-start justify-between">
-                    <span class="text-gray-500">最近访问</span>
-                    <div id="userLastVisit" class="text-right text-xs text-gray-700 space-y-1">-</div>
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-gray-500">最近访问</span>
+                        <select id="visitRangeSelect" class="border rounded px-2 py-0.5 text-[11px] text-gray-600">
+                            <option value="1">近1天</option>
+                            <option value="3">近3天</option>
+                            <option value="7" selected>近7天</option>
+                        </select>
+                    </div>
+                    <div id="userLastVisit" class="text-right text-xs text-gray-700 space-y-2 max-h-[6.5rem] overflow-y-auto pr-1">-</div>
                 </div>
                 <div class="text-xs text-gray-500">用户信息以账号为准</div>
             </div>
@@ -478,7 +491,7 @@
                 <p class="text-xs text-gray-500">导出/导入：包含喜欢、播放历史、搜索历史、播放进度与昵称</p>
                 <div>
                     <label class="block text-sm font-medium mb-2">导入导出历史记录</label>
-                    <div id="transferHistoryList" class="space-y-2"></div>
+                    <div id="transferHistoryList" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
                 </div>
             </div>
         </div>
@@ -564,7 +577,7 @@
                             <span>自定义选集</span>
                         </label>
                     </div>
-                    <div id="shareEpisodeList" class="mt-2 hidden max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-2"></div>
+                    <div id="shareEpisodeList" class="mt-2 hidden max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 grid grid-cols-3 gap-2"></div>
                     <div id="shareEpisodeActions" class="mt-2 hidden flex items-center justify-between text-xs text-gray-500">
                         <button type="button" data-action="select-all" class="text-blue-600 hover:underline">全选</button>
                         <button type="button" data-action="clear-all" class="text-gray-500 hover:underline">全不选</button>
@@ -744,6 +757,13 @@
                         class="input-primary w-full"
                         placeholder="请输入API Host地址"
                     >
+                    <div class="mt-2 flex items-center justify-between">
+                        <label class="block text-sm font-medium">接口类型</label>
+                        <select id="customTypeSelect" class="border rounded px-2 py-1 text-sm">
+                            <option value="normal">普通</option>
+                            <option value="adult">摩西</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="flex space-x-3">
                     <button onclick="saveHost()" class="btn-primary flex-1">
@@ -804,7 +824,7 @@
                 </div>
 
                 <div class="flex items-center justify-between">
-                    <label class="block text-sm font-medium">官方推荐</label>
+                    <label class="block text-sm font-medium">官方推荐（总数 <span id="officialApiCount2">0</span>）</label>
                     <button 
                         type="button"
                         onclick="toggleOfficialApiSection(); fetchOfficialApis(false)"
@@ -899,6 +919,10 @@
         let resumeLastUrl = '';
         const WATCH_TIME_KEY = 'videoWatchTimeDaily';
         const WATCH_TIME_MAX_DAYS = 60;
+        const OFFICIAL_API_TYPE_KEY = 'officialApiType';
+        const CUSTOM_API_TYPE_KEY = 'customApiType';
+        const OFFICIAL_API_LIST_KEY = 'officialApiList';
+        const OFFICIAL_API_LIST_SIGNATURE_KEY = 'officialApiListSignature';
         let lastWatchTime = 0;
         let lastWatchUrl = '';
         const loadedTotalCount = document.getElementById('loadedTotalCount');
@@ -922,6 +946,7 @@
         const videoPlayerModal = document.getElementById('videoPlayerModal');
         const hostModal = document.getElementById('hostModal');
         const hostInput = document.getElementById('hostInput');
+        const customTypeSelect = document.getElementById('customTypeSelect');
         const hostNameDisplay = document.getElementById('hostNameDisplay');
         const hostHistoryWrap = document.getElementById('hostHistoryWrap');
         const hostHistoryList = document.getElementById('hostHistoryList');
@@ -941,6 +966,7 @@
         const officialApiCountNormal = document.getElementById('officialApiCountNormal');
         const officialApiCountAdult2 = document.getElementById('officialApiCountAdult2');
         const officialApiCountNormal2 = document.getElementById('officialApiCountNormal2');
+        const officialApiCount2 = document.getElementById('officialApiCount2');
         const privacySwitch = document.getElementById('privacySwitch');
         const searchInput = document.getElementById('searchInput');
         const searchInputMobile = document.getElementById('searchInputMobile');
@@ -1279,6 +1305,74 @@
             })();
             return visitHistoryFetchPromise;
         }
+
+        function normalizeVisitEntry(entry) {
+            if (entry && typeof entry === 'object') {
+                const time = Number(entry.time ?? entry.timestamp ?? entry.lastSeenAt ?? '');
+                if (!Number.isFinite(time)) return null;
+                return {
+                    time,
+                    ip: String(entry.ip || ''),
+                    userAgent: String(entry.userAgent || entry.ua || '')
+                };
+            }
+            const time = Number(entry);
+            if (!Number.isFinite(time)) return null;
+            return { time, ip: '', userAgent: '' };
+        }
+
+        function normalizeVisitHistory(list) {
+            const raw = Array.isArray(list) ? list : [];
+            return raw.map(normalizeVisitEntry).filter(Boolean);
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function formatIp(value) {
+            const raw = String(value || '').trim();
+            if (!raw) return '未知';
+            if (raw.startsWith('::ffff:')) return raw.slice(7);
+            return raw;
+        }
+
+        function detectClientLabel(ua) {
+            const text = String(ua || '').toLowerCase();
+            if (!text) return '未知';
+            if (text.includes('windows')) return 'Windows';
+            if (text.includes('mac os') || text.includes('macintosh')) return 'macOS';
+            if (text.includes('android')) return 'Android';
+            if (text.includes('iphone') || text.includes('ipad') || text.includes('ios')) return 'iOS';
+            if (text.includes('linux')) return 'Linux';
+            return '其他';
+        }
+
+        function formatDateOnly(timestamp) {
+            if (!timestamp || !Number.isFinite(Number(timestamp))) return '';
+            return new Date(Number(timestamp)).toLocaleDateString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            });
+        }
+
+        function getVisitRangeDays() {
+            const saved = localStorage.getItem('visitRangeDays');
+            const value = Number(saved || '7');
+            return Number.isFinite(value) ? value : 7;
+        }
+
+        function setVisitRangeDays(value) {
+            const days = Number(value);
+            if (!Number.isFinite(days)) return;
+            localStorage.setItem('visitRangeDays', String(days));
+        }
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
@@ -1286,7 +1380,17 @@
             host = localStorage.getItem('apiHost') || '';
             hostName = localStorage.getItem('apiHostName') || '';
             updateHostNameDisplay(host);
+            updateCustomTypeSelect();
             applyAvatarFromStorage();
+            if (customTypeSelect) {
+                customTypeSelect.addEventListener('change', () => {
+                    const value = customTypeSelect.value;
+                    if (value === 'normal' || value === 'adult') {
+                        localStorage.setItem(CUSTOM_API_TYPE_KEY, value);
+                        updateHostNameDisplay(host);
+                    }
+                });
+            }
             const aggregateEnabled = isAggregateSearchEnabled();
             if (aggregateSwitch) {
                 aggregateSwitch.checked = aggregateEnabled;
@@ -1325,25 +1429,35 @@
                 officialApiToggleButton.textContent = officialApiSection && officialApiSection.classList.contains('hidden') ? '展开' : '收起';
             }
             switchAggregateTab('adult');
-            switchOfficialTab('adult');
+            switchOfficialTab(getDefaultOfficialTab());
             if (hostHistoryToggleButton) {
                 hostHistoryToggleButton.textContent = hostHistoryWrap && hostHistoryWrap.classList.contains('hidden') ? '展开' : '收起';
             }
 
             const previousVisit = localStorage.getItem('lastVisit');
-            const visitHistory = JSON.parse(localStorage.getItem('visitHistory') || '[]');
+            const nowTs = Date.now();
+            const rangeDays = getVisitRangeDays();
+            const cutoff = nowTs - rangeDays * 24 * 60 * 60 * 1000;
+            const visitHistory = normalizeVisitHistory(JSON.parse(localStorage.getItem('visitHistory') || '[]'))
+                .filter((item) => item.time >= cutoff);
             if (previousVisit) {
-                visitHistory.unshift(Number(previousVisit));
+                const time = Number(previousVisit);
+                if (Number.isFinite(time)) {
+                    visitHistory.unshift({ time, ip: '', userAgent: '' });
+                }
             }
-            const filteredHistory = visitHistory.filter((item) => Number.isFinite(item));
             const uniqueHistory = [];
-            for (const item of filteredHistory) {
-                if (!uniqueHistory.includes(item)) uniqueHistory.push(item);
+            const seen = new Set();
+            for (const item of visitHistory) {
+                const key = String(item.time);
+                if (seen.has(key)) continue;
+                seen.add(key);
+                uniqueHistory.push(item);
             }
-            const trimmedHistory = uniqueHistory.slice(0, 5);
+            const trimmedHistory = uniqueHistory.slice(0, 200);
             localStorage.setItem('visitHistory', JSON.stringify(trimmedHistory));
-            lastVisitAtStart = trimmedHistory[0] ? String(trimmedHistory[0]) : null;
-            localStorage.setItem('lastVisit', Date.now());
+            lastVisitAtStart = trimmedHistory[0] ? String(trimmedHistory[0].time) : null;
+            localStorage.setItem('lastVisit', nowTs);
 
             renderTransferHistory();
 
@@ -1649,7 +1763,23 @@
                 const response = await fetch(getProxyUrl('', params), {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const data = await response.json();
+                const rawText = await response.text();
+                if (rawText && rawText.includes("搜索关闭")) {
+                    if (page === 1) {
+                        showErrorState("当前接口无法搜索", { showRetry: false });
+                    } else {
+                        showToast("当前接口无法搜索");
+                    }
+                    hideLoadMoreButton();
+                    hasMore = false;
+                    return [];
+                }
+                let data = {};
+                try {
+                    data = rawText ? JSON.parse(rawText) : {};
+                } catch (e) {
+                    data = {};
+                }
                 
                 if (!data.list || data.list.length === 0) {
                     if (page === 1) {
@@ -1679,6 +1809,11 @@
                     });
                     return filtered;
                 })();
+                const hostCategory = getCurrentHostCategory();
+                const tagged = deduped.map(video => ({
+                    ...video,
+                    _sourceCategory: hostCategory
+                }));
                 
                 // 渲染数据
                 if (page === 1) {
@@ -1688,7 +1823,7 @@
                 }
                 
                 hideEmptyState();
-                renderVideos(deduped);
+                renderVideos(tagged);
                 updateLoadedCount(renderedVideos.length);
                 
                 // 更新分页状态
@@ -1704,7 +1839,7 @@
                     hasMore = true;
                 }
                 
-                return deduped;
+                return tagged;
             } catch (error) {
                 console.error('获取数据失败:', error);
                 if (page === 1) {
@@ -1769,11 +1904,12 @@
                         aggregateNoMore.add(item.url);
                     }
                     const label = getOfficialLabel(item);
+                    const normalizedCategory = normalizeCategory(item.category || getOfficialCategoryByUrl(item.url) || '');
                     list.forEach(video => {
                         merged.push({
                             ...video,
                             _sourceLabel: label,
-                            _sourceCategory: item && item.category ? item.category : ''
+                            _sourceCategory: normalizedCategory
                         });
                     });
                 });
@@ -1878,18 +2014,18 @@
         }
 
         function renderVideos(videos) {
-            const categories = new Set(
-                (videos || []).map((video) =>
-                    normalizeCategory(video._sourceCategory || getCurrentHostCategory())
-                )
-            );
+            const resolveVideoCategory = (video) => {
+                if (video && video._sourceCategory) return normalizeCategory(video._sourceCategory);
+                return normalizeCategory(getCurrentHostCategory());
+            };
+            const categories = new Set((videos || []).map(resolveVideoCategory));
             const layoutCategory = categories.size === 1 ? Array.from(categories)[0] : 'adult';
             updateVideoGridLayout(layoutCategory);
 
             videos.forEach(video => {
                 const favorited = isFavorited(video.vod_play_url);
                 const sourceLabel = video._sourceLabel || getHostLabel();
-                const category = normalizeCategory(video._sourceCategory || getCurrentHostCategory());
+                const category = resolveVideoCategory(video);
                 const isNormal = category === 'normal';
                 if (video.vod_play_url) {
                     renderedVideos.push({
@@ -1985,14 +2121,14 @@
                                     class="${actionClass} ${favorited ? 'text-red-500' : 'text-gray-500'} hover:text-red-500"
                                     title="喜欢"
                                 >
-                                    <i class="fa ${favorited ? 'fa-heart' : 'fa-heart-o'} mr-1"></i> 喜欢
+                                    <i class="fa ${favorited ? 'fa-heart' : 'fa-heart-o'} ${isNormal ? '' : 'mr-1'}"></i><span class="${isNormal ? 'hidden sm:inline' : ''} ${isNormal ? 'sm:ml-1' : ''}">喜欢</span>
                                 </button>
                                 <button 
                                     onclick="shareVideo('${video.vod_play_url}', '${video.vod_name}', '${video.vod_pic}', '${sourceLabel}', 0)"
                                     class="${actionClass} text-gray-500 hover:text-blue-500"
                                     title="分享视频"
                                 >
-                                    <i class="fa fa-share-alt mr-1"></i> 分享
+                                    <i class="fa fa-share-alt ${isNormal ? '' : 'mr-1'}"></i><span class="${isNormal ? 'hidden sm:inline' : ''} ${isNormal ? 'sm:ml-1' : ''}">分享</span>
                                 </button>
                             </div>
                         </div>
@@ -2554,11 +2690,12 @@
                     const selected = episodes[currentEpisodeIndex];
                     handleClose();
                     openVideoPlayer(
-                        selected ? selected.url : item.videoUrl,
-                        selected ? selected.name : (item.title || ''),
+                        item.videoUrl,
+                        item.title || '',
                         item.url || '',
                         item.source || '',
-                        item.category || ''
+                        item.category || '',
+                        currentEpisodeIndex
                     );
                 });
             }
@@ -2583,12 +2720,14 @@
                         btn.classList.toggle('border-white/20', !isActive);
                     });
                     handleClose();
+                    const item = items[currentIndex] || {};
                     openVideoPlayer(
-                        url,
-                        name || (items[currentIndex]?.title || ''),
-                        items[currentIndex]?.url || '',
-                        items[currentIndex]?.source || '',
-                        items[currentIndex]?.category || ''
+                        item.videoUrl || url,
+                        item.title || (name || ''),
+                        item.url || '',
+                        item.source || '',
+                        item.category || '',
+                        idx
                     );
                 });
             }
@@ -2764,6 +2903,20 @@
                 const episodePanel = document.getElementById('episodePanel');
                 const episodeList = document.getElementById('episodeList');
                 let activeEpisodeIndex = initialIndex;
+                const setActiveEpisodeButton = () => {
+                    if (!episodeList) return;
+                    const buttons = episodeList.querySelectorAll('button[data-episode-index]');
+                    buttons.forEach((btn) => {
+                        const idx = Number(btn.getAttribute('data-episode-index'));
+                        const isActive = Number.isFinite(idx) && idx === activeEpisodeIndex;
+                        btn.classList.toggle('bg-blue-600', isActive);
+                        btn.classList.toggle('text-white', isActive);
+                        btn.classList.toggle('border-blue-600', isActive);
+                        btn.classList.toggle('bg-white/10', !isActive);
+                        btn.classList.toggle('text-white', !isActive);
+                        btn.classList.toggle('border-white/20', !isActive);
+                    });
+                };
                 const renderEpisodePanel = () => {
                     if (!episodePanel || !episodeList) return;
                     if (resolvedCategory !== 'normal' || !hasEpisodeList) {
@@ -2779,6 +2932,7 @@
                             data-episode-index="${idx}"
                         >${ep.name}</button>
                     `).join('');
+                    setActiveEpisodeButton();
                 };
                 const updatePlayerTitle = (title) => {
                     const playerTitle = document.getElementById('playerTitle');
@@ -2901,6 +3055,7 @@
                         const idx = Number(target.getAttribute('data-episode-index'));
                         if (!Number.isFinite(idx) || !episodes[idx]) return;
                         activeEpisodeIndex = idx;
+                        setActiveEpisodeButton();
                         const ep = episodes[idx];
                         if (!isM3u8Url(ep.url)) {
                             showToast('仅支持 .m3u8 视频地址');
@@ -2978,7 +3133,9 @@
             const app = document.getElementById('appContent');
             if (locked) {
                 const scrollY = window.scrollY || window.pageYOffset || 0;
+                const scrollbarWidth = window.innerWidth - html.clientWidth;
                 body.dataset.scrollLockY = String(scrollY);
+                body.dataset.scrollbarWidth = String(scrollbarWidth);
                 if (app) {
                     app.style.position = 'fixed';
                     app.style.top = `-${scrollY}px`;
@@ -2987,8 +3144,12 @@
                     app.style.width = '100%';
                 }
                 body.style.overflow = 'hidden';
+                if (scrollbarWidth > 0) {
+                    body.style.paddingRight = `${scrollbarWidth}px`;
+                }
             } else {
                 const scrollY = Number(body.dataset.scrollLockY || 0);
+                const scrollbarWidth = Number(body.dataset.scrollbarWidth || 0);
                 if (app) {
                     app.style.position = '';
                     app.style.top = '';
@@ -2997,7 +3158,9 @@
                     app.style.width = '';
                 }
                 body.style.overflow = '';
+                body.style.paddingRight = '';
                 delete body.dataset.scrollLockY;
+                delete body.dataset.scrollbarWidth;
                 if (Number.isFinite(scrollY)) {
                     window.scrollTo(0, scrollY);
                 }
@@ -3489,6 +3652,7 @@
             if (willOpen) {
                 hostInput.value = host;
                 updateHostNameDisplay(host);
+                updateCustomTypeSelect();
                 hostInput.focus();
                 fetchOfficialApis(false);
                 renderHostHistory();
@@ -3524,8 +3688,22 @@
             localStorage.setItem('apiHost', host);
             hostName = getOfficialNameByUrl(host) || getHostNameFromUrl(host);
             localStorage.setItem('apiHostName', hostName);
+            const rawCategory = getOfficialCategoryByUrl(host);
+            if (rawCategory) {
+                const officialCategory = normalizeCategory(rawCategory);
+                if (officialCategory === 'normal' || officialCategory === 'adult') {
+                    localStorage.setItem(OFFICIAL_API_TYPE_KEY, officialCategory);
+                    switchOfficialTab(officialCategory);
+                }
+            } else if (customTypeSelect) {
+                const manualType = customTypeSelect.value;
+                if (manualType === 'normal' || manualType === 'adult') {
+                    localStorage.setItem(CUSTOM_API_TYPE_KEY, manualType);
+                }
+            }
             saveHostHistory(host);
             updateHostNameDisplay(host);
+            updateCustomTypeSelect();
             
             toggleHostModal();
             showToast('Host设置已保存');
@@ -3544,6 +3722,7 @@
             localStorage.removeItem('apiHost');
             localStorage.removeItem('apiHostName');
             updateHostNameDisplay('');
+            updateCustomTypeSelect();
             showToast('Host已重置');
         }
 
@@ -3649,6 +3828,13 @@
                 normalTab.classList.toggle('text-gray-800', type === 'normal');
                 normalTab.classList.toggle('text-gray-600', type !== 'normal');
             }
+        }
+
+        function getDefaultOfficialTab() {
+            const savedType = localStorage.getItem(OFFICIAL_API_TYPE_KEY);
+            if (savedType === 'normal' || savedType === 'adult') return savedType;
+            const category = getCurrentHostCategory();
+            return category === 'normal' ? 'normal' : 'adult';
         }
 
         function updateAggregateSwitchUI(enabled) {
@@ -3924,6 +4110,7 @@
             const noteDisplay = document.getElementById('userNoteDisplay');
             const noteInput = document.getElementById('userNoteInput');
             const logoutBtn = document.querySelector('[data-action="logout"]');
+            const rangeSelect = document.getElementById('visitRangeSelect');
             const skipStatsFetch = !!options.skipStatsFetch;
             if (nicknameDisplay) {
                 nicknameDisplay.innerHTML = `
@@ -3985,6 +4172,12 @@
             if (logoutBtn) {
                 logoutBtn.disabled = !profile;
             }
+            if (rangeSelect) {
+                rangeSelect.onchange = () => {
+                    setVisitRangeDays(rangeSelect.value);
+                    renderUserInfo({ skipStatsFetch: true });
+                };
+            }
             const favoriteCountEl = document.getElementById('userFavoriteCount');
             const shareCountEl = document.getElementById('userShareCount');
             const historyCountEl = document.getElementById('userHistoryCount');
@@ -3998,15 +4191,38 @@
             const lastVisitEl = document.getElementById('userLastVisit');
             if (lastVisitEl) {
                 const historyList = Array.isArray(profile?.visitHistory) && profile.visitHistory.length > 0
-                    ? profile.visitHistory
-                    : JSON.parse(localStorage.getItem('visitHistory') || '[]');
-                if (!historyList || historyList.length === 0) {
+                    ? normalizeVisitHistory(profile.visitHistory)
+                    : normalizeVisitHistory(JSON.parse(localStorage.getItem('visitHistory') || '[]'));
+                const rangeDays = getVisitRangeDays();
+                if (rangeSelect) {
+                    rangeSelect.value = String(rangeDays);
+                }
+                const cutoff = Date.now() - rangeDays * 24 * 60 * 60 * 1000;
+                const filteredHistory = historyList.filter((item) => item.time >= cutoff);
+                if (!filteredHistory || filteredHistory.length === 0) {
                     lastVisitEl.textContent = '首次访问';
                 } else {
-                    lastVisitEl.innerHTML = historyList
-                        .slice(0, 5)
-                        .map((timestamp) => `<div>${formatDate(Number(timestamp))}</div>`)
-                        .join('');
+                    const groups = new Map();
+                    filteredHistory.forEach((entry) => {
+                        const dayKey = formatDateOnly(entry.time) || '未知日期';
+                        if (!groups.has(dayKey)) groups.set(dayKey, []);
+                        groups.get(dayKey).push(entry);
+                    });
+                    const html = Array.from(groups.entries()).map(([day, entries]) => {
+                        const itemsHtml = entries.map((entry) => {
+                            const timeText = formatDate(Number(entry.time));
+                            const ipText = escapeHtml(formatIp(entry.ip));
+                            const uaText = escapeHtml(detectClientLabel(entry.userAgent));
+                            return `<div class="text-[11px] text-gray-600 leading-5">${timeText} · ${ipText} · ${uaText}</div>`;
+                        }).join('');
+                        return `
+                            <div class="space-y-1">
+                                <div class="text-xs text-gray-500">${day}</div>
+                                ${itemsHtml}
+                            </div>
+                        `;
+                    }).join('');
+                    lastVisitEl.innerHTML = html;
                 }
             }
             if (skipStatsFetch) {
@@ -4266,6 +4482,43 @@
             if (officialApiListNormal) officialApiListNormal.innerHTML = messageHtml;
         }
 
+        function getOfficialListSignature(list) {
+            if (!Array.isArray(list)) return '';
+            const normalized = list
+                .filter(item => item && (item.url || item.name))
+                .map(item => ({
+                    name: String(item.name || '').trim(),
+                    url: String(item.url || '').trim(),
+                    category: normalizeCategory(item.category || ''),
+                    type: String(item.type || '').trim()
+                }))
+                .sort((a, b) => {
+                    const keyA = `${a.url}||${a.name}`;
+                    const keyB = `${b.url}||${b.name}`;
+                    return keyA.localeCompare(keyB);
+                });
+            return JSON.stringify(normalized);
+        }
+
+        function syncOfficialApiListCache(remoteList) {
+            if (!Array.isArray(remoteList)) return;
+            const remoteSignature = getOfficialListSignature(remoteList);
+            let localSignature = '';
+            try {
+                localSignature = localStorage.getItem(OFFICIAL_API_LIST_SIGNATURE_KEY) || '';
+            } catch (e) {
+                localSignature = '';
+            }
+            if (remoteSignature && remoteSignature !== localSignature) {
+                try {
+                    localStorage.setItem(OFFICIAL_API_LIST_KEY, JSON.stringify(remoteList));
+                    localStorage.setItem(OFFICIAL_API_LIST_SIGNATURE_KEY, remoteSignature);
+                } catch (e) {
+                    // ignore storage errors
+                }
+            }
+        }
+
         function fetchOfficialApis(force) {
             if (!officialApiListAdult && !officialApiListNormal) return;
             if (officialApiCache && !force) {
@@ -4291,6 +4544,7 @@
                     if (!data || data.code !== 200 || !Array.isArray(data.data)) {
                         throw new Error('官方接口返回异常');
                     }
+                    syncOfficialApiListCache(data.data);
                     officialApiCache = data;
                     renderOfficialApis(data);
                 })
@@ -4315,6 +4569,15 @@
                 if (officialApiCountNormal) {
                     officialApiCountNormal.textContent = '0';
                 }
+                if (officialApiCountAdult2) {
+                    officialApiCountAdult2.textContent = '0';
+                }
+                if (officialApiCountNormal2) {
+                    officialApiCountNormal2.textContent = '0';
+                }
+                if (officialApiCount2) {
+                    officialApiCount2.textContent = '0';
+                }
                 if (aggregateApiList) {
                     aggregateApiList.innerHTML = `
                         <div class="text-xs text-gray-500">暂无可选接口</div>
@@ -4323,11 +4586,7 @@
                 return;
             }
 
-            try {
-                localStorage.setItem('officialApiList', JSON.stringify(data.data));
-            } catch (e) {
-                // ignore storage errors
-            }
+            syncOfficialApiListCache(data.data);
             
             const metaText = [data.title, data.subtitle].filter(Boolean).join(' · ');
             const metaHtml = metaText
@@ -4372,6 +4631,9 @@
                 if (officialApiCountNormal2) {
                     officialApiCountNormal2.textContent = String(normalList.length);
                 }
+                if (officialApiCount2) {
+                    officialApiCount2.textContent = String(data.data.length);
+                }
 
             if (officialApiListAdult) {
                 officialApiListAdult.innerHTML = `
@@ -4387,7 +4649,16 @@
             }
 
             renderAggregateApiSelection(data.data);
+            const latestOfficialName = getOfficialNameByUrl(host);
+            if (host && latestOfficialName) {
+                const savedName = localStorage.getItem('apiHostName') || '';
+                if (latestOfficialName !== savedName) {
+                    hostName = latestOfficialName;
+                    localStorage.setItem('apiHostName', latestOfficialName);
+                }
+            }
             updateHostNameDisplay(host);
+            updateCustomTypeSelect();
         }
 
         async function getOfficialApis() {
@@ -4402,12 +4673,8 @@
             });
             const data = await res.json();
             if (data && data.code === 200 && Array.isArray(data.data)) {
+                syncOfficialApiListCache(data.data);
                 officialApiCache = data;
-                try {
-                    localStorage.setItem('officialApiList', JSON.stringify(data.data));
-                } catch (e) {
-                    // ignore storage errors
-                }
                 ensureDefaultAggregateSelection(data.data);
                 renderAggregateApiSelection(data.data);
                 return data.data.filter(item => item && item.url);
@@ -4454,10 +4721,19 @@
             localStorage.setItem('aggregateApiSelectionNames', JSON.stringify(unique));
         }
 
+        function setAggregateSelectionCleared(cleared) {
+            localStorage.setItem('aggregateSelectionCleared', cleared ? '1' : '0');
+        }
+
+        function isAggregateSelectionCleared() {
+            return localStorage.getItem('aggregateSelectionCleared') === '1';
+        }
+
         function resolveAggregateSelection(apis) {
             const selectedUrls = getAggregateApiSelection();
             const list = (apis || []).filter(item => item && item.url);
             if (selectedUrls.length > 0) {
+                setAggregateSelectionCleared(false);
                 const urlSet = new Set(list.map(item => item.url));
                 const matched = selectedUrls.filter(url => urlSet.has(url));
                 if (matched.length > 0) {
@@ -4467,6 +4743,7 @@
                     return matched;
                 }
             }
+            if (isAggregateSelectionCleared()) return [];
             const names = getAggregateApiSelectionNames();
             if (!names.length) return [];
             if (list.length === 0) return [];
@@ -4481,6 +4758,7 @@
         function ensureDefaultAggregateSelection(apis) {
             const current = resolveAggregateSelection(apis);
             if (current.length > 0) return current;
+            if (isAggregateSelectionCleared()) return [];
             const list = (apis || []).filter(item => item && item.url);
             const defaults = list.slice(0, 3).map(item => item.url).filter(Boolean);
             const defaultNames = list.slice(0, 3).map(item => item.name).filter(Boolean);
@@ -4546,6 +4824,7 @@
                 selected.push(url);
                 if (name) selectedNames.push(name);
             }
+            setAggregateSelectionCleared(false);
             setAggregateApiSelection(selected);
             setAggregateApiSelectionNames(selectedNames);
         }
@@ -4554,12 +4833,14 @@
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
             const urls = list.map(item => item.url).filter(Boolean);
             const names = list.map(item => item.name).filter(Boolean);
+            setAggregateSelectionCleared(false);
             setAggregateApiSelection(urls);
             setAggregateApiSelectionNames(names);
             renderAggregateApiSelection(list);
         }
 
         function clearAggregateApis() {
+            setAggregateSelectionCleared(true);
             setAggregateApiSelection([]);
             setAggregateApiSelectionNames([]);
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
@@ -4570,6 +4851,7 @@
             const list = (officialApiCache && officialApiCache.data) ? officialApiCache.data : [];
             const defaults = list.slice(0, 3).map(item => item.url).filter(Boolean);
             const defaultNames = list.slice(0, 3).map(item => item.name).filter(Boolean);
+            setAggregateSelectionCleared(false);
             setAggregateApiSelection(defaults);
             setAggregateApiSelectionNames(defaultNames);
             renderAggregateApiSelection(list);
@@ -4628,13 +4910,52 @@
             }
         }
 
+        function getManualHostType() {
+            const value = localStorage.getItem(CUSTOM_API_TYPE_KEY);
+            return value === 'normal' || value === 'adult' ? value : 'adult';
+        }
+
+        function updateCustomTypeSelect() {
+            if (!customTypeSelect) return;
+            const officialName = getOfficialNameByUrl(host);
+            const rawCategory = getOfficialCategoryByUrl(host);
+            const isOfficial = !!officialName || !!rawCategory;
+            if (isOfficial) {
+                const officialCategory = normalizeCategory(rawCategory);
+                if (officialCategory === 'normal' || officialCategory === 'adult') {
+                    customTypeSelect.value = officialCategory;
+                } else {
+                    const savedType = localStorage.getItem(OFFICIAL_API_TYPE_KEY);
+                    customTypeSelect.value = savedType === 'normal' || savedType === 'adult' ? savedType : 'adult';
+                }
+                customTypeSelect.disabled = true;
+                customTypeSelect.classList.add('opacity-60', 'cursor-not-allowed');
+                return;
+            }
+            customTypeSelect.disabled = false;
+            customTypeSelect.classList.remove('opacity-60', 'cursor-not-allowed');
+            customTypeSelect.value = getManualHostType();
+        }
+
         function selectHost(value, name = '') {
             hostInput.value = value;
             host = value;
             localStorage.setItem('apiHost', host);
             hostName = name || getOfficialNameByUrl(host) || getHostNameFromUrl(host);
             localStorage.setItem('apiHostName', hostName);
+            const rawCategory = getOfficialCategoryByUrl(host);
+            const officialCategory = normalizeCategory(rawCategory);
+            if (rawCategory && (officialCategory === 'normal' || officialCategory === 'adult')) {
+                localStorage.setItem(OFFICIAL_API_TYPE_KEY, officialCategory);
+                switchOfficialTab(officialCategory);
+            } else if (customTypeSelect) {
+                const manualType = customTypeSelect.value;
+                if (manualType === 'normal' || manualType === 'adult') {
+                    localStorage.setItem(CUSTOM_API_TYPE_KEY, manualType);
+                }
+            }
             updateHostNameDisplay(host);
+            updateCustomTypeSelect();
             saveHostHistory(host);
             showToast('已切换Host');
             if (!hostModal.classList.contains('translate-x-full')) {
@@ -4648,7 +4969,21 @@
         function getCurrentHostDisplayName(url) {
             if (!url) return '未设置';
             const officialName = getOfficialNameByUrl(url);
-            if (officialName) return officialName;
+            if (officialName) {
+                const category = normalizeCategory(getOfficialCategoryByUrl(url));
+                const savedType = localStorage.getItem(OFFICIAL_API_TYPE_KEY);
+                const typeValue = category === 'normal' || category === 'adult'
+                    ? category
+                    : (savedType === 'normal' || savedType === 'adult' ? savedType : '');
+                const typeLabel = typeValue === 'normal' ? '普通' : (typeValue === 'adult' ? '摩西' : '');
+                return typeLabel ? `${officialName}·${typeLabel}` : officialName;
+            }
+            const savedName = hostName || localStorage.getItem('apiHostName') || '';
+            if (savedName) {
+                const savedType = localStorage.getItem(CUSTOM_API_TYPE_KEY) || localStorage.getItem(OFFICIAL_API_TYPE_KEY);
+                const typeLabel = savedType === 'normal' ? '普通' : (savedType === 'adult' ? '摩西' : '');
+                return typeLabel ? `${savedName}·${typeLabel}` : savedName;
+            }
             return '自定义';
         }
 
@@ -4686,7 +5021,7 @@
                 ? officialApiCache.data
                 : (() => {
                     try {
-                        const raw = localStorage.getItem('officialApiList');
+                        const raw = localStorage.getItem(OFFICIAL_API_LIST_KEY);
                         return raw ? JSON.parse(raw) : [];
                     } catch (e) {
                         return [];
@@ -4702,7 +5037,7 @@
                 ? officialApiCache.data
                 : (() => {
                     try {
-                        const raw = localStorage.getItem('officialApiList');
+                        const raw = localStorage.getItem(OFFICIAL_API_LIST_KEY);
                         return raw ? JSON.parse(raw) : [];
                     } catch (e) {
                         return [];
@@ -4713,7 +5048,15 @@
         }
 
         function getCurrentHostCategory() {
-            return normalizeCategory(getOfficialCategoryByUrl(host));
+            const rawCategory = getOfficialCategoryByUrl(host);
+            if (rawCategory) {
+                const category = normalizeCategory(rawCategory);
+                if (category === 'normal' || category === 'adult') return category;
+            }
+            const customType = localStorage.getItem(CUSTOM_API_TYPE_KEY);
+            if (customType === 'normal' || customType === 'adult') return customType;
+            const savedType = localStorage.getItem(OFFICIAL_API_TYPE_KEY);
+            return savedType === 'normal' || savedType === 'adult' ? savedType : 'adult';
         }
 
         function getOfficialNameByUrl(url) {
@@ -4722,7 +5065,7 @@
                 ? officialApiCache.data
                 : (() => {
                     try {
-                        const raw = localStorage.getItem('officialApiList');
+                        const raw = localStorage.getItem(OFFICIAL_API_LIST_KEY);
                         return raw ? JSON.parse(raw) : [];
                     } catch (e) {
                         return [];
@@ -4945,9 +5288,9 @@
         function renderShareEpisodeList(episodes) {
             if (!shareEpisodeList) return;
             shareEpisodeList.innerHTML = episodes.map((ep, idx) => `
-                <label class="flex items-center space-x-2 text-xs">
+                <label class="flex items-center space-x-2 text-xs w-full">
                     <input type="checkbox" value="${idx}">
-                    <span>${ep.name || `第${idx + 1}集`}</span>
+                    <span class="truncate">${ep.name || `第${idx + 1}集`}</span>
                 </label>
             `).join('');
         }
@@ -5409,16 +5752,20 @@
         }
         
         // 显示错误状态
-        function showErrorState(message) {
+        function showErrorState(message, options = {}) {
             hideEmptyState();
+            const showRetry = options.showRetry !== false;
+            const retryHtml = showRetry
+                ? `<button onclick="loadInitialData()" class="btn-primary">
+                        <i class="fa fa-refresh mr-1"></i> 重试
+                    </button>`
+                : '';
             videoList.innerHTML = `
                 <div class="col-span-full text-center py-16">
                     <i class="fa fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
                     <h3 class="text-xl font-semibold text-gray-700 mb-2">加载失败</h3>
                     <p class="text-gray-600 mb-4">${message}</p>
-                    <button onclick="loadInitialData()" class="btn-primary">
-                        <i class="fa fa-refresh mr-1"></i> 重试
-                    </button>
+                    ${retryHtml}
                 </div>
             `;
             hideLoadMoreButton();

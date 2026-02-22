@@ -307,11 +307,37 @@ userRouter.get("/user/visit-history", authMiddleware, async (ctx) => {
     const user = await db.collection("users").findOne({ _id: userId });
     const raw = Array.isArray(user?.visitHistory) ? user.visitHistory : [];
     const now = Date.now();
-    const list = [now, ...raw]
-        .map((v) => Number(v))
-        .filter((v) => Number.isFinite(v))
-        .filter((v, idx, arr) => arr.indexOf(v) === idx)
-        .slice(0, 5);
+    const cutoff = now - 7 * 24 * 60 * 60 * 1000;
+    const ip = ctx.request.ip || "";
+    const userAgent = ctx.headers["user-agent"] || "";
+    const normalizeEntry = (entry) => {
+        if (entry && typeof entry === "object") {
+            const time = Number(entry.time ?? entry.timestamp ?? entry.lastSeenAt ?? "");
+            if (!Number.isFinite(time)) return null;
+            return {
+                time,
+                ip: String(entry.ip || ""),
+                userAgent: String(entry.userAgent || entry.ua || ""),
+            };
+        }
+        const time = Number(entry);
+        if (!Number.isFinite(time)) return null;
+        return { time, ip: "", userAgent: "" };
+    };
+    const normalized = raw
+        .map(normalizeEntry)
+        .filter(Boolean)
+        .filter((item) => item.time >= cutoff);
+    const merged = [{ time: now, ip, userAgent }, ...normalized];
+    const deduped = [];
+    const seen = new Set();
+    merged.forEach((item) => {
+        const key = `${item.time}|${item.ip}|${item.userAgent}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        deduped.push(item);
+    });
+    const list = deduped.slice(0, 200);
     await db.collection("users").updateOne({ _id: userId }, { $set: { visitHistory: list, updatedAt: new Date() } });
     ctx.body = { code: 200, message: "获取成功", data: list };
 });
@@ -1540,10 +1566,26 @@ userRouter.put("/user/:id", authMiddleware, async (ctx) => {
     }
     if (visitHistory !== undefined) {
         const raw = Array.isArray(visitHistory) ? visitHistory : [];
+        const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const normalizeEntry = (entry) => {
+            if (entry && typeof entry === "object") {
+                const time = Number(entry.time ?? entry.timestamp ?? entry.lastSeenAt ?? "");
+                if (!Number.isFinite(time)) return null;
+                return {
+                    time,
+                    ip: String(entry.ip || ""),
+                    userAgent: String(entry.userAgent || entry.ua || ""),
+                };
+            }
+            const time = Number(entry);
+            if (!Number.isFinite(time)) return null;
+            return { time, ip: "", userAgent: "" };
+        };
         const sanitized = raw
-            .map((v) => Number(v))
-            .filter((v) => Number.isFinite(v))
-            .slice(0, 5);
+            .map(normalizeEntry)
+            .filter(Boolean)
+            .filter((item) => item.time >= cutoff)
+            .slice(0, 200);
         update.visitHistory = sanitized;
     }
     if (user.role === "admin" && role) update.role = String(role);

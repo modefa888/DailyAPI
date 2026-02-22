@@ -14,21 +14,56 @@
     body {
       overflow-y: scroll;
     }
+    body.drawer-open {
+      overflow: hidden;
+    }
+    @media (max-width: 768px) {
+      .module-section table {
+        font-size: 12px;
+      }
+      .module-section th,
+      .module-section td {
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+      }
+      .module-section input[type="text"],
+      .module-section input[type="number"],
+      .module-section select {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+      .module-section .text-sm {
+        font-size: 12px !important;
+      }
+      .module-section .text-xs {
+        font-size: 11px !important;
+      }
+      .module-section button {
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+      }
+    }
   </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen">
   <div class="min-h-screen flex flex-col">
     <nav class="bg-white border-b shadow-sm fixed top-0 left-0 right-0 z-40">
       <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-        <div class="text-lg font-semibold">DailyAPI 管理后台</div>
+        <div class="flex items-center gap-2">
+          <button id="mobileMenuBtn" class="md:hidden px-2 py-1 rounded border text-slate-600">
+            菜单
+          </button>
+          <div class="text-lg font-semibold">DailyAPI 管理后台</div>
+        </div>
         <div class="flex items-center space-x-2">
           <span id="authStatus" class="text-sm text-slate-500">校验中...</span>
           <button id="logoutBtn" class="hidden px-3 py-1.5 rounded bg-slate-800 text-white text-sm">退出</button>
         </div>
       </div>
     </nav>
+    <div id="sideNavOverlay" class="fixed inset-0 bg-black/40 hidden md:hidden z-30"></div>
     <div class="flex flex-1 pt-14">
-      <aside class="w-52 bg-white border-r p-3 space-y-2 fixed top-14 bottom-0 left-0 overflow-y-auto">
+      <aside id="sideNav" class="w-52 bg-white border-r p-3 space-y-2 fixed top-14 bottom-0 left-0 overflow-y-auto transform -translate-x-full md:translate-x-0 transition-transform duration-200 z-40">
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-800 text-white" data-module-target="profile">我的信息</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="users">用户</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="userAccess">用户权限</button>
@@ -37,7 +72,7 @@
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="official">接口</button>
         <button class="module-tab w-full text-left px-3 py-2 rounded text-sm bg-slate-200 text-slate-700" data-module-target="routeAccess">访问控制</button>
       </aside>
-      <main class="flex-1 p-4 ml-52">
+      <main class="flex-1 p-4 ml-0 md:ml-52">
         <div id="appContent" class="max-w-6xl mx-auto space-y-6">
 
     <section id="favoritesSection" class="module-section bg-white rounded-xl shadow p-4 space-y-4" data-module="profile">
@@ -199,10 +234,12 @@
 
       <div id="adminOfficialSection" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-6 gap-2 text-sm">
+          <input id="officialParseInput" class="border rounded px-3 py-2 md:col-span-6" placeholder="输入格式：名称m3u8 json采集接口：https://example.com/api.php/provide/vod/from/xxx/at/json">
           <input id="officialNameInput" class="border rounded px-3 py-2" placeholder="名称">
           <input id="officialUrlInput" class="border rounded px-3 py-2 md:col-span-2" placeholder="接口 URL">
           <input id="officialTypeInput" class="border rounded px-3 py-2" placeholder="类型(默认 vod)">
           <select id="officialCategoryInput" class="border rounded px-3 py-2">
+            <option value="">请选择分类</option>
             <option value="adult">18+</option>
             <option value="normal">普通</option>
           </select>
@@ -643,6 +680,34 @@
       routeAccess: false,
     };
 
+    const sideNav = document.getElementById("sideNav");
+    const sideNavOverlay = document.getElementById("sideNavOverlay");
+    const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+
+    const closeSideNav = () => {
+      if (!sideNav) return;
+      sideNav.classList.add("-translate-x-full");
+      if (sideNavOverlay) sideNavOverlay.classList.add("hidden");
+      document.body.classList.remove("drawer-open");
+    };
+
+    const openSideNav = () => {
+      if (!sideNav) return;
+      sideNav.classList.remove("-translate-x-full");
+      if (sideNavOverlay) sideNavOverlay.classList.remove("hidden");
+      document.body.classList.add("drawer-open");
+    };
+
+    const toggleSideNav = () => {
+      if (!sideNav) return;
+      const hidden = sideNav.classList.contains("-translate-x-full");
+      if (hidden) {
+        openSideNav();
+      } else {
+        closeSideNav();
+      }
+    };
+
     const setActiveModule = async (name) => {
       const sections = document.querySelectorAll(".module-section");
       sections.forEach((sec) => {
@@ -1011,6 +1076,7 @@
               <td class="text-xs text-slate-500">${item.userAgent || "-"}</td>
             `;
             tbody.appendChild(tr);
+            cacheRowInitialValues(tr);
           });
           if (!data.data || data.data.length === 0) {
             const tr = document.createElement("tr");
@@ -1038,6 +1104,59 @@
         btn.disabled = false;
         const text = btn.dataset.label || label || "";
         btn.textContent = text || btn.textContent;
+      }
+    };
+
+    const setBtnIconLoading = (btn, loading) => {
+      if (!btn) return;
+      if (loading) {
+        btn.dataset.label = btn.textContent || "";
+        btn.innerHTML = '<span class="inline-flex items-center"><span class="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin"></span></span>';
+        btn.disabled = true;
+      } else {
+        btn.disabled = false;
+        const text = btn.dataset.label || "";
+        if (text) btn.textContent = text;
+      }
+    };
+
+    const cacheRowInitialValues = (row) => {
+      if (!row) return;
+      const inputs = row.querySelectorAll('[data-field]');
+      inputs.forEach((input) => {
+        const field = input.getAttribute('data-field');
+        if (field === 'sort') return;
+        input.dataset.initialValue = String(input.value || '');
+      });
+      const saveBtn = row.querySelector('button[data-action="save"]');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.classList.remove('text-blue-600');
+        saveBtn.classList.add('text-slate-400', 'cursor-not-allowed');
+      }
+    };
+
+    const updateRowSaveState = (row) => {
+      if (!row) return;
+      const inputs = row.querySelectorAll('[data-field]');
+      let dirty = false;
+      inputs.forEach((input) => {
+        const field = input.getAttribute('data-field');
+        if (field === 'sort') return;
+        const initialValue = input.dataset.initialValue ?? '';
+        if (String(input.value || '') !== String(initialValue)) {
+          dirty = true;
+        }
+      });
+      const saveBtn = row.querySelector('button[data-action="save"]');
+      if (!saveBtn) return;
+      saveBtn.disabled = !dirty;
+      if (dirty) {
+        saveBtn.classList.add('text-blue-600');
+        saveBtn.classList.remove('text-slate-400', 'cursor-not-allowed');
+      } else {
+        saveBtn.classList.remove('text-blue-600');
+        saveBtn.classList.add('text-slate-400', 'cursor-not-allowed');
       }
     };
 
@@ -1098,11 +1217,12 @@
                 </button>
               </td>
               <td class="space-x-2">
-                <button class="text-xs text-blue-600" data-action="save" data-id="${item.id}">保存</button>
+                <button class="text-xs text-slate-400 cursor-not-allowed" data-action="save" data-id="${item.id}" disabled>保存</button>
                 <button class="text-xs text-rose-600" data-action="delete" data-id="${item.id}">删除</button>
               </td>
             `;
             tbody.appendChild(tr);
+            cacheRowInitialValues(tr);
           });
           if (officialApisCache.length === 0) {
             const tr = document.createElement("tr");
@@ -1140,17 +1260,51 @@
       });
     };
 
+    const parseOfficialInput = (raw) => {
+      const text = String(raw || "").trim();
+      if (!text) return null;
+      const clean = text.replace(/[{}]/g, " ").replace(/\s+/g, " ").trim();
+      const match = clean.match(/^(.*?)\s*(https?:\/\/\S+)$/i);
+      if (!match) return null;
+      let name = (match[1] || "").trim();
+      const url = (match[2] || "").trim();
+      name = name.replace(/m3u8|json采集接口|采集接口|接口/gi, "").replace(/[：:]+$/g, "").trim();
+      return { name, url };
+    };
+
+    const applyParsedOfficialInput = () => {
+      const parseInput = document.getElementById("officialParseInput");
+      if (!parseInput) return;
+      const parsed = parseOfficialInput(parseInput.value);
+      if (!parsed) return;
+      const nameInput = document.getElementById("officialNameInput");
+      const urlInput = document.getElementById("officialUrlInput");
+      if (nameInput && parsed.name) nameInput.value = parsed.name;
+      if (urlInput && parsed.url) urlInput.value = parsed.url;
+    };
+
+    const syncOfficialCategoryTab = (category) => {
+      if (category !== "adult" && category !== "normal") return;
+      applyOfficialAdminTab(category);
+    };
+
     const addOfficialApi = async () => {
       const nameInput = document.getElementById("officialNameInput");
       const urlInput = document.getElementById("officialUrlInput");
       const typeInput = document.getElementById("officialTypeInput");
       const categoryInput = document.getElementById("officialCategoryInput");
+      applyParsedOfficialInput();
       const name = (nameInput.value || "").trim();
       const url = (urlInput.value || "").trim();
       const type = (typeInput.value || "vod").trim();
-      const category = (categoryInput?.value || "adult").trim();
+      const category = (categoryInput?.value || "").trim();
+      syncOfficialCategoryTab(category);
       if (!name || !url) {
         toast("名称或URL不能为空");
+        return;
+      }
+      if (!category) {
+        toast("请选择分类");
         return;
       }
       const btn = document.getElementById("addOfficialBtn");
@@ -1163,10 +1317,12 @@
         });
         const data = await res.json();
         if (data.code === 200) {
+          const parseInput = document.getElementById("officialParseInput");
+          if (parseInput) parseInput.value = "";
           nameInput.value = "";
           urlInput.value = "";
           typeInput.value = "";
-          if (categoryInput) categoryInput.value = "adult";
+          if (categoryInput) categoryInput.value = "";
           toast("新增成功");
           await loadOfficialApis();
         } else {
@@ -1246,7 +1402,7 @@
         setBtnLoading(btn, false, "保存排序");
         return;
       }
-      setBtnLoading(btn, true, "保存中...");
+      setBtnIconLoading(btn, true);
       syncOfficialSortNumbers();
       const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
       const items = rows.map((row, index) => ({
@@ -1265,7 +1421,7 @@
         toast("排序已保存");
       }
       await loadOfficialApis();
-      setBtnLoading(btn, false, "保存排序");
+      setBtnIconLoading(btn, false);
     };
 
     const batchToggleOfficial = async (enabled) => {
@@ -1340,7 +1496,7 @@
                 </button>
               </td>
               <td class="space-x-2">
-                <button class="text-xs text-blue-600" data-action="save" data-id="${item.id}">保存</button>
+                <button class="text-xs text-slate-400 cursor-not-allowed" data-action="save" data-id="${item.id}" disabled>保存</button>
                 <button class="text-xs text-rose-600" data-action="delete" data-id="${item.id}">删除</button>
               </td>
             `;
@@ -1458,7 +1614,7 @@
         setBtnLoading(btn, false, "保存排序");
         return;
       }
-      setBtnLoading(btn, true, "保存中...");
+      setBtnIconLoading(btn, true);
       syncParseSortNumbers();
       const rows = Array.from(tbody.querySelectorAll("tr[data-id]"));
       const items = rows.map((row, index) => ({
@@ -1481,7 +1637,7 @@
       } else if (tbody) {
         tbody.dataset.sortSignature = currentSignature;
       }
-      setBtnLoading(btn, false, "保存排序");
+      setBtnIconLoading(btn, false);
     };
 
     const batchToggleParse = async (enabled) => {
@@ -1988,8 +2144,10 @@
           const watchM = String(Math.floor((watchSeconds % 3600) / 60)).padStart(2, "0");
           const watchS = String(Math.floor(watchSeconds % 60)).padStart(2, "0");
           const tr = document.createElement("tr");
+          const fullId = String(u._id || "");
+          const shortId = fullId.slice(-4);
           tr.innerHTML = `
-            <td class="py-2">${u._id}</td>
+            <td class="py-2"><span class="md:hidden">${shortId}</span><span class="hidden md:inline">${fullId}</span></td>
             <td>${u.username}</td>
             <td>${u.nickname || ""}</td>
             <td>${u.role}</td>
@@ -2279,6 +2437,20 @@
     document.getElementById("addOfficialBtn").addEventListener("click", async () => {
       await addOfficialApi();
     });
+    const officialCategoryInput = document.getElementById("officialCategoryInput");
+    if (officialCategoryInput) {
+      officialCategoryInput.addEventListener("change", (e) => {
+        const value = e.target.value;
+        if (value === "adult" || value === "normal") {
+          applyOfficialAdminTab(value);
+        }
+      });
+    }
+    const officialParseInput = document.getElementById("officialParseInput");
+    if (officialParseInput) {
+      officialParseInput.addEventListener("blur", applyParsedOfficialInput);
+      officialParseInput.addEventListener("change", applyParsedOfficialInput);
+    }
     document.getElementById("loadParseApisBtn").addEventListener("click", async () => {
       await loadParseApis();
     });
@@ -2463,8 +2635,21 @@
         const target = tab.dataset.moduleTarget;
         if (!target) return;
         await setActiveModule(target);
+        if (window.innerWidth < 768) {
+          closeSideNav();
+        }
       });
     });
+    if (mobileMenuBtn) {
+      mobileMenuBtn.addEventListener("click", () => {
+        toggleSideNav();
+      });
+    }
+    if (sideNavOverlay) {
+      sideNavOverlay.addEventListener("click", () => {
+        closeSideNav();
+      });
+    }
     document.getElementById("loadFavoritesBtn").addEventListener("click", async () => {
       await loadFavorites();
       openModal("favoritesModal");
@@ -2667,6 +2852,16 @@
         if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
         dragSourceRow = null;
       });
+      officialTbody.addEventListener("input", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        updateRowSaveState(row);
+      });
+      officialTbody.addEventListener("change", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        updateRowSaveState(row);
+      });
       officialTbody.addEventListener("click", async (e) => {
         const target = e.target;
         if (!(target instanceof HTMLElement)) return;
@@ -2696,7 +2891,7 @@
           return;
         }
         if (action === "save") {
-          setBtnLoading(target, true, "保存中...");
+          setBtnIconLoading(target, true);
           const rowInputs = officialTbody.querySelectorAll(`[data-id="${id}"][data-field]`);
           const payload = {};
           rowInputs.forEach((input) => {
@@ -2713,7 +2908,7 @@
             toast("已保存");
             await loadOfficialApis();
           }
-          setBtnLoading(target, false, "保存");
+          setBtnIconLoading(target, false);
         }
       });
     }
@@ -2769,6 +2964,16 @@
         if (dragSourceRow) dragSourceRow.classList.remove("opacity-50");
         dragSourceRow = null;
       });
+      parseTbody.addEventListener("input", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        updateRowSaveState(row);
+      });
+      parseTbody.addEventListener("change", (e) => {
+        const row = e.target && e.target.closest("tr[data-id]");
+        if (!row) return;
+        updateRowSaveState(row);
+      });
       parseTbody.addEventListener("click", async (e) => {
         const target = e.target;
         if (!(target instanceof HTMLElement)) return;
@@ -2803,7 +3008,7 @@
         }
         if (action === "save") {
           lockBtnWidth(target);
-          setBtnLoading(target, true, "");
+          setBtnIconLoading(target, true);
           const rowInputs = parseTbody.querySelectorAll(`[data-id="${id}"][data-field]`);
           const payload = {};
           rowInputs.forEach((input) => {
@@ -2820,7 +3025,7 @@
             toast("已保存");
             await loadParseApis();
           }
-          setBtnLoading(target, false, "保存");
+          setBtnIconLoading(target, false);
           unlockBtnWidth(target);
         }
       });
